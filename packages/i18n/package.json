@@ -1,0 +1,22 @@
+{
+  "name": "@workspace/i18n",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@workspace/typescript-config": "*",
+    "typescript": "^5"
+  },
+  "exports": {
+    "./*": "./src/*.ts",
+    "./react": "./src/react.tsx",
+    "./dictionaries": "./src/dictionaries/index.ts"
+  }
+}

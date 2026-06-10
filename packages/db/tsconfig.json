@@ -1,0 +1,5 @@
+﻿{
+  "extends": "@workspace/typescript-config/internal-library.json",
+  "include": ["src", "seed", "drizzle.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}
