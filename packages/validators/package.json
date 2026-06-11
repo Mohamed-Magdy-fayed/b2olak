@@ -4,14 +4,16 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@workspace/typescript-config": "*",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.0.0"
   },
   "exports": {
     "./*": "./src/*.ts"
