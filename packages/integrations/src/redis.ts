@@ -27,6 +27,13 @@ export async function cached<T>(
   ttlSeconds: number,
   load: () => Promise<T>,
 ): Promise<T> {
+  // Dev fallback: no Upstash configured → skip caching, hit the loader.
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL &&
+    process.env.NODE_ENV !== "production"
+  ) {
+    return load();
+  }
   const redis = getRedis();
   const hit = await redis.get<T>(key);
   if (hit !== null && hit !== undefined) return hit;

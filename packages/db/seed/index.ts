@@ -4,7 +4,10 @@ config({ path: "../../apps/web/.env" });
 
 async function main() {
   const { seedAdmin } = await import("./admin");
+  const { seedCatalog, seedSettings } = await import("./catalog");
   await seedAdmin();
+  await seedCatalog();
+  await seedSettings();
   console.log("✅ Seed complete.");
   process.exit(0);
 }

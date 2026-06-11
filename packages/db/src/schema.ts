@@ -9,3 +9,7 @@ export * from "./schemas/auth/users";
 export * from "./schemas/auth/user-credentials";
 export * from "./schemas/auth/user-tokens";
 export * from "./schemas/drivers/driver-profiles";
+export * from "./schemas/catalog/categories";
+export * from "./schemas/catalog/items";
+export * from "./schemas/catalog/item-aliases";
+export * from "./schemas/system/system-settings";
