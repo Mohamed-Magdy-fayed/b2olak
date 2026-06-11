@@ -10,6 +10,7 @@ const links = [
   { href: "/admin", key: "admin.nav.dashboard" },
   { href: "/admin/categories", key: "admin.nav.categories" },
   { href: "/admin/items", key: "admin.nav.items" },
+  { href: "/admin/items/review", key: "admin.nav.review" },
   { href: "/admin/settings", key: "admin.nav.settings" },
 ] as const;
 
@@ -20,10 +21,10 @@ export function AdminNav() {
   return (
     <nav className="flex flex-col gap-1">
       {links.map((link) => {
-        const active =
-          link.href === "/admin"
-            ? pathname === "/admin"
-            : pathname.startsWith(link.href);
+        const bestMatch = links
+          .filter((l) => pathname === l.href || pathname.startsWith(`${l.href}/`))
+          .sort((a, b) => b.href.length - a.href.length)[0];
+        const active = bestMatch?.href === link.href;
         return (
           <Link
             key={link.href}

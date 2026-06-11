@@ -7,10 +7,12 @@ import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 
 import { adminProcedure, createTRPCRouter } from "../../init";
 import { adminCatalogRouter } from "./catalog";
+import { adminReviewRouter } from "./review";
 import { adminSettingsRouter } from "./settings";
 
 export const adminRouter = createTRPCRouter({
   catalog: adminCatalogRouter,
+  review: adminReviewRouter,
   settings: adminSettingsRouter,
 
   dashboard: adminProcedure.query(async ({ ctx }) => {
