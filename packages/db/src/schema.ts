@@ -1,9 +1,11 @@
 /**
  * Barrel export of all Drizzle schemas.
  * Domains land with their phases (docs/08-file-structure.md):
- * - auth/, drivers/  → Phase 3
  * - catalog/, system/ → Phase 4
  * - orders/          → Phase 6
  */
 
-export {};
+export * from "./schemas/auth/users";
+export * from "./schemas/auth/user-credentials";
+export * from "./schemas/auth/user-tokens";
+export * from "./schemas/drivers/driver-profiles";
