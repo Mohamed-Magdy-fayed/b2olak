@@ -8,6 +8,8 @@ import { cn } from "@workspace/ui/lib/utils";
 
 const links = [
   { href: "/admin", key: "admin.nav.dashboard" },
+  { href: "/admin/orders", key: "admin.nav.orders" },
+  { href: "/admin/drivers", key: "admin.nav.drivers" },
   { href: "/admin/categories", key: "admin.nav.categories" },
   { href: "/admin/items", key: "admin.nav.items" },
   { href: "/admin/items/review", key: "admin.nav.review" },

@@ -30,11 +30,13 @@ export function I18nApp({ children }: { children: React.ReactNode }) {
         I18nManager.forceRTL(wantsRTL);
         // First launch with the default (ar) on an LTR-initialized app:
         // reload silently so the shell starts in the right direction.
-        try {
-          await Updates.reloadAsync();
-          return;
-        } catch {
-          // dev client without updates — continue, layout flips on next start
+        if (Updates.isEmbeddedLaunch) {
+          try {
+            await Updates.reloadAsync();
+            return;
+          } catch {
+            // dev client without updates — continue, layout flips on next start
+          }
         }
       }
       setLocale(stored);

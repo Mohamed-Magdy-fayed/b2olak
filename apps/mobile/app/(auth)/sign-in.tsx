@@ -21,6 +21,8 @@ export default function SignInScreen() {
         router.push({ pathname: "/(auth)/verify", params: { phone } });
       },
       onError: (err) => {
+        console.log(err);
+        
         setError(
           err.message === "errors.tooManyRequests"
             ? t("errors.tooManyRequests")

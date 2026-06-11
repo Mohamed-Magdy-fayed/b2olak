@@ -7,11 +7,15 @@ import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 
 import { adminProcedure, createTRPCRouter } from "../../init";
 import { adminCatalogRouter } from "./catalog";
+import { adminDriversRouter } from "./drivers";
+import { adminOrdersRouter } from "./orders";
 import { adminReviewRouter } from "./review";
 import { adminSettingsRouter } from "./settings";
 
 export const adminRouter = createTRPCRouter({
   catalog: adminCatalogRouter,
+  drivers: adminDriversRouter,
+  orders: adminOrdersRouter,
   review: adminReviewRouter,
   settings: adminSettingsRouter,
 
