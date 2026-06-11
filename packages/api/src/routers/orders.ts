@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Db } from "@workspace/db/client";
 import { AddressesTable } from "@workspace/db/schemas/orders/addresses";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
+import { inngest } from "@workspace/integrations/inngest/client";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrderStatusEventsTable } from "@workspace/db/schemas/orders/order-status-events";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
@@ -117,6 +118,15 @@ export const ordersRouter = createTRPCRouter({
         return order;
       });
 
+      try {
+        await inngest.send({
+          name: "order/status.changed",
+          data: { orderId: result.id, fromStatus: null, toStatus: "placed" },
+        });
+      } catch {
+        // notifications are best-effort
+      }
+
       return { orderId: result.id, orderNumber: result.orderNumber };
     }),
 
@@ -179,26 +189,17 @@ export const ordersRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "orders.cannotCancel" });
       }
 
-      await ctx.db.transaction(async (tx) => {
-        await tx
-          .update(OrdersTable)
-          .set({
-            status: "cancelled",
-            cancelledBy: "customer",
-            cancelReason: input.reason,
-            updatedBy: ctx.session.user.id,
-          })
-          .where(eq(OrdersTable.id, order.id));
-        await tx.insert(OrderStatusEventsTable).values({
-          orderId: order.id,
-          fromStatus: order.status,
-          toStatus: "cancelled",
-          actorUserId: ctx.session.user.id,
-          actorRole: "customer",
+      const { applyTransition } = await import("../lib/order-transitions");
+      await applyTransition(
+        ctx.db,
+        order,
+        "cancelled",
+        { id: ctx.session.user.id, role: "customer" },
+        {
           note: input.reason,
-          createdBy: ctx.session.user.id,
-        });
-      });
+          extra: { cancelledBy: "customer", cancelReason: input.reason },
+        },
+      );
 
       return { ok: true as const };
     }),

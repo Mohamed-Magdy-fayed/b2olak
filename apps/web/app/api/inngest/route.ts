@@ -6,4 +6,6 @@ import { inngestFunctions } from "@workspace/integrations/inngest/functions/inde
 export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: inngestFunctions,
+  // empty-string env vars must not be treated as keys
+  signingKey: process.env.INNGEST_SIGNING_KEY || undefined,
 });

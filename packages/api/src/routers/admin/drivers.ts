@@ -73,6 +73,10 @@ export const adminDriversRouter = createTRPCRouter({
           .update(UsersTable)
           .set({ role: "driver", name: input.name, updatedBy: ctx.session.user.id })
           .where(eq(UsersTable.id, existing.id));
+        const { deleteAllSessionsForUser } = await import(
+          "@workspace/auth/session"
+        );
+        await deleteAllSessionsForUser(existing.id);
         userId = existing.id;
       } else {
         const [created] = await ctx.db

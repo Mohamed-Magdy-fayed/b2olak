@@ -74,10 +74,24 @@ export async function createSession(user: SessionUser): Promise<Session> {
     exp: sessionExpirationEpoch(),
     user,
   });
-  await getRedis().set(`session:${sessionId}`, session, {
+  const redis = getRedis();
+  await redis.set(`session:${sessionId}`, session, {
     ex: SESSION_EXPIRATION_SECONDS,
   });
+  // user → sessions index, so role changes/suspensions can revoke everything
+  await redis.sadd(`user-sessions:${user.id}`, sessionId);
+  await redis.expire(`user-sessions:${user.id}`, SESSION_EXPIRATION_SECONDS);
   return session;
+}
+
+/** Revoke every session of a user — on role change or suspension. */
+export async function deleteAllSessionsForUser(userId: string) {
+  const redis = getRedis();
+  const sessionIds = await redis.smembers(`user-sessions:${userId}`);
+  if (sessionIds.length > 0) {
+    await redis.del(...sessionIds.map((id) => `session:${id}`));
+  }
+  await redis.del(`user-sessions:${userId}`);
 }
 
 /** Sliding renewal + refresh of the embedded user snapshot. */
