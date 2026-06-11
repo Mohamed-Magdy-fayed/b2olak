@@ -51,6 +51,28 @@ const en = {
     unsupportedImageType: "Unsupported image type.",
     imageTooLarge: "Image is larger than 4 MB.",
   },
+  mobile: {
+    welcomeTitle: "ba2olak",
+    welcomeSubtitle: "You want it. We buy it. We deliver it.",
+    phoneLabel: "Your mobile number",
+    phonePlaceholder: "01001234567",
+    sendCode: "Send code on WhatsApp",
+    sending: "Sending…",
+    codeSentTo: "We sent a code on WhatsApp to {phone}",
+    codeLabel: "6-digit code",
+    verify: "Verify",
+    verifying: "Verifying…",
+    resend: "Resend code",
+    resendIn: "Resend in {seconds}s",
+    customerHome: "Welcome to ba2olak 👋",
+    customerHomeHint: "Browsing and ordering arrive in the next phase.",
+    driverHome: "Driver dashboard",
+    driverHomeHint: "Your assigned orders will appear here.",
+    driverPendingTitle: "Account under review",
+    driverPendingBody:
+      "Your driver account is awaiting approval. We'll let you know on WhatsApp.",
+    signedInAs: "Signed in: {phone}",
+  },
   admin: {
     title: "Dashboard",
     nav: {
