@@ -188,6 +188,42 @@ const en = {
     tabHistory: "History",
     tabAccount: "Account",
   },
+  landing: {
+    nav: {
+      download: "Get the app",
+      signIn: "Sign in",
+    },
+    hero: {
+      title: "You want it.\nWe buy it.\nWe deliver it.",
+      subtitle:
+        "Groceries, market runs, anything from the souq — a ba2olak rider shops for you and shows up at your door. Cash on delivery, zero stress.",
+      ctaAndroid: "Download for Android",
+      ctaIos: "Download for iPhone",
+      badge: "Now in Egypt 🇪🇬",
+    },
+    how: {
+      title: "How it works",
+      step1Title: "اطلب — Order",
+      step1Body: "Pick from the catalog or type anything — even stuff we don't have yet.",
+      step2Title: "نشتري — We shop",
+      step2Body: "Your rider hits the market, grabs your items, and prices them live in the app.",
+      step3Title: "نوصّل — We deliver",
+      step3Body: "Track every step. Pay cash at your door. Done.",
+    },
+    categories: {
+      title: "Whatever you need",
+      subtitle: "From fresh vegetables to cleaning supplies — and if it's missing, add it yourself.",
+    },
+    cta: {
+      title: "Your market run, off your plate.",
+      body: "Join ba2olak today — first orders are moving.",
+    },
+    footer: {
+      privacy: "Privacy policy",
+      terms: "Terms of service",
+      rights: "© {year} ba2olak. All rights reserved.",
+    },
+  },
   admin: {
     title: "Dashboard",
     nav: {
