@@ -1,58 +1,44 @@
-import { Text, View } from "react-native";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { LanguageToggle } from "@/components/language-toggle";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useTranslation } from "@/lib/i18n";
-import { clearToken } from "@/lib/session";
 import { useTRPC } from "@/lib/trpc";
 
 export default function CustomerHome() {
   const trpc = useTRPC();
-  const { t } = useTranslation();
-  const { data } = useQuery(trpc.auth.me.queryOptions());
-
-  const signOut = useMutation(
-    trpc.auth.signOut.mutationOptions({
-      onSettled: async () => {
-        await clearToken();
-        router.replace("/(auth)/sign-in");
-      },
-    }),
-  );
+  const { t, locale } = useTranslation();
+  const { data: categories } = useQuery(trpc.catalog.categories.queryOptions());
 
   return (
-    <View className="flex-1 bg-background p-6 pt-16">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-2xl font-black text-primary">
+    <View className="flex-1 bg-background px-4 pt-16">
+      <View className="mb-4 flex-row items-center justify-between">
+        <Text className="text-3xl font-black text-primary">
           {t("mobile.welcomeTitle")}
         </Text>
         <LanguageToggle />
       </View>
-
-      <View className="flex-1 justify-center gap-4">
-        <Card className="items-center gap-2 p-6">
-          <Text className="text-2xl font-bold text-foreground">
-            {t("mobile.customerHome")}
-          </Text>
-          <Text className="text-center text-muted-foreground">
-            {t("mobile.customerHomeHint")}
-          </Text>
-          {data?.user.phone ? (
-            <Text className="text-sm text-muted-foreground">
-              {t("mobile.signedInAs", { phone: data.user.phone })}
+      <Text className="mb-3 text-lg font-bold text-foreground">
+        {t("shop.categories")}
+      </Text>
+      <FlatList
+        data={categories ?? []}
+        numColumns={2}
+        keyExtractor={(c) => c.id}
+        columnWrapperClassName="gap-3"
+        contentContainerClassName="gap-3 pb-6"
+        renderItem={({ item: category }) => (
+          <Pressable
+            className="flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card p-6 active:bg-muted"
+            onPress={() => router.push(`/(customer)/category/${category.id}`)}
+          >
+            <Text className="text-center text-base font-bold text-foreground">
+              {locale === "ar" ? category.nameAr : category.nameEn}
             </Text>
-          ) : null}
-        </Card>
-        <Button
-          variant="outline"
-          label={t("auth.signOut")}
-          loading={signOut.isPending}
-          onPress={() => signOut.mutate()}
-        />
-      </View>
+          </Pressable>
+        )}
+      />
     </View>
   );
 }

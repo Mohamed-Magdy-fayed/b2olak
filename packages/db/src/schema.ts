@@ -13,3 +13,8 @@ export * from "./schemas/catalog/categories";
 export * from "./schemas/catalog/items";
 export * from "./schemas/catalog/item-aliases";
 export * from "./schemas/system/system-settings";
+export * from "./schemas/orders/enums";
+export * from "./schemas/orders/addresses";
+export * from "./schemas/orders/orders";
+export * from "./schemas/orders/order-items";
+export * from "./schemas/orders/order-status-events";

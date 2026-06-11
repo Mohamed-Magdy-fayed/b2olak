@@ -17,6 +17,12 @@ const visibleItem = and(
 );
 
 export const catalogRouter = createTRPCRouter({
+  /** Public so the checkout screen can show the fee before placing. */
+  deliveryFee: baseProcedure.query(async ({ ctx }) => {
+    const { getDeliveryFeeEgp } = await import("../lib/settings");
+    return { amount: await getDeliveryFeeEgp(ctx.db) };
+  }),
+
   categories: baseProcedure.query(({ ctx }) =>
     cached("catalog:categories", 60, () =>
       ctx.db.query.CategoriesTable.findMany({
