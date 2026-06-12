@@ -15,6 +15,7 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import { Select } from "@workspace/ui/components/select";
 import {
   Table,
   TableBody,
@@ -212,8 +213,7 @@ export default function AdminDriversPage() {
             </div>
             <div className="flex flex-col gap-2">
               <Label>{t("admin.drivers.vehicle")}</Label>
-              <select
-                className="border-input dark:bg-input/30 h-9 rounded-md border bg-transparent px-2 text-sm"
+              <Select
                 value={vehicle}
                 onChange={(e) => setVehicle(e.target.value as Vehicle)}
               >
@@ -222,7 +222,7 @@ export default function AdminDriversPage() {
                     {t(`admin.drivers.${vehicleKey[v]}`)}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div className="flex flex-col gap-2">
               <Label>{t("admin.drivers.plate")}</Label>

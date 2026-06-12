@@ -1,10 +1,12 @@
 "use client";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { buttonVariants } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
 
 import { trackEvent } from "@/lib/analytics";
 
-/** Store links land in P11 once EAS builds are submitted. */
+/** Store links land once EAS builds are submitted. */
 const ANDROID_URL = "#download";
 const IOS_URL = "#download";
 
@@ -15,29 +17,31 @@ export function DownloadButtons({
 }) {
   const { t } = useTranslation();
 
-  const base =
-    "rounded-xl px-6 py-3 text-base font-bold transition-transform active:scale-95";
-  const primary =
-    variant === "inverted"
-      ? "bg-background text-foreground"
-      : "bg-primary text-primary-foreground";
-  const secondary =
-    variant === "inverted"
-      ? "border border-primary-foreground/40 text-primary-foreground"
-      : "border border-border text-foreground";
+  const primaryClass = cn(
+    buttonVariants({ size: "xl" }),
+    "active:scale-95",
+    variant === "inverted" &&
+      "bg-background text-foreground hover:bg-background/90",
+  );
+  const secondaryClass = cn(
+    buttonVariants({ variant: "outline", size: "xl" }),
+    "active:scale-95",
+    variant === "inverted" &&
+      "border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground dark:bg-transparent",
+  );
 
   return (
     <div className="flex flex-wrap justify-center gap-3">
       <a
         href={ANDROID_URL}
-        className={`${base} ${primary}`}
+        className={primaryClass}
         onClick={() => trackEvent("download_click", { platform: "android" })}
       >
         🤖 {t("landing.hero.ctaAndroid")}
       </a>
       <a
         href={IOS_URL}
-        className={`${base} ${secondary}`}
+        className={secondaryClass}
         onClick={() => trackEvent("download_click", { platform: "ios" })}
       >
          {t("landing.hero.ctaIos")}

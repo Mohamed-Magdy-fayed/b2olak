@@ -61,9 +61,9 @@ export default function AdminReviewPage() {
             {item.suggestions.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {item.suggestions.map((suggestion) => (
-                  <div
+                  <Card
                     key={suggestion.id}
-                    className="flex items-center justify-between gap-3 rounded-md border p-3"
+                    className="flex-row items-center justify-between gap-3 rounded-md p-3"
                   >
                     <div className="flex flex-col">
                       <span className="font-medium">
@@ -100,7 +100,7 @@ export default function AdminReviewPage() {
                     >
                       {t("admin.review.mergeInto")}
                     </Button>
-                  </div>
+                  </Card>
                 ))}
               </div>
             ) : null}

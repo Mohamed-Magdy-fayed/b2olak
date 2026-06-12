@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@workspace/i18n/react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { Card } from "@workspace/ui/components/card";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
+import { Select } from "@workspace/ui/components/select";
 import {
   Table,
   TableBody,
@@ -91,18 +93,14 @@ export default function AdminOrdersPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t("admin.orders.title")}</h1>
-        <select
-          className="border-input dark:bg-input/30 h-9 rounded-md border bg-transparent px-2 text-sm"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
+        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="">{t("admin.common.allStatuses")}</option>
           {STATUSES.map((s) => (
             <option key={s} value={s}>
               {t(`shop.status.${s}`)}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <Table>
@@ -192,9 +190,9 @@ export default function AdminOrdersPage() {
               </p>
             ) : null}
             {(drivers ?? []).map((driver) => (
-              <div
+              <Card
                 key={driver.id}
-                className="flex items-center justify-between rounded-md border p-3"
+                className="flex-row items-center justify-between gap-3 rounded-md p-3"
               >
                 <div className="flex flex-col">
                   <span className="font-medium">{driver.user.name}</span>
@@ -217,7 +215,7 @@ export default function AdminOrdersPage() {
                 >
                   {t("admin.orders.assign")}
                 </Button>
-              </div>
+              </Card>
             ))}
           </div>
         </DialogContent>

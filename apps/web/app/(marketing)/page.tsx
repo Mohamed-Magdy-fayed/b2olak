@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { Badge } from "@workspace/ui/components/badge";
+import { Card } from "@workspace/ui/components/card";
+
 import { DownloadButtons } from "@/features/marketing/download-buttons";
 import { getT } from "@/lib/i18n";
 
@@ -29,9 +32,9 @@ export default async function LandingPage() {
         <div className="bg-primary/10 absolute -top-32 -end-32 size-96 rounded-full blur-3xl" />
         <div className="bg-accent/20 absolute -bottom-32 -start-32 size-96 rounded-full blur-3xl" />
         <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-6 px-4 py-20 text-center md:py-28">
-          <span className="bg-accent text-accent-foreground rounded-full px-4 py-1.5 text-sm font-bold">
+          <Badge className="bg-accent text-accent-foreground rounded-full border-transparent px-4 py-1.5 text-sm font-bold">
             {t("landing.hero.badge")}
-          </span>
+          </Badge>
           <h1 className="text-5xl font-black tracking-tight whitespace-pre-line md:text-7xl">
             {t("landing.hero.title")}
           </h1>
@@ -56,17 +59,17 @@ export default async function LandingPage() {
                 ["🛵", "landing.how.step3Title", "landing.how.step3Body"],
               ] as const
             ).map(([emoji, titleKey, bodyKey], index) => (
-              <div
+              <Card
                 key={titleKey}
-                className="bg-card flex flex-col items-center gap-3 rounded-2xl border p-8 text-center"
+                className="items-center gap-3 rounded-2xl p-8 text-center"
               >
                 <span className="text-5xl">{emoji}</span>
-                <span className="bg-primary/10 text-primary rounded-full px-3 py-0.5 text-xs font-bold">
+                <Badge className="bg-primary/10 text-primary rounded-full border-transparent px-3 py-0.5 font-bold">
                   {index + 1}
-                </span>
+                </Badge>
                 <h3 className="text-xl font-bold">{t(titleKey)}</h3>
                 <p className="text-muted-foreground">{t(bodyKey)}</p>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
