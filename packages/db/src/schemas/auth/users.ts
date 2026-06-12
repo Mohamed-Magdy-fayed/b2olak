@@ -30,6 +30,7 @@ export const UsersTable = pgTable(
     role: userRoleEnum().notNull().default("customer"),
     status: userStatusEnum().notNull().default("active"),
     preferredLocale: localeEnum().notNull().default("ar"),
+    pushToken: varchar({ length: 512 }),
     phoneVerifiedAt: timestamp({ withTimezone: true }),
     emailVerifiedAt: timestamp({ withTimezone: true }),
     lastSignInAt: timestamp({ withTimezone: true }),

@@ -19,6 +19,8 @@ import {
   verifyOtpSchema,
 } from "@workspace/validators/auth";
 
+import { z } from "zod";
+
 import {
   baseProcedure,
   createTRPCRouter,
@@ -175,6 +177,16 @@ export const authRouter = createTRPCRouter({
       await updateSessionUser(ctx.session.sessionId, toSessionUser(updated));
 
       return { user: toSessionUser(updated) };
+    }),
+
+  registerPushToken: protectedProcedure
+    .input(z.object({ token: z.string().max(512) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(UsersTable)
+        .set({ pushToken: input.token, updatedBy: ctx.session.user.id })
+        .where(eq(UsersTable.id, ctx.session.user.id));
+      return { ok: true as const };
     }),
 
   signOut: protectedProcedure.mutation(async ({ ctx }) => {

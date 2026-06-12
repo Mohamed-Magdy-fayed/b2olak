@@ -6,6 +6,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useTranslation } from "@/lib/i18n";
+import { getExpoPushToken } from "@/lib/notifications";
 import { setToken } from "@/lib/session";
 import { useTRPC } from "@/lib/trpc";
 
@@ -25,10 +26,15 @@ export default function VerifyScreen() {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
+  const registerPush = useMutation(trpc.auth.registerPushToken.mutationOptions());
+
   const verify = useMutation(
     trpc.auth.verifyOtp.mutationOptions({
       onSuccess: async (data) => {
         await setToken(data.sessionId);
+        void getExpoPushToken().then((token) => {
+          if (token) registerPush.mutate({ token });
+        });
         router.replace(data.user.role === "driver" ? "/(driver)" : "/(customer)");
       },
       onError: (err) => {
