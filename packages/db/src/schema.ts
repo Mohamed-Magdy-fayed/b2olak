@@ -14,6 +14,7 @@ export * from "./schemas/catalog/items";
 export * from "./schemas/catalog/item-aliases";
 export * from "./schemas/catalog/item-merge-suggestions";
 export * from "./schemas/system/system-settings";
+export * from "./schemas/system/provider-config";
 export * from "./schemas/orders/enums";
 export * from "./schemas/orders/addresses";
 export * from "./schemas/orders/orders";

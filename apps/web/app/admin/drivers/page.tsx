@@ -15,7 +15,14 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { Select } from "@workspace/ui/components/select";
+import { PhoneInput } from "@workspace/ui/components/phone-input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import {
   Table,
   TableBody,
@@ -80,7 +87,6 @@ export default function AdminDriversPage() {
       onSuccess: () => void invalidate(),
     }),
   );
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -201,27 +207,28 @@ export default function AdminDriversPage() {
             </div>
             <div className="flex flex-col gap-2">
               <Label>{t("admin.drivers.phone")}</Label>
-              <Input
-                dir="ltr"
-                placeholder="01001234567"
+              <PhoneInput
+                id="driver-phone"
                 value={phone}
-                onChange={(e) => {
-                  setError(null);
-                  setPhone(e.target.value);
-                }}
+                onChange={(v) => { setError(null); setPhone(v); }}
               />
             </div>
             <div className="flex flex-col gap-2">
               <Label>{t("admin.drivers.vehicle")}</Label>
               <Select
                 value={vehicle}
-                onChange={(e) => setVehicle(e.target.value as Vehicle)}
+                onValueChange={(v) => { if (v) setVehicle(v as Vehicle); }}
               >
-                {VEHICLES.map((v) => (
-                  <option key={v} value={v}>
-                    {t(`admin.drivers.${vehicleKey[v]}`)}
-                  </option>
-                ))}
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {VEHICLES.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {t(`admin.drivers.${vehicleKey[v]}`)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="flex flex-col gap-2">

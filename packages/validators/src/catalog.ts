@@ -57,3 +57,22 @@ export const settingsUpdateSchema = z.object({
   deliveryFeeEgp: z.number().min(0).max(10_000),
   supportWhatsappNumber: z.string().trim().max(20),
 });
+
+export const whatsappProviderSchema = z.enum(["wapilot", "twilio", "console"]);
+
+export const whatsappSettingsUpdateSchema = z.object({
+  provider: whatsappProviderSchema,
+  wapilot: z
+    .object({
+      instanceId: z.string().trim().min(1).max(200),
+      token: z.string().trim().min(1).max(500),
+    })
+    .optional(),
+  twilio: z
+    .object({
+      accountSid: z.string().trim().regex(/^AC[a-z0-9]{32}$/),
+      authToken: z.string().trim().min(32).max(64),
+      fromNumber: z.string().trim().regex(/^\+[1-9]\d{1,14}$/),
+    })
+    .optional(),
+});

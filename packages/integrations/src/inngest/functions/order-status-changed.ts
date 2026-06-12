@@ -4,7 +4,8 @@ import { db } from "@workspace/db/client";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { SystemSettingsTable } from "@workspace/db/schemas/system/system-settings";
 
-import { sendWhatsAppText } from "../../whatsapp/send";
+import { getWhatsAppConfig } from "../../whatsapp/config";
+import { sendWhatsAppMessage } from "../../whatsapp/send";
 import {
   customerMessages,
   driverMessages,
@@ -17,6 +18,9 @@ export const onOrderStatusChanged = inngest.createFunction(
   { id: "order-status-changed", retries: 2 },
   { event: "order/status.changed" },
   async ({ event, step }) => {
+    // Load config once — re-fetched on Inngest replay but that's fine (simple DB read).
+    const whatsappConfig = await getWhatsAppConfig(db);
+
     const order = await step.run("load-order", () =>
       db.query.OrdersTable.findFirst({
         where: eq(OrdersTable.id, event.data.orderId),
@@ -45,11 +49,14 @@ export const onOrderStatusChanged = inngest.createFunction(
           where: eq(SystemSettingsTable.key, "support_whatsapp_number"),
         });
         const opsNumber = (setting?.value as { value?: string } | null)?.value;
-        if (opsNumber) await sendWhatsAppText(opsNumber, opsMessages.placed(info));
+        if (opsNumber) {
+          await sendWhatsAppMessage(whatsappConfig, opsNumber, opsMessages.placed(info));
+        }
       });
       if (order.customer.phone) {
         await step.run("notify-customer", () =>
-          sendWhatsAppText(
+          sendWhatsAppMessage(
+            whatsappConfig,
             order.customer.phone!,
             customerMessages.placed(info, order.customer.preferredLocale),
           ),
@@ -61,7 +68,8 @@ export const onOrderStatusChanged = inngest.createFunction(
     if (to === "assigned") {
       if (order.driver?.phone) {
         await step.run("notify-driver", () =>
-          sendWhatsAppText(
+          sendWhatsAppMessage(
+            whatsappConfig,
             order.driver!.phone!,
             driverMessages.assigned(info, order.driver!.preferredLocale),
           ),
@@ -69,7 +77,8 @@ export const onOrderStatusChanged = inngest.createFunction(
       }
       if (order.customer.phone) {
         await step.run("notify-customer", () =>
-          sendWhatsAppText(
+          sendWhatsAppMessage(
+            whatsappConfig,
             order.customer.phone!,
             customerMessages.assigned(info, order.customer.preferredLocale),
           ),
@@ -81,7 +90,8 @@ export const onOrderStatusChanged = inngest.createFunction(
     if (to === "delivering" || to === "delivered") {
       if (order.customer.phone) {
         await step.run("notify-customer", () =>
-          sendWhatsAppText(
+          sendWhatsAppMessage(
+            whatsappConfig,
             order.customer.phone!,
             customerMessages[to](info, order.customer.preferredLocale),
           ),
@@ -93,7 +103,8 @@ export const onOrderStatusChanged = inngest.createFunction(
     if (to === "cancelled") {
       if (order.customer.phone) {
         await step.run("notify-customer", () =>
-          sendWhatsAppText(
+          sendWhatsAppMessage(
+            whatsappConfig,
             order.customer.phone!,
             customerMessages.cancelled(info, order.customer.preferredLocale),
           ),
@@ -101,7 +112,8 @@ export const onOrderStatusChanged = inngest.createFunction(
       }
       if (order.driver?.phone) {
         await step.run("notify-driver", () =>
-          sendWhatsAppText(
+          sendWhatsAppMessage(
+            whatsappConfig,
             order.driver!.phone!,
             driverMessages.cancelled(info, order.driver!.preferredLocale),
           ),

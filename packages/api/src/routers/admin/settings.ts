@@ -1,11 +1,17 @@
-import { settingsUpdateSchema } from "@workspace/validators/catalog";
+import {
+  settingsUpdateSchema,
+  whatsappSettingsUpdateSchema,
+} from "@workspace/validators/catalog";
 
 import { adminProcedure, createTRPCRouter } from "../../init";
 import {
   getDeliveryFeeEgp,
   getSupportWhatsapp,
+  getWhatsAppCredentialsMasked,
+  getWhatsAppProvider,
   SETTING_KEYS,
   upsertSetting,
+  upsertWhatsappConfig,
 } from "../../lib/settings";
 
 export const adminSettingsRouter = createTRPCRouter({
@@ -29,6 +35,18 @@ export const adminSettingsRouter = createTRPCRouter({
         { value: input.supportWhatsappNumber },
         ctx.session.user.id,
       );
+      return { ok: true as const };
+    }),
+
+  getWhatsapp: adminProcedure.query(async ({ ctx }) => ({
+    provider: await getWhatsAppProvider(ctx.db),
+    credentials: await getWhatsAppCredentialsMasked(ctx.db),
+  })),
+
+  updateWhatsapp: adminProcedure
+    .input(whatsappSettingsUpdateSchema)
+    .mutation(async ({ ctx, input }) => {
+      await upsertWhatsappConfig(ctx.db, input, ctx.session.user.id);
       return { ok: true as const };
     }),
 });

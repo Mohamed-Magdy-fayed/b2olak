@@ -15,7 +15,13 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
-import { Select } from "@workspace/ui/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import {
   Table,
   TableBody,
@@ -93,13 +99,18 @@ export default function AdminOrdersPage() {
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">{t("admin.orders.title")}</h1>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">{t("admin.common.allStatuses")}</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {t(`shop.status.${s}`)}
-            </option>
-          ))}
+        <Select value={status} onValueChange={(v) => setStatus(v ?? "")}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("admin.common.allStatuses")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">{t("admin.common.allStatuses")}</SelectItem>
+            {STATUSES.map((s) => (
+              <SelectItem key={s} value={s}>
+                {t(`shop.status.${s}`)}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
       </div>
 

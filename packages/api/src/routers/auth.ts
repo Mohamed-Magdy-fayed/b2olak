@@ -9,7 +9,10 @@ import {
   updateSessionUser,
 } from "@workspace/auth/session";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
-import { sendWhatsAppText } from "@workspace/integrations/whatsapp/send";
+import { getWhatsAppConfig } from "@workspace/integrations/whatsapp/config";
+import {
+  sendWhatsAppMessage,
+} from "@workspace/integrations/whatsapp/send";
 import {
   requestOtpSchema,
   updateProfileSchema,
@@ -74,7 +77,9 @@ export const authRouter = createTRPCRouter({
       // Suspended accounts get the same generic response but no OTP.
       if (user && user.status === "active") {
         const code = await createOtp(ctx.db, user.id);
-        await sendWhatsAppText(
+        const whatsappConfig = await getWhatsAppConfig(ctx.db);
+        await sendWhatsAppMessage(
+          whatsappConfig,
           input.phone,
           otpMessage(code, user.preferredLocale),
         );

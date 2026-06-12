@@ -15,7 +15,13 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { Select } from "@workspace/ui/components/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import {
   Table,
   TableBody,
@@ -145,22 +151,29 @@ export default function AdminItemsPage() {
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"
         />
-        <Select
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
-          <option value="">{t("admin.common.allCategories")}</option>
-          {(categories ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {locale === "ar" ? c.nameAr : c.nameEn}
-            </option>
-          ))}
+        <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? "")}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("admin.common.allCategories")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">{t("admin.common.allCategories")}</SelectItem>
+            {(categories ?? []).map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {locale === "ar" ? c.nameAr : c.nameEn}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">{t("admin.common.allStatuses")}</option>
-          <option value="approved">{t("admin.items.statusApproved")}</option>
-          <option value="pending_review">{t("admin.items.statusPending")}</option>
-          <option value="merged">{t("admin.items.statusMerged")}</option>
+        <Select value={status} onValueChange={(v) => setStatus(v ?? "")}>
+          <SelectTrigger>
+            <SelectValue placeholder={t("admin.common.allStatuses")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">{t("admin.common.allStatuses")}</SelectItem>
+            <SelectItem value="approved">{t("admin.items.statusApproved")}</SelectItem>
+            <SelectItem value="pending_review">{t("admin.items.statusPending")}</SelectItem>
+            <SelectItem value="merged">{t("admin.items.statusMerged")}</SelectItem>
+          </SelectContent>
         </Select>
         <span className="text-muted-foreground text-sm">
           {t("admin.common.total", { count: String(data?.total ?? 0) })}
@@ -287,30 +300,36 @@ export default function AdminItemsPage() {
                 <Label>{t("admin.items.category")}</Label>
                 <Select
                   value={form.categoryId}
-                  onChange={(e) =>
-                    setForm({ ...form, categoryId: e.target.value })
-                  }
+                  onValueChange={(v) => { if (v) setForm({ ...form, categoryId: v }); }}
                 >
-                  {(categories ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {locale === "ar" ? c.nameAr : c.nameEn}
-                    </option>
-                  ))}
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(categories ?? []).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {locale === "ar" ? c.nameAr : c.nameEn}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="flex flex-col gap-2">
                 <Label>{t("admin.items.unit")}</Label>
                 <Select
                   value={form.defaultUnit}
-                  onChange={(e) =>
-                    setForm({ ...form, defaultUnit: e.target.value as Unit })
-                  }
+                  onValueChange={(v) => { if (v) setForm({ ...form, defaultUnit: v as Unit }); }}
                 >
-                  {UNITS.map((unit) => (
-                    <option key={unit} value={unit}>
-                      {unitLabel[unit]}
-                    </option>
-                  ))}
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNITS.map((unit) => (
+                      <SelectItem key={unit} value={unit}>
+                        {unitLabel[unit]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="flex flex-col gap-2">
