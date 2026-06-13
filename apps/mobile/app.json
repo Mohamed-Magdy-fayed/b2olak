@@ -9,7 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "y",
+      "bundleIdentifier": "com.gatelingsolutions.ba2olak",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
