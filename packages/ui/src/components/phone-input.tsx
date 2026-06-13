@@ -22,8 +22,10 @@ function PhoneInputField({ className, ...props }: ComponentProps<"input">) {
       {...props}
       dir="ltr"
       className={cn(
-        "border-input dark:bg-input/30 h-9 min-w-0 flex-1 rounded-e-md border border-s-0 bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] placeholder:text-muted-foreground",
-        "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
+        // No border/rounding here — the container owns the single rounded
+        // border. dir="ltr" keeps the digits LTR without flipping any box
+        // logical props (we use none on this element).
+        "h-9 min-w-0 flex-1 border-0 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground",
         "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
@@ -51,7 +53,7 @@ const CountrySelector = memo(function CountrySelector({
       value={value ?? ""}
       onValueChange={(v) => { if (v) onChange(v); }}
     >
-      <SelectTrigger className="h-9 w-[80px] shrink-0 rounded-e-none border-e-0 gap-1 px-2">
+      <SelectTrigger className="h-9! w-[80px] shrink-0 gap-1 rounded-none border-0 border-e border-input bg-transparent px-2">
         <span className="flex items-center gap-1 overflow-hidden">
           {value && iconComponent?.({ country: value as Country })}
           <span className="text-xs font-medium">{value}</span>
@@ -100,7 +102,12 @@ export function PhoneInput({
 
   return (
     <PhoneInputLib
-      className={cn("flex w-full", className)}
+      className={cn(
+        "border-input flex w-full items-stretch overflow-hidden rounded-md border bg-transparent shadow-xs transition-[color,box-shadow] dark:bg-input/30",
+        "focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
+        "has-disabled:pointer-events-none has-disabled:opacity-50",
+        className,
+      )}
       value={formatted}
       onChange={handleChange}
       defaultCountry="EG"
