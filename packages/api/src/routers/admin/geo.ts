@@ -25,6 +25,29 @@ const bulkIdsSchema = z.object({ ids: z.array(z.uuid()).min(1).max(200) });
 const bulkActiveSchema = bulkIdsSchema.extend({ isActive: z.boolean() });
 
 export const adminGeoRouter = createTRPCRouter({
+  /**
+   * Full coverage tree (cities → districts → areas) for the expandable
+   * admin table. Returns all non-deleted rows regardless of active state.
+   */
+  tree: adminProcedure.query(({ ctx }) =>
+    ctx.db.query.CitiesTable.findMany({
+      where: isNull(CitiesTable.deletedAt),
+      orderBy: [asc(CitiesTable.sortOrder), asc(CitiesTable.nameAr)],
+      with: {
+        districts: {
+          where: (d, { isNull: dIsNull }) => dIsNull(d.deletedAt),
+          orderBy: (d, { asc: dAsc }) => [dAsc(d.sortOrder), dAsc(d.nameAr)],
+          with: {
+            areas: {
+              where: (a, { isNull: aIsNull }) => aIsNull(a.deletedAt),
+              orderBy: (a, { asc: aAsc }) => [aAsc(a.sortOrder), aAsc(a.nameAr)],
+            },
+          },
+        },
+      },
+    }),
+  ),
+
   cities: createTRPCRouter({
     list: adminProcedure.query(async ({ ctx }) => {
       const cities = await ctx.db.query.CitiesTable.findMany({

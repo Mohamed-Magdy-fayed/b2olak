@@ -32,6 +32,7 @@ export {
   toYmdLocal,
 } from "./lib/filter-values";
 export { createEntityActionsColumn } from "./lib/entity-actions-column";
+export { createExpandColumn } from "./lib/expand-column";
 export { getEntityColumnPinning } from "./lib/entity-column-pinning";
 export { getPinningClassName } from "./lib/pinning";
 export { createSelectColumn } from "./lib/select-column";

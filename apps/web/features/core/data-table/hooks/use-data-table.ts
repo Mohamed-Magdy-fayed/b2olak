@@ -4,8 +4,10 @@ import {
   type ColumnDef,
   type ColumnFiltersState,
   type ColumnPinningState,
+  type ExpandedState,
   type FilterFn,
   getCoreRowModel,
+  getExpandedRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
@@ -53,6 +55,12 @@ export type UseDataTableArgs<T> = {
   initialColumnPinning?: ColumnPinningState;
   controlled?: DataTableControlledState;
   globalFilterFn?: FilterFn<T>;
+  /**
+   * Enables expandable sub-rows (e.g. a city → districts → areas tree).
+   * When provided, the table wires getExpandedRowModel and renders the
+   * flattened visible rows (parents + expanded children) automatically.
+   */
+  getSubRows?: (row: T) => T[] | undefined;
 };
 
 export function useDataTable<T>({
@@ -65,6 +73,7 @@ export function useDataTable<T>({
   initialColumnPinning = getEntityColumnPinning(),
   controlled,
   globalFilterFn,
+  getSubRows,
 }: UseDataTableArgs<T>) {
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -77,6 +86,7 @@ export function useDataTable<T>({
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
   const [columnPinning, setColumnPinning] =
     useState<ColumnPinningState>(initialColumnPinning);
+  const [expanded, setExpanded] = useState<ExpandedState>({});
 
   const resetFirstPage = useCallback((setPag: OnChangeFn<PaginationState>) => {
     setPag((p) => ({ ...p, pageIndex: 0 }));
@@ -145,6 +155,7 @@ export function useDataTable<T>({
       rowSelection: rs,
       columnVisibility: cv,
       columnPinning: cp,
+      expanded,
     },
     onPaginationChange: controlled?.onPaginationChange ?? setPagination,
     onSortingChange: handlers.onSortingChange,
@@ -155,6 +166,7 @@ export function useDataTable<T>({
       controlled?.onColumnVisibilityChange ?? setColumnVisibility,
     onColumnPinningChange:
       controlled?.onColumnPinningChange ?? setColumnPinning,
+    onExpandedChange: setExpanded,
     manualPagination: isServer,
     manualSorting: isServer,
     manualFiltering: isServer,
@@ -162,10 +174,13 @@ export function useDataTable<T>({
     rowCount: isServer ? rowCount : undefined,
     enableRowSelection: true,
     enableColumnPinning: true,
+    enableExpanding: getSubRows !== undefined,
+    getSubRows,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: isServer ? undefined : getFilteredRowModel(),
     getPaginationRowModel: isServer ? undefined : getPaginationRowModel(),
     getSortedRowModel: isServer ? undefined : getSortedRowModel(),
+    getExpandedRowModel: getSubRows ? getExpandedRowModel() : undefined,
     globalFilterFn,
   });
 
