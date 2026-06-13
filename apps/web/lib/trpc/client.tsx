@@ -8,7 +8,15 @@ import superjson from "superjson";
 
 import type { AppRouter } from "@workspace/api/root";
 
-export const { TRPCProvider, useTRPC } = createTRPCContext<AppRouter>();
+// The combined AppRouter type is large enough that letting TS infer the type
+// of these exports trips TS7056 ("inferred type exceeds maximum length").
+// Annotating the intermediate explicitly — as TS7056 itself recommends — keeps
+// the exports fully typed without any `any`.
+type TRPCContext = ReturnType<typeof createTRPCContext<AppRouter>>;
+const trpcContext: TRPCContext = createTRPCContext<AppRouter>();
+export const TRPCProvider: TRPCContext["TRPCProvider"] =
+  trpcContext.TRPCProvider;
+export const useTRPC: TRPCContext["useTRPC"] = trpcContext.useTRPC;
 
 function getUrl() {
   if (typeof window !== "undefined") return "/api/trpc";

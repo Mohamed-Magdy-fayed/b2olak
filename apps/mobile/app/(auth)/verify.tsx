@@ -3,12 +3,21 @@ import { KeyboardAvoidingView, Platform, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 
+import { BiometricEnableSheet } from "@/components/biometric-enable-sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { authenticate, isBiometricAvailable } from "@/lib/biometric";
 import { useTranslation } from "@/lib/i18n";
 import { getExpoPushToken } from "@/lib/notifications";
-import { setToken } from "@/lib/session";
+import {
+  hasSeenBiometricPrompt,
+  setBiometricEnabled,
+  setBiometricPromptSeen,
+  setToken,
+} from "@/lib/session";
 import { useTRPC } from "@/lib/trpc";
+
+type Dest = "/(driver)" | "/(customer)";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -19,6 +28,8 @@ export default function VerifyScreen() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
+  const [pendingDest, setPendingDest] = useState<Dest | null>(null);
+  const [enabling, setEnabling] = useState(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -35,7 +46,14 @@ export default function VerifyScreen() {
         void getExpoPushToken().then((token) => {
           if (token) registerPush.mutate({ token });
         });
-        router.replace(data.user.role === "driver" ? "/(driver)" : "/(customer)");
+        const dest: Dest =
+          data.user.role === "driver" ? "/(driver)" : "/(customer)";
+        // Offer biometric unlock once, only where it's actually available.
+        if ((await isBiometricAvailable()) && !(await hasSeenBiometricPrompt())) {
+          setPendingDest(dest);
+        } else {
+          router.replace(dest);
+        }
       },
       onError: (err) => {
         const key = err.message;
@@ -58,12 +76,29 @@ export default function VerifyScreen() {
     }),
   );
 
+  const enableBiometric = async () => {
+    if (!pendingDest) return;
+    setEnabling(true);
+    const ok = await authenticate(t("auth.biometric.unlockPrompt"));
+    if (ok) await setBiometricEnabled(true);
+    await setBiometricPromptSeen();
+    setEnabling(false);
+    router.replace(pendingDest);
+  };
+
+  const skipBiometric = async () => {
+    if (!pendingDest) return;
+    await setBiometricPromptSeen();
+    router.replace(pendingDest);
+  };
+
   if (!phone) {
     router.replace("/(auth)/sign-in");
     return null;
   }
 
   return (
+    <>
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-background"
@@ -113,5 +148,12 @@ export default function VerifyScreen() {
         </View>
       </View>
     </KeyboardAvoidingView>
+    <BiometricEnableSheet
+      visible={pendingDest !== null}
+      busy={enabling}
+      onEnable={() => void enableBiometric()}
+      onSkip={() => void skipBiometric()}
+    />
+    </>
   );
 }

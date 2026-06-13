@@ -13,7 +13,8 @@ import type { OAuthProvider } from "@workspace/db/schemas/auth/user-oauth-accoun
 import { UserOAuthAccountsTable } from "@workspace/db/schemas/auth/user-oauth-accounts";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
 
-import { OAUTH_NEXT_COOKIE_KEY, postAuthPath } from "@/features/auth/lib";
+import { OAUTH_NEXT_COOKIE_KEY } from "@/features/auth/lib";
+import { resolvePostLoginPath } from "@/features/auth/passkey-prompt";
 
 import { COOKIE_SESSION_KEY, SESSION_EXPIRATION_SECONDS } from "@workspace/auth/session";
 
@@ -145,9 +146,12 @@ export async function GET(
   });
 
   const next = store.get(OAUTH_NEXT_COOKIE_KEY)?.value ?? null;
-  const response = NextResponse.redirect(
-    new URL(postAuthPath(user.role, next), url.origin),
-  );
+  const target = await resolvePostLoginPath({
+    userId: user.id,
+    role: user.role,
+    next,
+  });
+  const response = NextResponse.redirect(new URL(target, url.origin));
   response.cookies.set(COOKIE_SESSION_KEY, session.sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

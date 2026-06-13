@@ -21,6 +21,7 @@ import {
   signInWithGoogleAction,
   verifyOtpAction,
 } from "./actions";
+import { PasskeyLoginButton } from "./passkey-login-button";
 
 const RESEND_SECONDS = 60;
 
@@ -97,6 +98,16 @@ export function CustomerSignIn({
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <PasskeyLoginButton next={next} className="w-full gap-2" />
+
+        <div className="flex items-center gap-3">
+          <div className="bg-border h-px flex-1" />
+          <span className="text-muted-foreground text-xs uppercase">
+            {t("auth.orDivider")}
+          </span>
+          <div className="bg-border h-px flex-1" />
+        </div>
+
         {step === "phone" ? (
           <form action={requestAction} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">

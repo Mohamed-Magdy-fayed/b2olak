@@ -2,11 +2,13 @@ import { Pressable, Text, View } from "react-native";
 
 import { useTranslation } from "@/lib/i18n";
 import { type CartLine, useCart } from "@/lib/cart-store";
+import { ItemThumb } from "./item-thumb";
 
 type CatalogItem = {
   id: string;
   nameEn: string | null;
   nameAr: string | null;
+  imageUrl?: string | null;
   defaultUnit: CartLine["unit"];
 };
 
@@ -17,23 +19,26 @@ export function itemDisplayName(
   return (locale === "ar" ? item.nameAr : item.nameEn) ?? item.nameAr ?? item.nameEn ?? "—";
 }
 
-/** Catalog row with qty stepper — the only way items enter the cart (C3/C5). */
+/** Catalog row with leading thumbnail, qty stepper — the only way items enter the cart (C3/C5). */
 export function ItemRow({ item }: { item: CatalogItem }) {
   const { t, locale } = useTranslation();
   const line = useCart((s) => s.lines.find((l) => l.itemId === item.id));
   const add = useCart((s) => s.add);
   const setQty = useCart((s) => s.setQty);
 
+  const name = itemDisplayName(item, locale);
+
   return (
-    <View className="flex-row items-center justify-between border-b border-border py-3">
+    <View className="flex-row items-center gap-3 border-b border-border py-3">
+      <ItemThumb uri={item.imageUrl} label={name} size={48} />
+
       <View className="flex-1 gap-0.5">
-        <Text className="text-base font-semibold text-foreground">
-          {itemDisplayName(item, locale)}
-        </Text>
+        <Text className="text-base font-semibold text-foreground">{name}</Text>
         <Text className="text-xs text-muted-foreground">
           {t(`units.${item.defaultUnit}`)}
         </Text>
       </View>
+
       {line ? (
         <View className="flex-row items-center gap-3">
           <Pressable

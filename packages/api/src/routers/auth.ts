@@ -8,6 +8,16 @@ import {
   type SessionUser,
   updateSessionUser,
 } from "@workspace/auth/session";
+import {
+  authenticateWithPasskey,
+  authenticationResponseSchema,
+  createPasskeyAuthenticationOptions,
+  createPasskeyRegistrationOptions,
+  getRelyingPartyFromEnv,
+  registerPasskey,
+  registrationResponseSchema,
+} from "@workspace/auth/webauthn";
+import { UserPasskeysTable } from "@workspace/db/schemas/auth/user-passkeys";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
 import { getWhatsAppConfig } from "@workspace/integrations/whatsapp/config";
 import {
@@ -275,5 +285,156 @@ export const authRouter = createTRPCRouter({
       await updateSessionUser(ctx.session.sessionId, toSessionUser(updated));
 
       return { user: toSessionUser(updated) };
+    }),
+
+  /**
+   * ── Passkeys (WebAuthn) ──────────────────────────────────────────────────
+   * Convenience login on the web. The challenge embedded in the returned
+   * options is persisted by the caller (apps/web stores it in a short-lived
+   * httpOnly cookie) and replayed into the matching verify* procedure. The
+   * cookie is server-trusted, so the client can't forge the expected challenge.
+   */
+  passkeyRegistrationOptions: protectedProcedure.mutation(async ({ ctx }) => {
+    const existing = await ctx.db.query.UserPasskeysTable.findMany({
+      where: and(
+        eq(UserPasskeysTable.userId, ctx.session.user.id),
+        isNull(UserPasskeysTable.deletedAt),
+      ),
+      columns: { credentialId: true, transports: true },
+    });
+
+    return createPasskeyRegistrationOptions({
+      rp: getRelyingPartyFromEnv(),
+      user: { id: ctx.session.user.id, name: ctx.session.user.name },
+      existingPasskeys: existing,
+    });
+  }),
+
+  verifyPasskeyRegistration: protectedProcedure
+    .input(
+      z.object({
+        response: registrationResponseSchema,
+        expectedChallenge: z.string(),
+        label: z.string().max(64).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const passkey = await registerPasskey({
+        db: ctx.db,
+        rp: getRelyingPartyFromEnv(),
+        userId: ctx.session.user.id,
+        label: input.label,
+        expectedChallenge: input.expectedChallenge,
+        response: input.response,
+      });
+
+      if (!passkey) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "auth.passkey.enrollFailed",
+        });
+      }
+
+      return {
+        id: passkey.id,
+        label: passkey.label,
+        createdAt: passkey.createdAt,
+      };
+    }),
+
+  /** Usernameless / discoverable-credential login — no allowCredentials. */
+  passkeyAuthenticationOptions: baseProcedure.mutation(async () => {
+    return createPasskeyAuthenticationOptions({ rp: getRelyingPartyFromEnv() });
+  }),
+
+  verifyPasskeyAuthentication: baseProcedure
+    .input(
+      z.object({
+        response: authenticationResponseSchema,
+        expectedChallenge: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const passkey = await authenticateWithPasskey({
+        db: ctx.db,
+        rp: getRelyingPartyFromEnv(),
+        expectedChallenge: input.expectedChallenge,
+        response: input.response,
+      });
+      if (!passkey) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "auth.passkey.loginFailed",
+        });
+      }
+
+      const user = await ctx.db.query.UsersTable.findFirst({
+        where: and(
+          eq(UsersTable.id, passkey.userId),
+          isNull(UsersTable.deletedAt),
+        ),
+      });
+      if (!user) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "auth.passkey.loginFailed",
+        });
+      }
+      if (user.status === "suspended") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "auth.suspended" });
+      }
+
+      await ctx.db
+        .update(UsersTable)
+        .set({ lastSignInAt: new Date() })
+        .where(eq(UsersTable.id, user.id));
+
+      const session = await createSession(toSessionUser(user));
+      return { sessionId: session.sessionId, user: session.user };
+    }),
+
+  listPasskeys: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.UserPasskeysTable.findMany({
+      where: and(
+        eq(UserPasskeysTable.userId, ctx.session.user.id),
+        isNull(UserPasskeysTable.deletedAt),
+      ),
+      columns: { id: true, label: true, createdAt: true, lastUsedAt: true },
+      orderBy: (t, { desc }) => [desc(t.createdAt)],
+    });
+  }),
+
+  deletePasskey: protectedProcedure
+    .input(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(UserPasskeysTable)
+        .set({ deletedAt: new Date(), updatedBy: ctx.session.user.id })
+        .where(
+          and(
+            eq(UserPasskeysTable.id, input.id),
+            eq(UserPasskeysTable.userId, ctx.session.user.id),
+            isNull(UserPasskeysTable.deletedAt),
+          ),
+        );
+      return { ok: true as const };
+    }),
+
+  renamePasskey: protectedProcedure
+    .input(z.object({ id: z.uuid(), label: z.string().min(1).max(64) }))
+    .mutation(async ({ ctx, input }) => {
+      const [updated] = await ctx.db
+        .update(UserPasskeysTable)
+        .set({ label: input.label, updatedBy: ctx.session.user.id })
+        .where(
+          and(
+            eq(UserPasskeysTable.id, input.id),
+            eq(UserPasskeysTable.userId, ctx.session.user.id),
+            isNull(UserPasskeysTable.deletedAt),
+          ),
+        )
+        .returning();
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
     }),
 });

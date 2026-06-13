@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
@@ -95,6 +96,20 @@ export function AccountClient() {
         className={buttonVariants({ variant: "outline" })}
       >
         {t("address.title")}
+      </Link>
+
+      {/* Security link */}
+      <Link
+        href="/account/security"
+        className={buttonVariants({ variant: "outline" })}
+      >
+        <ShieldCheck className="size-4" />
+        <span className="flex flex-col items-start gap-0.5 text-start">
+          <span>{t("account.security" as never)}</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            {t("account.securityHint" as never)}
+          </span>
+        </span>
       </Link>
 
       {/* Sign out */}

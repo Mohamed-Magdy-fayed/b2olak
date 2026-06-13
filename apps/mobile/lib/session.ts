@@ -10,6 +10,8 @@ import * as SecureStore from "expo-secure-store";
 
 const TOKEN_KEY = "session-token";
 const LOCALE_KEY = "locale";
+const BIOMETRIC_ENABLED_KEY = "biometric-enabled";
+const BIOMETRIC_PROMPT_SEEN_KEY = "biometric-prompt-seen";
 
 const isWeb = Platform.OS === "web";
 
@@ -53,4 +55,26 @@ export async function getStoredLocale(): Promise<"en" | "ar" | null> {
 
 export async function setStoredLocale(locale: "en" | "ar"): Promise<void> {
   await setItem(LOCALE_KEY, locale);
+}
+
+/**
+ * Biometric unlock preferences. The stored session token is the actual
+ * credential; these flags only decide whether opening the app is gated behind
+ * a local Face ID / fingerprint check (see lib/biometric.ts).
+ */
+export async function isBiometricEnabled(): Promise<boolean> {
+  return (await getItem(BIOMETRIC_ENABLED_KEY)) === "1";
+}
+
+export async function setBiometricEnabled(enabled: boolean): Promise<void> {
+  if (enabled) await setItem(BIOMETRIC_ENABLED_KEY, "1");
+  else await deleteItem(BIOMETRIC_ENABLED_KEY);
+}
+
+export async function hasSeenBiometricPrompt(): Promise<boolean> {
+  return (await getItem(BIOMETRIC_PROMPT_SEEN_KEY)) === "1";
+}
+
+export async function setBiometricPromptSeen(): Promise<void> {
+  await setItem(BIOMETRIC_PROMPT_SEEN_KEY, "1");
 }

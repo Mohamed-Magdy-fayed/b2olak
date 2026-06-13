@@ -24,7 +24,8 @@ import {
   verifyOtpSchema,
 } from "@workspace/validators/auth";
 
-import { OAUTH_NEXT_COOKIE_KEY, postAuthPath, sanitizeNextPath } from "./lib";
+import { OAUTH_NEXT_COOKIE_KEY, sanitizeNextPath } from "./lib";
+import { resolvePostLoginPath } from "./passkey-prompt";
 
 export type SignInState = { error: string } | undefined;
 
@@ -152,17 +153,21 @@ export async function verifyOtpAction(
     };
   }
 
-  let role: "admin" | "customer" | "driver";
+  let target: string;
   try {
     const caller = await apiCaller();
     const result = await caller.auth.verifyOtp(parsed.data);
     await setSessionCookie(result.sessionId);
-    role = result.user.role;
+    target = await resolvePostLoginPath({
+      userId: result.user.id,
+      role: result.user.role,
+      next: sanitizeNextPath(formData.get("next") as string),
+    });
   } catch (error) {
     return { phase: "code", phone: parsed.data.phone, error: errorKeyFrom(error) };
   }
 
-  redirect(postAuthPath(role, sanitizeNextPath(formData.get("next") as string)));
+  redirect(target);
 }
 
 /** Kicks off the Google OAuth flow (PKCE state cookies + provider redirect). */

@@ -3,25 +3,42 @@ import { ActivityIndicator, View } from "react-native";
 import { Redirect } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
-import { getToken } from "@/lib/session";
+import { BiometricLock } from "@/components/biometric-lock";
+import { getToken, isBiometricEnabled } from "@/lib/session";
 import { useTRPC } from "@/lib/trpc";
 
-/** Entry: no token → auth; token → role-based shell (one app, two worlds). */
+type Boot = { hasToken: boolean; needsUnlock: boolean } | null;
+
+/** Entry: no token → auth; token → optional biometric gate → role-based shell. */
 export default function Index() {
   const trpc = useTRPC();
-  const [hasToken, setHasToken] = useState<boolean | null>(null);
+  const [boot, setBoot] = useState<Boot>(null);
+  const [unlocked, setUnlocked] = useState(false);
 
   useEffect(() => {
-    void getToken().then((token) => setHasToken(token !== null));
+    void (async () => {
+      const token = await getToken();
+      if (!token) {
+        setBoot({ hasToken: false, needsUnlock: false });
+        return;
+      }
+      const gated = await isBiometricEnabled();
+      setBoot({ hasToken: true, needsUnlock: gated });
+      if (!gated) setUnlocked(true);
+    })();
   }, []);
 
   const me = useQuery({
     ...trpc.auth.me.queryOptions(),
-    enabled: hasToken === true,
+    enabled: boot?.hasToken === true && unlocked,
     retry: false,
   });
 
-  if (hasToken === false) return <Redirect href="/(auth)/sign-in" />;
+  if (boot === null) return <Spinner />;
+  if (!boot.hasToken) return <Redirect href="/(auth)/sign-in" />;
+  if (boot.needsUnlock && !unlocked) {
+    return <BiometricLock onUnlocked={() => setUnlocked(true)} />;
+  }
   if (me.isError) return <Redirect href="/(auth)/sign-in" />;
   if (me.data) {
     return me.data.user.role === "driver" ? (
@@ -31,6 +48,10 @@ export default function Index() {
     );
   }
 
+  return <Spinner />;
+}
+
+function Spinner() {
   return (
     <View className="flex-1 items-center justify-center bg-background">
       <ActivityIndicator size="large" color="#7c3aed" />

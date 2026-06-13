@@ -9,6 +9,7 @@ import {
   verifyRegistrationResponse,
 } from "@simplewebauthn/server";
 import { eq } from "drizzle-orm";
+import { z } from "zod";
 
 import type { Db } from "@workspace/db/client";
 import type { UserPasskey } from "@workspace/db/schemas/auth/user-passkeys";
@@ -28,6 +29,41 @@ export type PasskeyRelyingParty = {
   /** Full origin, e.g. "https://ba2olak.com". */
   origin: string;
 };
+
+function requiredEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) throw new Error(`Missing required env var ${name}`);
+  return value;
+}
+
+/**
+ * Reads the relying-party config from env (mirrors `createGoogleOAuthClient`).
+ * Dev: WEBAUTHN_RP_ID=localhost, WEBAUTHN_ORIGIN=http://localhost:3000.
+ * Prod: the registrable domain + full https origin.
+ */
+export function getRelyingPartyFromEnv(): PasskeyRelyingParty {
+  return {
+    rpId: requiredEnv("WEBAUTHN_RP_ID"),
+    rpName: requiredEnv("WEBAUTHN_RP_NAME"),
+    origin: requiredEnv("WEBAUTHN_ORIGIN"),
+  };
+}
+
+/**
+ * The browser-produced ceremony payloads are opaque, deeply-nested structures
+ * fully validated by @simplewebauthn during verification. We only assert "an
+ * object" at the tRPC boundary and keep the precise types here, so the API
+ * package doesn't need a direct @simplewebauthn dependency.
+ */
+export const registrationResponseSchema = z.custom<RegistrationResponseJSON>(
+  (value) => typeof value === "object" && value !== null,
+  { message: "auth.passkey.invalidResponse" },
+);
+export const authenticationResponseSchema =
+  z.custom<AuthenticationResponseJSON>(
+    (value) => typeof value === "object" && value !== null,
+    { message: "auth.passkey.invalidResponse" },
+  );
 
 function toTransports(transports: string[] | null) {
   return transports as

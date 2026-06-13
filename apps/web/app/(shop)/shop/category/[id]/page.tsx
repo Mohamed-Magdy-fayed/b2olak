@@ -7,7 +7,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { useTRPC } from "@/lib/trpc/client";
-import { ItemCard } from "@/features/shop/item-card";
+import { ItemCardRow } from "@/features/shop/item-card";
 import { AddItemDialog } from "@/features/shop/add-item-dialog";
 import { Button } from "@workspace/ui/components/button";
 import { Skeleton } from "@workspace/ui/components/skeleton";
@@ -78,7 +78,7 @@ export default function CategoryPage({
       ) : (
         <div className="flex flex-col">
           {allItems.map((item) => (
-            <ItemCard key={item.id} item={item} />
+            <ItemCardRow key={item.id} item={item} />
           ))}
         </div>
       )}
