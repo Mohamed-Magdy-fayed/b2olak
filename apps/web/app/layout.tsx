@@ -1,4 +1,5 @@
 import { Geist_Mono, Inter } from "next/font/google";
+import { Toaster } from "sonner";
 
 import "@workspace/ui/globals.css";
 
@@ -46,6 +47,7 @@ export default async function RootLayout({
           <TRPCReactProvider>
             <I18nProvider defaultLocale={locale}>{children}</I18nProvider>
           </TRPCReactProvider>
+          <Toaster position="bottom-center" />
         </ThemeProvider>
       </body>
     </html>

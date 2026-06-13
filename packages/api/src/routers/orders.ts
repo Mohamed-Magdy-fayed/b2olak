@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Db } from "@workspace/db/client";
+import { UsersTable } from "@workspace/db/schemas/auth/users";
 import { AddressesTable } from "@workspace/db/schemas/orders/addresses";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
 import { inngest } from "@workspace/integrations/inngest/client";
@@ -41,6 +42,23 @@ export const ordersRouter = createTRPCRouter({
     .input(placeOrderSchema)
     .mutation(async ({ ctx, input }) => {
       await enforceRateLimit("order-place", ctx.session.user.id, 5, "1 h");
+
+      // Scam prevention: only phone-verified accounts may place orders.
+      // OTP sign-ins are verified by definition; OAuth-created accounts must
+      // link a phone first (auth.requestPhoneLink/confirmPhoneLink).
+      const placer = await ctx.db.query.UsersTable.findFirst({
+        where: and(
+          eq(UsersTable.id, ctx.session.user.id),
+          isNull(UsersTable.deletedAt),
+        ),
+        columns: { phoneVerifiedAt: true },
+      });
+      if (!placer?.phoneVerifiedAt) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "auth.phoneVerificationRequired",
+        });
+      }
 
       const address = await ctx.db.query.AddressesTable.findFirst({
         where: and(

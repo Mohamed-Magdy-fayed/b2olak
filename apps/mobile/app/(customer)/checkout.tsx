@@ -11,6 +11,50 @@ import { useTranslation } from "@/lib/i18n";
 import { useCart } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
 
+function addressDisplayName(
+  address: {
+    label: string | null;
+    area: string;
+    areaRef: { nameEn: string | null; nameAr: string | null } | null;
+  },
+  locale: string,
+): string {
+  if (address.label) return address.label;
+  if (address.areaRef) {
+    return (
+      (locale === "ar" ? address.areaRef.nameAr : address.areaRef.nameEn) ??
+      address.areaRef.nameAr ??
+      address.areaRef.nameEn ??
+      address.area
+    );
+  }
+  return address.area;
+}
+
+function addressSubtitle(
+  address: {
+    area: string;
+    street: string;
+    building: string | null;
+    districtRef: { nameEn: string | null; nameAr: string | null } | null;
+    areaRef: { nameEn: string | null; nameAr: string | null } | null;
+  },
+  locale: string,
+): string {
+  const pickRef = (
+    ref: { nameEn: string | null; nameAr: string | null } | null,
+    fallback: string,
+  ) =>
+    (ref
+      ? (locale === "ar" ? ref.nameAr : ref.nameEn) ?? ref.nameAr ?? ref.nameEn
+      : null) ?? fallback;
+
+  const district = pickRef(address.districtRef, address.area);
+  const area = pickRef(address.areaRef, address.street);
+  const parts = [district, area].filter(Boolean).join("، ");
+  return address.building ? `${parts}، ${address.building}` : parts;
+}
+
 export default function CheckoutScreen() {
   const trpc = useTRPC();
   const { t, locale } = useTranslation();
@@ -98,11 +142,10 @@ export default function CheckoutScreen() {
             }`}
           >
             <Text className="font-semibold text-foreground">
-              {address.label || address.area}
+              {addressDisplayName(address, locale)}
             </Text>
             <Text className="text-sm text-muted-foreground">
-              {address.area}، {address.street}
-              {address.building ? `، ${address.building}` : ""}
+              {addressSubtitle(address, locale)}
             </Text>
           </Pressable>
         ))}

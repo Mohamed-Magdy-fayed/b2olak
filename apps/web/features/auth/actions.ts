@@ -2,9 +2,13 @@
 
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
 
+import { createCallerFactory, createTRPCContext } from "@workspace/api/init";
+import { appRouter } from "@workspace/api/root";
 import { enforceRateLimit, ipFromHeaders } from "@workspace/api/ratelimit";
+import { createGoogleOAuthClient } from "@workspace/auth/oauth";
 import { comparePasswords } from "@workspace/auth/password-hasher";
 import {
   COOKIE_SESSION_KEY,
@@ -14,9 +18,40 @@ import {
 } from "@workspace/auth/session";
 import { db } from "@workspace/db/client";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
-import { signInPasswordSchema } from "@workspace/validators/auth";
+import {
+  requestOtpSchema,
+  signInPasswordSchema,
+  verifyOtpSchema,
+} from "@workspace/validators/auth";
+
+import { OAUTH_NEXT_COOKIE_KEY, postAuthPath, sanitizeNextPath } from "./lib";
 
 export type SignInState = { error: string } | undefined;
+
+async function setSessionCookie(sessionId: string) {
+  const store = await cookies();
+  store.set(COOKIE_SESSION_KEY, sessionId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    expires: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
+  });
+}
+
+async function apiCaller() {
+  const ctx = await createTRPCContext({ headers: await headers() });
+  return createCallerFactory(appRouter)(ctx);
+}
+
+/** Maps thrown tRPC errors to dictionary keys the form can t(). */
+function errorKeyFrom(error: unknown): string {
+  if (error instanceof TRPCError) {
+    if (error.code === "TOO_MANY_REQUESTS") return "errors.tooManyRequests";
+    if (error.message.includes(".")) return error.message;
+  }
+  return "errors.unknown";
+}
 
 export async function signInAdminAction(
   _prev: SignInState,
@@ -71,16 +106,80 @@ export async function signInAdminAction(
     preferredLocale: user.preferredLocale,
   });
 
-  const store = await cookies();
-  store.set(COOKIE_SESSION_KEY, session.sessionId, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(Date.now() + SESSION_EXPIRATION_SECONDS * 1000),
-  });
+  await setSessionCookie(session.sessionId);
 
-  redirect("/");
+  redirect(user.role === "admin" ? "/admin" : "/");
+}
+
+export type OtpFormState =
+  | { phase: "phone"; error?: string }
+  | { phase: "code"; phone: string; error?: string }
+  | undefined;
+
+/** Step 1 of customer sign-in: send the WhatsApp code. */
+export async function requestOtpAction(
+  _prev: OtpFormState,
+  formData: FormData,
+): Promise<OtpFormState> {
+  const parsed = requestOtpSchema.safeParse({ phone: formData.get("phone") });
+  if (!parsed.success) {
+    return { phase: "phone", error: "validation.phoneInvalid" };
+  }
+
+  try {
+    const caller = await apiCaller();
+    await caller.auth.requestOtp({ phone: parsed.data.phone });
+    return { phase: "code", phone: parsed.data.phone };
+  } catch (error) {
+    return { phase: "phone", error: errorKeyFrom(error) };
+  }
+}
+
+/** Step 2: verify the code, mint the cookie session, land role-aware. */
+export async function verifyOtpAction(
+  _prev: OtpFormState,
+  formData: FormData,
+): Promise<OtpFormState> {
+  const parsed = verifyOtpSchema.safeParse({
+    phone: formData.get("phone"),
+    code: formData.get("code"),
+  });
+  if (!parsed.success) {
+    return {
+      phase: "code",
+      phone: String(formData.get("phone") ?? ""),
+      error: "validation.otpInvalid",
+    };
+  }
+
+  let role: "admin" | "customer" | "driver";
+  try {
+    const caller = await apiCaller();
+    const result = await caller.auth.verifyOtp(parsed.data);
+    await setSessionCookie(result.sessionId);
+    role = result.user.role;
+  } catch (error) {
+    return { phase: "code", phone: parsed.data.phone, error: errorKeyFrom(error) };
+  }
+
+  redirect(postAuthPath(role, sanitizeNextPath(formData.get("next") as string)));
+}
+
+/** Kicks off the Google OAuth flow (PKCE state cookies + provider redirect). */
+export async function signInWithGoogleAction(formData: FormData) {
+  const store = await cookies();
+  const next = sanitizeNextPath(formData.get("next") as string);
+  if (next) {
+    store.set(OAUTH_NEXT_COOKIE_KEY, next, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      expires: new Date(Date.now() + 10 * 60 * 1000),
+    });
+  }
+  const url = createGoogleOAuthClient().createAuthUrl(store);
+  redirect(url);
 }
 
 export async function signOutAction() {

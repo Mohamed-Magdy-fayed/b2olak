@@ -10,9 +10,11 @@ const links = [
   { href: "/admin", key: "admin.nav.dashboard" },
   { href: "/admin/orders", key: "admin.nav.orders" },
   { href: "/admin/drivers", key: "admin.nav.drivers" },
+  { href: "/admin/users", key: "admin.nav.users" },
   { href: "/admin/categories", key: "admin.nav.categories" },
   { href: "/admin/items", key: "admin.nav.items" },
   { href: "/admin/items/review", key: "admin.nav.review" },
+  { href: "/admin/geo", key: "admin.nav.geo" },
   { href: "/admin/settings", key: "admin.nav.settings" },
 ] as const;
 

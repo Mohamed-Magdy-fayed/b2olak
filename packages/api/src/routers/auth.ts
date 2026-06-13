@@ -14,6 +14,8 @@ import {
   sendWhatsAppMessage,
 } from "@workspace/integrations/whatsapp/send";
 import {
+  egyptianPhoneSchema,
+  otpCodeSchema,
   requestOtpSchema,
   updateProfileSchema,
   verifyOtpSchema,
@@ -193,4 +195,85 @@ export const authRouter = createTRPCRouter({
     await deleteSession(ctx.session.sessionId);
     return { ok: true as const };
   }),
+
+  /**
+   * Phone linking for accounts created without a phone (e.g. Google OAuth on
+   * web). Ordering requires a verified phone (scam prevention), so this is the
+   * gate-opener for those accounts.
+   */
+  requestPhoneLink: protectedProcedure
+    .input(z.object({ phone: egyptianPhoneSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await enforceRateLimit("otp-send", input.phone, 3, "15 m");
+      await enforceRateLimit("otp-send-ip", ipFromHeaders(ctx.headers), 10, "15 m");
+
+      const owner = await ctx.db.query.UsersTable.findFirst({
+        where: and(
+          eq(UsersTable.phone, input.phone),
+          isNull(UsersTable.deletedAt),
+        ),
+      });
+      if (owner && owner.id !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "auth.phoneAlreadyInUse",
+        });
+      }
+
+      const code = await createOtp(ctx.db, ctx.session.user.id);
+      const whatsappConfig = await getWhatsAppConfig(ctx.db);
+      await sendWhatsAppMessage(
+        whatsappConfig,
+        input.phone,
+        otpMessage(code, ctx.session.user.preferredLocale),
+      );
+
+      return { ok: true as const };
+    }),
+
+  confirmPhoneLink: protectedProcedure
+    .input(z.object({ phone: egyptianPhoneSchema, code: otpCodeSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await enforceRateLimit("otp-verify", input.phone, 10, "15 m");
+
+      const owner = await ctx.db.query.UsersTable.findFirst({
+        where: and(
+          eq(UsersTable.phone, input.phone),
+          isNull(UsersTable.deletedAt),
+        ),
+      });
+      if (owner && owner.id !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "auth.phoneAlreadyInUse",
+        });
+      }
+
+      const result = await verifyOtp(ctx.db, ctx.session.user.id, input.code);
+      if (result !== "ok") {
+        const message =
+          result === "too_many_attempts"
+            ? "auth.otpTooManyAttempts"
+            : result === "expired"
+              ? "auth.otpExpired"
+              : "auth.otpInvalid";
+        throw new TRPCError({ code: "BAD_REQUEST", message });
+      }
+
+      const [updated] = await ctx.db
+        .update(UsersTable)
+        .set({
+          phone: input.phone,
+          phoneVerifiedAt: new Date(),
+          updatedBy: ctx.session.user.id,
+        })
+        .where(eq(UsersTable.id, ctx.session.user.id))
+        .returning();
+
+      if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await updateSessionUser(ctx.session.sessionId, toSessionUser(updated));
+
+      return { user: toSessionUser(updated) };
+    }),
 });

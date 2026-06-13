@@ -2,8 +2,10 @@ import Link from "next/link";
 
 import { buttonVariants } from "@workspace/ui/components/button";
 
+import { UserMenu } from "@/features/auth/user-menu";
 import { LanguageToggle } from "@/components/language-toggle";
 import { AnalyticsScripts } from "@/lib/analytics";
+import { ScrollToTop } from "@/components/scroll-to-top";
 import { getT } from "@/lib/i18n";
 
 export default async function MarketingLayout({
@@ -20,22 +22,27 @@ export default async function MarketingLayout({
 
       <header className="sticky top-0 z-40 border-b bg-background/80 backdrop-blur">
         <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-4">
-          <Link href="/" className="text-2xl font-black text-primary">
+          <Link
+            href="/"
+            className="text-2xl font-black text-primary"
+            aria-label={t("common.appName")}
+          >
             {t("common.appName")}
           </Link>
           <nav className="flex items-center gap-2">
             <LanguageToggle />
+            <UserMenu />
             <Link
-              href="/sign-in"
+              href="/#download"
               className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
-              {t("landing.nav.signIn")}
+              {t("landing.nav.download")}
             </Link>
             <Link
-              href="#download"
+              href="/shop"
               className={buttonVariants({ size: "sm" })}
             >
-              {t("landing.nav.download")}
+              {t("landing.nav.orderNow")}
             </Link>
           </nav>
         </div>
@@ -56,6 +63,8 @@ export default async function MarketingLayout({
           <p>{t("landing.footer.rights", { year })}</p>
         </div>
       </footer>
+
+      <ScrollToTop />
     </div>
   );
 }

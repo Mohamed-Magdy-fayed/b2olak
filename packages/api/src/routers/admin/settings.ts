@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import {
   settingsUpdateSchema,
   whatsappSettingsUpdateSchema,
@@ -6,6 +8,7 @@ import {
 import { adminProcedure, createTRPCRouter } from "../../init";
 import {
   getDeliveryFeeEgp,
+  getStoreLinks,
   getSupportWhatsapp,
   getWhatsAppCredentialsMasked,
   getWhatsAppProvider,
@@ -35,6 +38,49 @@ export const adminSettingsRouter = createTRPCRouter({
         { value: input.supportWhatsappNumber },
         ctx.session.user.id,
       );
+      return { ok: true as const };
+    }),
+
+  getStoreLinks: adminProcedure.query(async ({ ctx }) =>
+    getStoreLinks(ctx.db),
+  ),
+
+  updateStoreLinks: adminProcedure
+    .input(
+      z.object({
+        playStoreUrl: z
+          .string()
+          .trim()
+          .max(512)
+          .refine((v) => v === "" || z.url().safeParse(v).success, {
+            message: "validation.urlInvalid",
+          })
+          .transform((v) => (v === "" ? null : v)),
+        appStoreUrl: z
+          .string()
+          .trim()
+          .max(512)
+          .refine((v) => v === "" || z.url().safeParse(v).success, {
+            message: "validation.urlInvalid",
+          })
+          .transform((v) => (v === "" ? null : v)),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await Promise.all([
+        upsertSetting(
+          ctx.db,
+          SETTING_KEYS.playStoreUrl,
+          { url: input.playStoreUrl ?? "" },
+          ctx.session.user.id,
+        ),
+        upsertSetting(
+          ctx.db,
+          SETTING_KEYS.appStoreUrl,
+          { url: input.appStoreUrl ?? "" },
+          ctx.session.user.id,
+        ),
+      ]);
       return { ok: true as const };
     }),
 

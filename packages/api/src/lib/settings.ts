@@ -17,6 +17,8 @@ import type { z } from "zod";
 export const SETTING_KEYS = {
   deliveryFee: "delivery_fee_egp",
   supportWhatsapp: "support_whatsapp_number",
+  playStoreUrl: "play_store_url",
+  appStoreUrl: "app_store_url",
 } as const;
 
 export async function getDeliveryFeeEgp(db: Db): Promise<number> {
@@ -48,6 +50,27 @@ export async function upsertSetting(
       target: SystemSettingsTable.key,
       set: { value, updatedBy },
     });
+}
+
+export async function getStoreLinks(
+  db: Db,
+): Promise<{ playStoreUrl: string | null; appStoreUrl: string | null }> {
+  const [playRow, appRow] = await Promise.all([
+    db.query.SystemSettingsTable.findFirst({
+      where: eq(SystemSettingsTable.key, SETTING_KEYS.playStoreUrl),
+    }),
+    db.query.SystemSettingsTable.findFirst({
+      where: eq(SystemSettingsTable.key, SETTING_KEYS.appStoreUrl),
+    }),
+  ]);
+  const playStoreUrl =
+    (playRow?.value as { url?: string } | null)?.url ?? null;
+  const appStoreUrl =
+    (appRow?.value as { url?: string } | null)?.url ?? null;
+  return {
+    playStoreUrl: playStoreUrl || null,
+    appStoreUrl: appStoreUrl || null,
+  };
 }
 
 // ── Provider config helpers ──────────────────────────────────────────────────

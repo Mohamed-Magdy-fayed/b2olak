@@ -41,6 +41,32 @@ export default function AdminSettingsPage() {
   const [supportWhatsapp, setSupportWhatsapp] = useState("");
   const [saved, setSaved] = useState(false);
 
+  // ── Store links ───────────────────────────────────────────────────────────
+  const storeLinksOptions = trpc.admin.settings.getStoreLinks.queryOptions();
+  const { data: storeLinksData } = useQuery(storeLinksOptions);
+
+  const [playStoreUrl, setPlayStoreUrl] = useState("");
+  const [appStoreUrl, setAppStoreUrl] = useState("");
+  const [storeLinksSaved, setStoreLinksSaved] = useState(false);
+
+  useEffect(() => {
+    if (storeLinksData) {
+      setPlayStoreUrl(storeLinksData.playStoreUrl ?? "");
+      setAppStoreUrl(storeLinksData.appStoreUrl ?? "");
+    }
+  }, [storeLinksData]);
+
+  const updateStoreLinks = useMutation(
+    trpc.admin.settings.updateStoreLinks.mutationOptions({
+      onSuccess: () => {
+        setStoreLinksSaved(true);
+        void queryClient.invalidateQueries({
+          queryKey: storeLinksOptions.queryKey,
+        });
+      },
+    }),
+  );
+
   useEffect(() => {
     if (data) {
       setDeliveryFee(String(data.deliveryFeeEgp));
@@ -161,6 +187,64 @@ export default function AdminSettingsPage() {
                 supportWhatsappNumber: supportWhatsapp,
               })
             }
+          >
+            {t("common.save")}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* App store links */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("admin.settings.storeLinks")}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <p className="text-muted-foreground text-xs">
+            {t("admin.settings.storeLinksHint")}
+          </p>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="play-store-url">
+              {t("admin.settings.playStoreUrl")}
+            </Label>
+            <Input
+              id="play-store-url"
+              type="url"
+              dir="ltr"
+              value={playStoreUrl}
+              onChange={(e) => {
+                setStoreLinksSaved(false);
+                setPlayStoreUrl(e.target.value);
+              }}
+              placeholder="https://play.google.com/store/apps/details?id=…"
+            />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="app-store-url">
+              {t("admin.settings.appStoreUrl")}
+            </Label>
+            <Input
+              id="app-store-url"
+              type="url"
+              dir="ltr"
+              value={appStoreUrl}
+              onChange={(e) => {
+                setStoreLinksSaved(false);
+                setAppStoreUrl(e.target.value);
+              }}
+              placeholder="https://apps.apple.com/app/…"
+            />
+          </div>
+          {storeLinksSaved ? (
+            <Alert>
+              <AlertDescription>{t("admin.settings.saved")}</AlertDescription>
+            </Alert>
+          ) : null}
+          <Button
+            disabled={updateStoreLinks.isPending}
+            onClick={() => {
+              setStoreLinksSaved(false);
+              updateStoreLinks.mutate({ playStoreUrl, appStoreUrl });
+            }}
           >
             {t("common.save")}
           </Button>

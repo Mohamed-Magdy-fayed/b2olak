@@ -1,5 +1,19 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import { DriverProfilesTable } from "@workspace/db/schemas/drivers/driver-profiles";
@@ -8,40 +22,143 @@ import { ORDER_STATUSES } from "@workspace/validators/order-status";
 
 import { adminProcedure, createTRPCRouter } from "../../init";
 import { applyTransition } from "../../lib/order-transitions";
+import {
+  dateBounds,
+  EXPORT_ROW_CAP,
+  facetValues,
+  isDateRangeValue,
+  isNumberRangeValue,
+  pageMath,
+  tableExportInputSchema,
+  tableListInputSchema,
+} from "../../lib/table-query";
+
+function ordersWhere(input: {
+  columnFilters: { id: string; value: unknown }[];
+  globalFilter?: string;
+}): SQL | undefined {
+  const conditions: (SQL | undefined)[] = [isNull(OrdersTable.deletedAt)];
+
+  for (const filter of input.columnFilters) {
+    if (filter.id === "status") {
+      const values = facetValues(filter.value, ORDER_STATUSES);
+      if (values.length) conditions.push(inArray(OrdersTable.status, values));
+    } else if (filter.id === "createdAt" && isDateRangeValue(filter.value)) {
+      const { from, to } = dateBounds(filter.value);
+      if (from) conditions.push(gte(OrdersTable.createdAt, from));
+      if (to) conditions.push(lte(OrdersTable.createdAt, to));
+    } else if (filter.id === "codTotal" && isNumberRangeValue(filter.value)) {
+      if (typeof filter.value.min === "number") {
+        conditions.push(gte(OrdersTable.codTotal, filter.value.min.toFixed(2)));
+      }
+      if (typeof filter.value.max === "number") {
+        conditions.push(lte(OrdersTable.codTotal, filter.value.max.toFixed(2)));
+      }
+    } else if (
+      filter.id === "area" &&
+      typeof filter.value === "string" &&
+      filter.value.trim()
+    ) {
+      conditions.push(ilike(OrdersTable.area, `%${filter.value.trim()}%`));
+    }
+  }
+
+  const q = input.globalFilter?.trim();
+  if (q) {
+    const pattern = `%${q}%`;
+    const asNumber = Number.parseInt(q, 10);
+    conditions.push(
+      or(
+        Number.isFinite(asNumber) && String(asNumber) === q
+          ? eq(OrdersTable.orderNumber, asNumber)
+          : undefined,
+        sql`exists (select 1 from "users" u where u."id" = ${OrdersTable.customerId} and (u."name" ilike ${pattern} or u."phone" ilike ${pattern}))`,
+      ),
+    );
+  }
+
+  return and(...conditions);
+}
+
+const ORDER_SORTABLE = {
+  orderNumber: OrdersTable.orderNumber,
+  createdAt: OrdersTable.createdAt,
+  codTotal: OrdersTable.codTotal,
+  status: OrdersTable.status,
+} as const;
+
+function ordersOrderBy(sorting: { id: string; desc: boolean }[]) {
+  const explicit = sorting
+    .filter((s): s is { id: keyof typeof ORDER_SORTABLE; desc: boolean } =>
+      s.id in ORDER_SORTABLE,
+    )
+    .map((s) => (s.desc ? desc(ORDER_SORTABLE[s.id]) : asc(ORDER_SORTABLE[s.id])));
+  if (explicit.length) return explicit;
+  // Default: needs-assignment first, newest first (journey A6).
+  return [
+    sql`case when ${OrdersTable.status} = 'placed' then 0 else 1 end`,
+    desc(OrdersTable.createdAt),
+  ];
+}
 
 export const adminOrdersRouter = createTRPCRouter({
   list: adminProcedure
-    .input(
-      z.object({
-        status: z.enum(ORDER_STATUSES).optional(),
-        cursor: z.number().int().min(0).default(0),
-        limit: z.number().int().min(1).max(100).default(50),
-      }),
-    )
+    .input(tableListInputSchema)
     .query(async ({ ctx, input }) => {
-      const where = and(
-        isNull(OrdersTable.deletedAt),
-        input.status ? eq(OrdersTable.status, input.status) : undefined,
-      );
-      const orders = await ctx.db.query.OrdersTable.findMany({
+      const where = ordersWhere(input);
+
+      const [{ value: total } = { value: 0 }] = await ctx.db
+        .select({ value: count() })
+        .from(OrdersTable)
+        .where(where);
+
+      const { pageCount, offset } = pageMath(total, input.page, input.perPage);
+
+      const rows = await ctx.db.query.OrdersTable.findMany({
         where,
         with: {
           customer: { columns: { id: true, name: true, phone: true } },
           driver: { columns: { id: true, name: true, phone: true } },
           items: { columns: { id: true } },
         },
-        // needs-assignment first, oldest first within placed (journey A6)
-        orderBy: [
-          sql`case when ${OrdersTable.status} = 'placed' then 0 else 1 end`,
-          desc(OrdersTable.createdAt),
-        ],
-        offset: input.cursor,
-        limit: input.limit + 1,
+        orderBy: ordersOrderBy(input.sorting),
+        offset,
+        limit: input.perPage,
       });
-      const hasMore = orders.length > input.limit;
+
+      return { rows, pageCount, total };
+    }),
+
+  exportRows: adminProcedure
+    .input(tableExportInputSchema)
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db.query.OrdersTable.findMany({
+        where: ordersWhere(input),
+        with: {
+          customer: { columns: { name: true, phone: true } },
+          driver: { columns: { name: true } },
+          items: { columns: { id: true } },
+        },
+        orderBy: ordersOrderBy(input.sorting),
+        limit: EXPORT_ROW_CAP,
+      });
+
       return {
-        orders: hasMore ? orders.slice(0, input.limit) : orders,
-        nextCursor: hasMore ? input.cursor + input.limit : null,
+        rows: rows.map((order) => ({
+          orderNumber: order.orderNumber,
+          status: order.status,
+          customerName: order.customer?.name ?? "",
+          customerPhone: order.customer?.phone ?? "",
+          driverName: order.driver?.name ?? "",
+          itemCount: order.items.length,
+          city: order.city,
+          area: order.area,
+          street: order.street,
+          deliveryFee: order.deliveryFee,
+          codTotal: order.codTotal ?? "",
+          createdAt: order.createdAt.toISOString(),
+          deliveredAt: order.deliveredAt?.toISOString() ?? "",
+        })),
       };
     }),
 

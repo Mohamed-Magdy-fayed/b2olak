@@ -23,6 +23,14 @@ export const catalogRouter = createTRPCRouter({
     return { amount: await getDeliveryFeeEgp(ctx.db) };
   }),
 
+  /** Public store links — shown on the landing page download section. */
+  storeLinks: baseProcedure.query(({ ctx }) =>
+    cached("catalog:store-links", 60, async () => {
+      const { getStoreLinks } = await import("../lib/settings");
+      return getStoreLinks(ctx.db);
+    }),
+  ),
+
   categories: baseProcedure.query(({ ctx }) =>
     cached("catalog:categories", 60, () =>
       ctx.db.query.CategoriesTable.findMany({

@@ -8,16 +8,20 @@ import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { adminProcedure, createTRPCRouter } from "../../init";
 import { adminCatalogRouter } from "./catalog";
 import { adminDriversRouter } from "./drivers";
+import { adminGeoRouter } from "./geo";
 import { adminOrdersRouter } from "./orders";
 import { adminReviewRouter } from "./review";
 import { adminSettingsRouter } from "./settings";
+import { adminUsersRouter } from "./users";
 
 export const adminRouter = createTRPCRouter({
   catalog: adminCatalogRouter,
   drivers: adminDriversRouter,
+  geo: adminGeoRouter,
   orders: adminOrdersRouter,
   review: adminReviewRouter,
   settings: adminSettingsRouter,
+  users: adminUsersRouter,
 
   dashboard: adminProcedure.query(async ({ ctx }) => {
     const [customers] = await ctx.db

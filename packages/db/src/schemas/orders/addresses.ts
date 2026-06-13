@@ -10,6 +10,9 @@ import {
 
 import { auditColumns, id } from "../../helpers";
 import { UsersTable } from "../auth/users";
+import { AreasTable } from "../geo/areas";
+import { CitiesTable } from "../geo/cities";
+import { DistrictsTable } from "../geo/districts";
 
 export const AddressesTable = pgTable(
   "addresses",
@@ -19,6 +22,16 @@ export const AddressesTable = pgTable(
       .notNull()
       .references(() => UsersTable.id, { onDelete: "cascade" }),
     label: varchar({ length: 64 }),
+    /**
+     * Structured geo selection (admin-defined coverage). Nullable for legacy
+     * free-text rows; new addresses always carry the full chain. The text
+     * columns below are localized name snapshots resolved at write time.
+     */
+    cityId: uuid().references(() => CitiesTable.id, { onDelete: "set null" }),
+    districtId: uuid().references(() => DistrictsTable.id, {
+      onDelete: "set null",
+    }),
+    areaId: uuid().references(() => AreasTable.id, { onDelete: "set null" }),
     city: varchar({ length: 128 }).notNull(),
     area: varchar({ length: 128 }).notNull(),
     street: varchar({ length: 256 }).notNull(),
@@ -39,6 +52,18 @@ export const addressesRelations = relations(AddressesTable, ({ one }) => ({
   user: one(UsersTable, {
     fields: [AddressesTable.userId],
     references: [UsersTable.id],
+  }),
+  cityRef: one(CitiesTable, {
+    fields: [AddressesTable.cityId],
+    references: [CitiesTable.id],
+  }),
+  districtRef: one(DistrictsTable, {
+    fields: [AddressesTable.districtId],
+    references: [DistrictsTable.id],
+  }),
+  areaRef: one(AreasTable, {
+    fields: [AddressesTable.areaId],
+    references: [AreasTable.id],
   }),
 }));
 

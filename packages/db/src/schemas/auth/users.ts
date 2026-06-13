@@ -4,6 +4,8 @@ import { pgEnum, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg
 import { auditColumns, id } from "../../helpers";
 import { DriverProfilesTable } from "../drivers/driver-profiles";
 import { UserCredentialsTable } from "./user-credentials";
+import { UserOAuthAccountsTable } from "./user-oauth-accounts";
+import { UserPasskeysTable } from "./user-passkeys";
 import { UserTokensTable } from "./user-tokens";
 
 export const userRoleValues = ["admin", "customer", "driver"] as const;
@@ -48,6 +50,8 @@ export const usersRelations = relations(UsersTable, ({ many, one }) => ({
     references: [UserCredentialsTable.userId],
   }),
   tokens: many(UserTokensTable),
+  oauthAccounts: many(UserOAuthAccountsTable),
+  passkeys: many(UserPasskeysTable),
   driverProfile: one(DriverProfilesTable, {
     fields: [UsersTable.id],
     references: [DriverProfilesTable.userId],

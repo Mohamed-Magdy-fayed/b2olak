@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
+import { createCallerFactory, createTRPCContext } from "@workspace/api/init";
+import { appRouter } from "@workspace/api/root";
 
+import { CategoryTeaser } from "@/features/marketing/category-teaser";
 import { DownloadButtons } from "@/features/marketing/download-buttons";
+import { DownloadSection } from "@/features/marketing/download-section";
 import { getT } from "@/lib/i18n";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -20,10 +25,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-const CATEGORY_EMOJIS = ["🍅", "🥖", "🥛", "🍗", "🐟", "🧃", "🍫", "🧼", "🧴", "🍼"];
-
 export default async function LandingPage() {
   const { t } = await getT();
+
+  const ctx = await createTRPCContext({ headers: await headers() });
+  const caller = createCallerFactory(appRouter)(ctx);
+  const { playStoreUrl, appStoreUrl } = await caller.catalog.storeLinks();
 
   return (
     <div className="flex flex-col">
@@ -41,7 +48,10 @@ export default async function LandingPage() {
           <p className="text-muted-foreground max-w-xl text-lg md:text-xl">
             {t("landing.hero.subtitle")}
           </p>
-          <DownloadButtons />
+          <DownloadButtons
+            playStoreUrl={playStoreUrl}
+            appStoreUrl={appStoreUrl}
+          />
         </div>
       </section>
 
@@ -61,12 +71,12 @@ export default async function LandingPage() {
             ).map(([emoji, titleKey, bodyKey], index) => (
               <Card
                 key={titleKey}
-                className="items-center gap-3 rounded-2xl p-8 text-center"
+                className="relative items-center gap-3 rounded-2xl p-8 text-center"
               >
-                <span className="text-5xl">{emoji}</span>
-                <Badge className="bg-primary/10 text-primary rounded-full border-transparent px-3 py-0.5 font-bold">
+                <Badge className="bg-primary/10 text-primary absolute top-4 start-4 rounded-full border-transparent px-3 py-0.5 font-bold">
                   {index + 1}
                 </Badge>
+                <span className="text-5xl">{emoji}</span>
                 <h3 className="text-xl font-bold">{t(titleKey)}</h3>
                 <p className="text-muted-foreground">{t(bodyKey)}</p>
               </Card>
@@ -76,39 +86,10 @@ export default async function LandingPage() {
       </section>
 
       {/* categories teaser */}
-      <section className="py-16">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-4 px-4 text-center">
-          <h2 className="text-3xl font-black md:text-4xl">
-            {t("landing.categories.title")}
-          </h2>
-          <p className="text-muted-foreground max-w-lg">
-            {t("landing.categories.subtitle")}
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-3">
-            {CATEGORY_EMOJIS.map((emoji) => (
-              <span
-                key={emoji}
-                className="bg-card flex size-16 items-center justify-center rounded-2xl border text-3xl"
-              >
-                {emoji}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
+      <CategoryTeaser />
 
-      {/* bottom CTA */}
-      <section id="download" className="bg-primary py-16">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-4 px-4 text-center">
-          <h2 className="text-primary-foreground text-3xl font-black md:text-4xl">
-            {t("landing.cta.title")}
-          </h2>
-          <p className="text-primary-foreground/80 max-w-lg text-lg">
-            {t("landing.cta.body")}
-          </p>
-          <DownloadButtons variant="inverted" />
-        </div>
-      </section>
+      {/* bottom CTA / download / waitlist */}
+      <DownloadSection playStoreUrl={playStoreUrl} appStoreUrl={appStoreUrl} />
     </div>
   );
 }
