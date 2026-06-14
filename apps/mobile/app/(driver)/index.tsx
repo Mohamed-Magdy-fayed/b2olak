@@ -1,4 +1,5 @@
 import { FlatList, Pressable, Switch, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -8,6 +9,7 @@ import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
 export default function DriverHome() {
+  const insets = useSafeAreaInsets();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -103,7 +105,7 @@ export default function DriverHome() {
             {t("driver.noActive")}
           </Text>
         }
-        contentContainerClassName="pb-6"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
       />
     </View>
   );

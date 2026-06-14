@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ export default function DriverOrderScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +57,56 @@ export default function DriverOrderScreen() {
   const startShopping = useMutation(
     trpc.driver.startShopping.mutationOptions(mutationOpts),
   );
+  // Per-line edits update the cache optimistically so the row flips instantly;
+  // the server call (and its recomputed totals) reconciles in the background.
   const updateLine = useMutation(
-    trpc.driver.updateLine.mutationOptions(mutationOpts),
+    trpc.driver.updateLine.mutationOptions({
+      onMutate: async (vars) => {
+        await queryClient.cancelQueries({ queryKey: orderOptions.queryKey });
+        const previous = queryClient.getQueryData(orderOptions.queryKey);
+        setError(null);
+        queryClient.setQueryData(orderOptions.queryKey, (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((it) =>
+              it.id === vars.orderItemId
+                ? {
+                    ...it,
+                    status: vars.status,
+                    actualUnitPrice:
+                      vars.actualUnitPrice != null
+                        ? vars.actualUnitPrice.toFixed(2)
+                        : null,
+                    actualLineTotal:
+                      vars.actualUnitPrice != null
+                        ? (vars.actualUnitPrice * Number(it.qty)).toFixed(2)
+                        : null,
+                  }
+                : it,
+            ),
+          };
+        });
+        return { previous };
+      },
+      onError: (err, _vars, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(orderOptions.queryKey, context.previous);
+        }
+        setError(
+          err.message === "driver.linesPending"
+            ? t("driver.linesPending")
+            : err.message === "driver.priceRequired"
+              ? t("driver.priceRequired")
+              : t("errors.unknown"),
+        );
+      },
+      onSettled: () => {
+        void queryClient.invalidateQueries({
+          queryKey: orderOptions.queryKey,
+        });
+      },
+    }),
   );
   const doneShopping = useMutation(
     trpc.driver.doneShopping.mutationOptions(mutationOpts),
@@ -102,7 +152,8 @@ export default function DriverOrderScreen() {
   return (
     <ScrollView
       className="flex-1 bg-background px-4 pt-16"
-      contentContainerClassName="gap-4 pb-10"
+      contentContainerClassName="gap-4"
+      contentContainerStyle={{ paddingBottom: insets.bottom + 96 }}
       keyboardShouldPersistTaps="handled"
     >
       <View className="flex-row items-center gap-3">
@@ -176,7 +227,7 @@ export default function DriverOrderScreen() {
               {shoppingMode ? (
                 <View className="flex-row items-center gap-2">
                   <TextInput
-                    className="h-10 flex-1 rounded-lg border border-input bg-card px-3 text-foreground"
+                    className="h-12 flex-1 rounded-lg border border-input bg-card px-3 text-foreground"
                     placeholder={t("driver.enterPrice")}
                     placeholderTextColor="#71717a"
                     keyboardType="decimal-pad"
@@ -187,7 +238,7 @@ export default function DriverOrderScreen() {
                     style={{ textAlign: "left", writingDirection: "ltr" }}
                   />
                   <Pressable
-                    className="rounded-lg bg-success px-3 py-2.5"
+                    className="rounded-lg bg-success px-3 py-3.5"
                     onPress={() => {
                       const price = Number(prices[line.id] ?? line.actualUnitPrice);
                       if (!price || price <= 0) {
@@ -206,7 +257,7 @@ export default function DriverOrderScreen() {
                     </Text>
                   </Pressable>
                   <Pressable
-                    className="rounded-lg bg-destructive px-3 py-2.5"
+                    className="rounded-lg bg-destructive px-3 py-3.5"
                     onPress={() =>
                       updateLine.mutate({
                         orderItemId: line.id,
