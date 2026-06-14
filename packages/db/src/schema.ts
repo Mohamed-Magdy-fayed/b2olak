@@ -10,6 +10,7 @@ export * from "./schemas/auth/user-credentials";
 export * from "./schemas/auth/user-tokens";
 export * from "./schemas/auth/user-oauth-accounts";
 export * from "./schemas/auth/user-passkeys";
+export * from "./schemas/auth/user-devices";
 export * from "./schemas/geo/cities";
 export * from "./schemas/geo/districts";
 export * from "./schemas/geo/areas";

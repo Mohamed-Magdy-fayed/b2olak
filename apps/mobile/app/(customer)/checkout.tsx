@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { itemDisplayName } from "@/components/item-row";
+import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useCart } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
@@ -58,6 +59,7 @@ function addressSubtitle(
 export default function CheckoutScreen() {
   const trpc = useTRPC();
   const { t, locale } = useTranslation();
+  const signedIn = useSignedIn();
   const lines = useCart((s) => s.lines);
   const clear = useCart((s) => s.clear);
 
@@ -65,7 +67,21 @@ export default function CheckoutScreen() {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const { data: addresses } = useQuery(trpc.addresses.list.queryOptions());
+  // Checkout is the sign-in wall. A guest who reaches it (e.g. deep link) is
+  // sent to sign-in and returned here afterwards.
+  useEffect(() => {
+    if (signedIn === false) {
+      router.replace({
+        pathname: "/(auth)/sign-in",
+        params: { returnTo: "/(customer)/checkout" },
+      });
+    }
+  }, [signedIn]);
+
+  const { data: addresses } = useQuery({
+    ...trpc.addresses.list.queryOptions(),
+    enabled: signedIn === true,
+  });
   const { data: fee } = useQuery(trpc.catalog.deliveryFee.queryOptions());
 
   const selected =

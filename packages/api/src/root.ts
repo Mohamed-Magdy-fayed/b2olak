@@ -1,6 +1,7 @@
 import { createTRPCRouter } from "./init";
 import { addressesRouter } from "./routers/addresses";
 import { adminRouter } from "./routers/admin/index";
+import { analyticsRouter } from "./routers/analytics";
 import { authRouter } from "./routers/auth";
 import { catalogRouter } from "./routers/catalog";
 import { driverRouter } from "./routers/driver";
@@ -13,6 +14,7 @@ import { waitlistRouter } from "./routers/waitlist";
 export const appRouter = createTRPCRouter({
   health: healthRouter,
   auth: authRouter,
+  analytics: analyticsRouter,
   catalog: catalogRouter,
   geo: geoRouter,
   items: itemsRouter,

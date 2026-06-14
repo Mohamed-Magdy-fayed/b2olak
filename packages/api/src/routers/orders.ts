@@ -145,6 +145,20 @@ export const ordersRouter = createTRPCRouter({
         // notifications are best-effort
       }
 
+      try {
+        await inngest.send({
+          name: "order/placed",
+          data: {
+            orderId: result.id,
+            userId: ctx.session.user.id,
+            value: Number(deliveryFee),
+            currency: "EGP",
+          },
+        });
+      } catch {
+        // best-effort
+      }
+
       return { orderId: result.id, orderNumber: result.orderNumber };
     }),
 

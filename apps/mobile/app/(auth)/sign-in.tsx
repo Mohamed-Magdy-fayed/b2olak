@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { KeyboardAvoidingView, Platform, Text, View } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 
 import { LanguageToggle } from "@/components/language-toggle";
@@ -12,13 +12,17 @@ import { useTRPC } from "@/lib/trpc";
 export default function SignInScreen() {
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const requestOtp = useMutation(
     trpc.auth.requestOtp.mutationOptions({
       onSuccess: () => {
-        router.push({ pathname: "/(auth)/verify", params: { phone } });
+        router.push({
+          pathname: "/(auth)/verify",
+          params: { phone, ...(returnTo ? { returnTo } : {}) },
+        });
       },
       onError: (err) => {
         console.log(err);
@@ -48,6 +52,11 @@ export default function SignInScreen() {
           <Text className="text-center text-lg text-muted-foreground">
             {t("mobile.welcomeSubtitle")}
           </Text>
+          {returnTo?.includes("checkout") ? (
+            <Text className="text-center font-semibold text-primary">
+              🛒 {t("shop.cartSavedHint")}
+            </Text>
+          ) : null}
         </View>
         <View className="gap-3">
           <Text className="font-medium text-foreground">

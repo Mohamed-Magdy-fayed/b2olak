@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Modal,
   Pressable,
@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -239,12 +240,21 @@ export default function AddressesScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
+  const signedIn = useSignedIn();
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Address management is sign-in only; a guest who lands here is sent back.
+  useEffect(() => {
+    if (signedIn === false) router.replace("/(customer)");
+  }, [signedIn]);
+
   // List addresses
   const listOptions = trpc.addresses.list.queryOptions();
-  const { data: addresses } = useQuery(listOptions);
+  const { data: addresses } = useQuery({
+    ...listOptions,
+    enabled: signedIn === true,
+  });
 
   // Geo queries — city always loaded, district/area enabled by selection
   const citiesOptions = trpc.geo.cities.queryOptions();

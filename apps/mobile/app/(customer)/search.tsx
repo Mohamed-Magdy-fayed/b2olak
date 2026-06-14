@@ -7,6 +7,7 @@ import { ItemRow } from "@/components/item-row";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { ensureSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useCart } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
@@ -305,7 +306,9 @@ export default function SearchScreen() {
             showAddCta ? (
               <Pressable
                 className="mt-2 items-center rounded-xl border border-dashed border-primary p-4"
-                onPress={() => {
+                onPress={async () => {
+                  // Adding a not-found item writes to the catalog — gate it.
+                  if (!(await ensureSignedIn("/(customer)/search"))) return;
                   setFeedback(null);
                   setAdding(true);
                 }}

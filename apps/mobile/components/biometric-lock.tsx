@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import { Button } from "@/components/ui/button";
 import { authenticate } from "@/lib/biometric";
 import { useTranslation } from "@/lib/i18n";
-import { clearToken } from "@/lib/session";
+import { removeActiveAccount } from "@/lib/session";
 
 /**
  * Full-screen gate shown on cold start when biometric unlock is enabled. Runs
@@ -31,8 +31,8 @@ export function BiometricLock({ onUnlocked }: { onUnlocked: () => void }) {
   }, [tryUnlock]);
 
   const useOtp = useCallback(async () => {
-    await clearToken();
-    router.replace("/(auth)/sign-in");
+    const remaining = await removeActiveAccount();
+    router.replace(remaining.length > 0 ? "/" : "/(auth)/sign-in");
   }, []);
 
   return (

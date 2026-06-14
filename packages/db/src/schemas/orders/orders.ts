@@ -48,6 +48,7 @@ export const OrdersTable = pgTable(
     deliveryFee: numeric({ precision: 10, scale: 2 }).notNull(),
     actualItemsTotal: numeric({ precision: 10, scale: 2 }),
     codTotal: numeric({ precision: 10, scale: 2 }),
+    amountCollected: numeric({ precision: 10, scale: 2 }),
     customerNote: text(),
     cancelledBy: cancelledByEnum(),
     cancelReason: text(),

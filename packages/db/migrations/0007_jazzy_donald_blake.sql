@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "amount_collected" numeric(10, 2);

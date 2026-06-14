@@ -218,7 +218,7 @@ export const driverRouter = createTRPCRouter({
     }),
 
   markDelivered: driverProcedure
-    .input(z.object({ orderId: z.uuid() }))
+    .input(z.object({ orderId: z.uuid(), amountCollected: z.number().positive().max(100_000) }))
     .mutation(async ({ ctx, input }) => {
       const order = await ownedOrder(ctx.db, input.orderId, ctx.session.user.id);
       await applyTransition(
@@ -226,8 +226,8 @@ export const driverRouter = createTRPCRouter({
         order,
         "delivered",
         { id: ctx.session.user.id, role: "driver" },
-        { extra: { deliveredAt: new Date() } },
+        { extra: { deliveredAt: new Date(), amountCollected: input.amountCollected.toFixed(2) } },
       );
-      return { ok: true as const, codTotal: order.codTotal };
+      return { ok: true as const, codTotal: order.codTotal, amountCollected: input.amountCollected.toFixed(2) };
     }),
 });

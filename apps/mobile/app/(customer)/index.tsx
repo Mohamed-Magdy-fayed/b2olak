@@ -5,12 +5,14 @@ import { useQuery } from "@tanstack/react-query";
 import { CategoryCard } from "@/components/category-card";
 import { ItemHScroll } from "@/components/item-h-scroll";
 import { LanguageToggle } from "@/components/language-toggle";
+import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
 export default function CustomerHome() {
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const signedIn = useSignedIn();
 
   const { data: categories, isLoading: categoriesLoading } = useQuery(
     trpc.catalog.categories.queryOptions(),
@@ -18,9 +20,11 @@ export default function CustomerHome() {
   const { data: popularItems } = useQuery(
     trpc.catalog.popularItems.queryOptions(),
   );
-  const { data: reorderItems } = useQuery(
-    trpc.catalog.reorderItems.queryOptions(),
-  );
+  // "Buy again" is personalised and auth-only — skip it entirely for guests.
+  const { data: reorderItems } = useQuery({
+    ...trpc.catalog.reorderItems.queryOptions(),
+    enabled: signedIn === true,
+  });
 
   return (
     <ScrollView

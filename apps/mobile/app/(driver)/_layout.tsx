@@ -1,6 +1,7 @@
 import { Text } from "react-native";
 import { Tabs } from "expo-router";
 
+import { AuthGuard } from "@/components/auth-guard";
 import { useTranslation } from "@/lib/i18n";
 
 function TabIcon({ glyph, focused }: { glyph: string; focused: boolean }) {
@@ -13,6 +14,7 @@ export default function DriverLayout() {
   const { t } = useTranslation();
 
   return (
+    <AuthGuard>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -43,5 +45,6 @@ export default function DriverLayout() {
       />
       <Tabs.Screen name="orders/[id]" options={{ href: null }} />
     </Tabs>
+    </AuthGuard>
   );
 }

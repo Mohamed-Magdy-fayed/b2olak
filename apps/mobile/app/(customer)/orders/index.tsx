@@ -2,6 +2,8 @@ import { FlatList, Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { Button } from "@/components/ui/button";
+import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -26,11 +28,30 @@ export function StatusChip({ status }: { status: string }) {
 export default function OrdersScreen() {
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const signedIn = useSignedIn();
 
   const { data } = useQuery({
     ...trpc.orders.mine.queryOptions({ cursor: 0 }),
     refetchInterval: 15_000,
+    enabled: signedIn === true,
   });
+
+  if (signedIn === false) {
+    return (
+      <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
+        <Text className="text-center text-xl font-black text-foreground">
+          {t("shop.guestOrdersTitle")}
+        </Text>
+        <Text className="text-center text-muted-foreground">
+          {t("shop.guestOrdersSubtitle")}
+        </Text>
+        <Button
+          label={t("shop.signInCta")}
+          onPress={() => router.push("/(auth)/sign-in")}
+        />
+      </View>
+    );
+  }
 
   const orders = [...(data?.orders ?? [])].sort((a, b) => {
     const aActive = ACTIVE.includes(a.status) ? 0 : 1;

@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { itemDisplayName } from "@/components/item-row";
+import { track } from "@/lib/analytics";
+import { ensureSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useCart } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
@@ -86,7 +88,16 @@ export default function CartScreen() {
             </Text>
             <Button
               label={t("shop.checkout")}
-              onPress={() => router.push("/(customer)/checkout")}
+              onPress={async () => {
+                track("begin_checkout", {
+                  value: fee ? Number(fee.amount) : undefined,
+                  currency: "EGP",
+                  itemCount: lines.length,
+                });
+                if (await ensureSignedIn("/(customer)/checkout")) {
+                  router.push("/(customer)/checkout");
+                }
+              }}
             />
           </View>
         </>

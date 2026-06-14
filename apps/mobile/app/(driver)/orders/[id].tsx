@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -24,6 +23,8 @@ export default function DriverOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [collecting, setCollecting] = useState(false);
+  const [cashCollected, setCashCollected] = useState("");
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
   const { data: order } = useQuery({ ...orderOptions, enabled: !!id });
@@ -262,24 +263,42 @@ export default function DriverOrderScreen() {
           onPress={() => startDelivery.mutate({ orderId: order.id })}
         />
       ) : null}
-      {order.status === "delivering" ? (
+      {order.status === "delivering" && !collecting ? (
         <Button
           label={t("driver.markDelivered")}
           loading={markDelivered.isPending}
-          onPress={() =>
-            Alert.alert(
-              t("driver.markDelivered"),
-              t("driver.deliveredConfirm", { amount: codTotal }),
-              [
-                { text: t("common.cancel"), style: "cancel" },
-                {
-                  text: t("common.confirm"),
-                  onPress: () => markDelivered.mutate({ orderId: order.id }),
-                },
-              ],
-            )
-          }
+          onPress={() => setCollecting(true)}
         />
+      ) : null}
+      {order.status === "delivering" && collecting ? (
+        <Card className="gap-3">
+          <Text className="font-semibold text-foreground">
+            {t("driver.cashCollectedLabel")}
+          </Text>
+          <Text className="text-sm text-muted-foreground">
+            {t("driver.cashCollectedHint", { amount: codTotal })}
+          </Text>
+          <TextInput
+            className="h-12 rounded-lg border border-input bg-card px-3 text-foreground"
+            keyboardType="decimal-pad"
+            value={cashCollected}
+            onChangeText={setCashCollected}
+            placeholderTextColor="#71717a"
+            style={{ textAlign: "left", writingDirection: "ltr" }}
+          />
+          <Button
+            label={t("driver.confirmCollected")}
+            loading={markDelivered.isPending}
+            onPress={() => {
+              const amount = Number(cashCollected);
+              if (!amount || amount <= 0) {
+                setError(t("driver.amountRequired"));
+                return;
+              }
+              markDelivered.mutate({ orderId: order.id, amountCollected: amount });
+            }}
+          />
+        </Card>
       ) : null}
     </ScrollView>
   );

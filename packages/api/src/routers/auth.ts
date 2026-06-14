@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { and, eq, isNull } from "drizzle-orm";
+import * as crypto from "node:crypto";
 
 import { createOtp, verifyOtp } from "@workspace/auth/otp";
 import {
@@ -17,8 +18,10 @@ import {
   registerPasskey,
   registrationResponseSchema,
 } from "@workspace/auth/webauthn";
+import { UserDevicesTable } from "@workspace/db/schemas/auth/user-devices";
 import { UserPasskeysTable } from "@workspace/db/schemas/auth/user-passkeys";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
+import { inngest } from "@workspace/integrations/inngest/client";
 import { getWhatsAppConfig } from "@workspace/integrations/whatsapp/config";
 import {
   sendWhatsAppMessage,
@@ -39,6 +42,10 @@ import {
   protectedProcedure,
 } from "../init";
 import { enforceRateLimit, ipFromHeaders } from "../ratelimit";
+
+function sha256(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
 
 function otpMessage(code: string, locale: "en" | "ar") {
   return locale === "ar"
@@ -144,6 +151,19 @@ export const authRouter = createTRPCRouter({
 
       const session = await createSession(toSessionUser(user));
 
+      try {
+        await inngest.send({
+          name: "auth/signed_in",
+          data: {
+            userId: user.id,
+            role: user.role,
+            signedInAt: new Date().toISOString(),
+          },
+        });
+      } catch {
+        // best-effort
+      }
+
       return {
         sessionId: session.sessionId,
         user: session.user,
@@ -202,6 +222,16 @@ export const authRouter = createTRPCRouter({
     }),
 
   signOut: protectedProcedure.mutation(async ({ ctx }) => {
+    if (ctx.session.user.role === "customer") {
+      try {
+        await inngest.send({
+          name: "customer/signed_out",
+          data: { userId: ctx.session.user.id, signedOutAt: new Date().toISOString() },
+        });
+      } catch {
+        // best-effort
+      }
+    }
     await deleteSession(ctx.session.sessionId);
     return { ok: true as const };
   }),
@@ -435,6 +465,133 @@ export const authRouter = createTRPCRouter({
         )
         .returning();
       if (!updated) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
+    }),
+
+  /**
+   * ── Trusted-device biometric login ──────────────────────────────────────
+   * Lets a mobile device re-authenticate without OTP by presenting a
+   * device-bound secret that was issued at registration time.
+   */
+
+  /**
+   * Register the current device as trusted. Returns a (deviceId, secret) pair
+   * that the client must persist securely (e.g. in the device Keychain /
+   * Keystore). The secret is returned exactly once and never stored in plain
+   * text.
+   */
+  registerDevice: protectedProcedure
+    .input(z.object({ label: z.string().max(64).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const deviceId = crypto.randomUUID();
+      const secret = crypto.randomBytes(32).toString("hex");
+
+      await ctx.db.insert(UserDevicesTable).values({
+        userId: ctx.session.user.id,
+        deviceId,
+        secretHash: sha256(secret),
+        label: input.label,
+        createdBy: ctx.session.user.id,
+      });
+
+      return { deviceId, secret };
+    }),
+
+  /**
+   * Exchange a (deviceId, secret) pair for a fresh session. Rate-limited on
+   * both IP and deviceId to resist brute-force. Uses timing-safe comparison
+   * to prevent hash-timing attacks.
+   */
+  deviceLogin: baseProcedure
+    .input(
+      z.object({
+        deviceId: z.string().min(1).max(128),
+        secret: z.string().min(1).max(256),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      await enforceRateLimit("device-login-ip", ipFromHeaders(ctx.headers), 20, "15 m");
+      await enforceRateLimit("device-login", input.deviceId, 10, "15 m");
+
+      const device = await ctx.db.query.UserDevicesTable.findFirst({
+        where: eq(UserDevicesTable.deviceId, input.deviceId),
+      });
+
+      if (!device) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "auth.deviceLoginFailed" });
+      }
+
+      // Timing-safe comparison — guard against unequal buffer lengths (timingSafeEqual
+      // throws if the two Buffers differ in byte length).
+      const candidateHash = sha256(input.secret);
+      const candidateBuf = Buffer.from(candidateHash, "utf8");
+      const storedBuf = Buffer.from(device.secretHash, "utf8");
+      const match =
+        candidateBuf.length === storedBuf.length &&
+        crypto.timingSafeEqual(candidateBuf, storedBuf);
+
+      if (!match) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "auth.deviceLoginFailed" });
+      }
+
+      const user = await ctx.db.query.UsersTable.findFirst({
+        where: and(
+          eq(UsersTable.id, device.userId),
+          isNull(UsersTable.deletedAt),
+        ),
+      });
+
+      if (!user) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "auth.deviceLoginFailed" });
+      }
+      if (user.status === "suspended") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "auth.suspended" });
+      }
+
+      const now = new Date();
+      await ctx.db
+        .update(UserDevicesTable)
+        .set({ lastUsedAt: now })
+        .where(eq(UserDevicesTable.id, device.id));
+
+      await ctx.db
+        .update(UsersTable)
+        .set({ lastSignInAt: now })
+        .where(eq(UsersTable.id, user.id));
+
+      const session = await createSession(toSessionUser(user));
+
+      try {
+        await inngest.send({
+          name: "auth/signed_in",
+          data: {
+            userId: user.id,
+            role: user.role,
+            signedInAt: new Date().toISOString(),
+          },
+        });
+      } catch {
+        // best-effort
+      }
+
+      return { sessionId: session.sessionId, user: session.user };
+    }),
+
+  /**
+   * Revoke a trusted device. Only the owning user can revoke their own devices.
+   */
+  revokeDevice: protectedProcedure
+    .input(z.object({ deviceId: z.string().min(1).max(128) }))
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .delete(UserDevicesTable)
+        .where(
+          and(
+            eq(UserDevicesTable.deviceId, input.deviceId),
+            eq(UserDevicesTable.userId, ctx.session.user.id),
+          ),
+        );
+
       return { ok: true as const };
     }),
 });
