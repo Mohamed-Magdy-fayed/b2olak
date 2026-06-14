@@ -5,12 +5,19 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { useTRPC } from "@/lib/trpc/client";
-import { useCart } from "@/features/shop/cart-store";
+import { cartLineUnitName, useCart } from "@/features/shop/cart-store";
 import { itemDisplayName } from "@/features/shop/helpers";
 import { QtyStepper } from "@/features/shop/qty-stepper";
 
-import { Button, buttonVariants } from "@workspace/ui/components/button";
+import { buttonVariants } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 
 export default function CartPage() {
   const { t, locale } = useTranslation();
@@ -19,6 +26,7 @@ export default function CartPage() {
   const lines = useCart((s) => s.lines);
   const setQty = useCart((s) => s.setQty);
   const setNote = useCart((s) => s.setNote);
+  const setUnit = useCart((s) => s.setUnit);
   const remove = useCart((s) => s.remove);
 
   const { data: feeData } = useQuery(trpc.catalog.deliveryFee.queryOptions());
@@ -51,9 +59,27 @@ export default function CartPage() {
                 <span className="text-sm font-semibold text-foreground">
                   {itemDisplayName(line, locale)}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {t(`units.${line.unit}` as never)}
-                </span>
+                {line.units.length > 1 ? (
+                  <Select
+                    value={line.unitId}
+                    onValueChange={(v) => v && setUnit(line.itemId, v)}
+                  >
+                    <SelectTrigger className="mt-0.5 h-7 w-auto gap-1 px-2 py-0 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {line.units.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {locale === "ar" ? u.nameAr : u.nameEn}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    {cartLineUnitName(line, locale)}
+                  </span>
+                )}
               </div>
               <QtyStepper
                 qty={line.qty}

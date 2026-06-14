@@ -1,10 +1,13 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { ActivityIndicator, Pressable, Text } from "react-native";
+import * as Haptics from "expo-haptics";
 
-/** shadcn-parity button (react-native-reusables conventions, cva variants). */
+import { glowShadow } from "@/lib/shadows";
+
+/** Dark-luxury button — gold primary, glow depth, subtle haptics. */
 
 const buttonVariants = cva(
-  "flex-row items-center justify-center rounded-xl active:opacity-80",
+  "flex-row items-center justify-center rounded-2xl active:opacity-90",
   {
     variants: {
       variant: {
@@ -15,16 +18,16 @@ const buttonVariants = cva(
         destructive: "bg-destructive",
       },
       size: {
-        default: "h-12 px-5",
-        sm: "h-9 px-3",
-        lg: "h-14 px-6",
+        default: "h-14 px-6",
+        sm: "h-10 px-4",
+        lg: "h-16 px-7",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
   },
 );
 
-const buttonTextVariants = cva("font-semibold", {
+const buttonTextVariants = cva("font-medium tracking-wide", {
   variants: {
     variant: {
       default: "text-primary-foreground",
@@ -55,19 +58,27 @@ export function Button({
   onPress,
   disabled,
   loading,
-  variant,
+  variant = "default",
   size,
   className,
 }: ButtonProps) {
+  const inactive = disabled || loading;
   return (
     <Pressable
       accessibilityRole="button"
-      disabled={disabled || loading}
-      onPress={onPress}
-      className={`${buttonVariants({ variant, size })} ${disabled || loading ? "opacity-50" : ""} ${className ?? ""}`}
+      disabled={inactive}
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress?.();
+      }}
+      style={variant === "default" && !inactive ? glowShadow : undefined}
+      className={`${buttonVariants({ variant, size })} ${inactive ? "opacity-50" : ""} ${className ?? ""}`}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="#ffffff" />
+        <ActivityIndicator
+          size="small"
+          color={variant === "default" ? "#0E0E10" : "#F5F2EC"}
+        />
       ) : (
         <Text className={buttonTextVariants({ variant, size })}>{label}</Text>
       )}

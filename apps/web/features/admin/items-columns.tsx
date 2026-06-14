@@ -2,7 +2,7 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import type { Row } from "@tanstack/react-table";
-import { MoreHorizontalIcon } from "lucide-react";
+import { CheckIcon, MoreHorizontalIcon } from "lucide-react";
 
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -37,15 +37,26 @@ import {
   createSelectColumn,
 } from "@/features/core/data-table";
 
-const UNITS = ["piece", "kg", "gram", "liter", "pack"] as const;
-type Unit = (typeof UNITS)[number];
+export type UnitOption = {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+};
+
+type ItemUnitLink = {
+  unitId: string;
+  isDefault: boolean;
+  sortOrder: number;
+  unit: { id: string; code: string; nameEn: string; nameAr: string };
+};
 
 export type ItemRow = {
   id: string;
   nameEn: string | null;
   nameAr: string | null;
   categoryId: string;
-  defaultUnit: Unit;
+  itemUnits: ItemUnitLink[];
   status: "approved" | "pending_review" | "merged";
   source: "seed" | "customer" | "admin";
   imageUrl: string | null;
@@ -58,17 +69,107 @@ export type ItemFormState = {
   categoryId: string;
   nameEn: string;
   nameAr: string;
-  defaultUnit: Unit;
+  unitIds: string[];
+  defaultUnitId: string;
   imageUrl: string | null;
 };
 
 type Translate = ReturnType<typeof useTranslation>["t"];
+
+/** Order an item's links by sortOrder and return the default-first unit names. */
+export function itemUnitNames(item: ItemRow, locale: string): string[] {
+  return [...item.itemUnits]
+    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.sortOrder - b.sortOrder)
+    .map((iu) => (locale === "ar" ? iu.unit.nameAr : iu.unit.nameEn));
+}
+
+/**
+ * Multi-select of units + a default picker. Toggling a unit adds/removes it;
+ * the default is highlighted and always one of the selected units.
+ */
+export function UnitsPicker({
+  units,
+  unitIds,
+  defaultUnitId,
+  onChange,
+  locale,
+  t,
+}: {
+  units: UnitOption[];
+  unitIds: string[];
+  defaultUnitId: string;
+  onChange: (unitIds: string[], defaultUnitId: string) => void;
+  locale: string;
+  t: Translate;
+}) {
+  const toggle = (id: string) => {
+    const has = unitIds.includes(id);
+    const next = has ? unitIds.filter((u) => u !== id) : [...unitIds, id];
+    let def = defaultUnitId;
+    if (has && def === id) def = next[0] ?? "";
+    if (!has && !def) def = id;
+    onChange(next, def);
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <Label>{String(t("admin.items.units"))}</Label>
+      <div className="flex flex-col gap-1">
+        {units.map((u) => {
+          const selected = unitIds.includes(u.id);
+          const isDefault = u.id === defaultUnitId;
+          const name = locale === "ar" ? u.nameAr : u.nameEn;
+          return (
+            <div
+              key={u.id}
+              className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5"
+            >
+              <button
+                type="button"
+                onClick={() => toggle(u.id)}
+                className="flex items-center gap-2 text-sm"
+              >
+                <span
+                  className={
+                    selected
+                      ? "flex size-4 items-center justify-center rounded border border-primary bg-primary text-primary-foreground"
+                      : "flex size-4 items-center justify-center rounded border border-input"
+                  }
+                >
+                  {selected ? <CheckIcon className="size-3" /> : null}
+                </span>
+                <span>{name}</span>
+              </button>
+              {selected ? (
+                isDefault ? (
+                  <Badge variant="success">
+                    {String(t("admin.items.defaultUnit"))}
+                  </Badge>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onChange(unitIds, u.id)}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    {String(t("admin.items.setDefault"))}
+                  </button>
+                )
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 type BuildColumnsArgs = {
   t: Translate;
   locale: string;
   categoryOptions: { label: string; value: string }[];
   categories: { id: string; nameEn: string; nameAr: string }[];
+  units: UnitOption[];
+  unitOptions: { label: string; value: string }[];
   editForm: ItemFormState | null;
   setEditForm: (form: ItemFormState | null) => void;
   onFormSubmit: () => void;
@@ -82,24 +183,19 @@ function ItemRowActions({
   t,
   locale,
   categories,
+  units,
   editForm,
   setEditForm,
   onFormSubmit,
   onFormChange,
   isSubmitting,
   onDelete,
-}: { row: Row<ItemRow> } & Omit<BuildColumnsArgs, "categoryOptions">) {
+}: { row: Row<ItemRow> } & Omit<
+  BuildColumnsArgs,
+  "categoryOptions" | "unitOptions"
+>) {
   const item = row.original;
   const isThisFormOpen = editForm?.id === item.id;
-
-  const UNITS_LIST = UNITS;
-  const unitLabel: Record<Unit, string> = {
-    piece: String(t("admin.items.unitPiece")),
-    kg: String(t("admin.items.unitKg")),
-    gram: String(t("admin.items.unitGram")),
-    liter: String(t("admin.items.unitLiter")),
-    pack: String(t("admin.items.unitPack")),
-  };
 
   return (
     <>
@@ -114,16 +210,23 @@ function ItemRowActions({
         />
         <DropdownMenuContent align="end">
           <DropdownMenuItem
-            onClick={() =>
+            onClick={() => {
+              const links = [...item.itemUnits].sort(
+                (a, b) => a.sortOrder - b.sortOrder,
+              );
               setEditForm({
                 id: item.id,
                 categoryId: item.categoryId,
                 nameEn: item.nameEn ?? "",
                 nameAr: item.nameAr ?? "",
-                defaultUnit: item.defaultUnit,
+                unitIds: links.map((l) => l.unitId),
+                defaultUnitId:
+                  links.find((l) => l.isDefault)?.unitId ??
+                  links[0]?.unitId ??
+                  "",
                 imageUrl: item.imageUrl,
-              })
-            }
+              });
+            }}
           >
             {String(t("admin.common.edit"))}
           </DropdownMenuItem>
@@ -190,26 +293,16 @@ function ItemRowActions({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex flex-col gap-2">
-                <Label>{String(t("admin.items.unit"))}</Label>
-                <Select
-                  value={editForm.defaultUnit}
-                  onValueChange={(v) => {
-                    if (v) onFormChange({ ...editForm, defaultUnit: v as Unit });
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {UNITS_LIST.map((unit) => (
-                      <SelectItem key={unit} value={unit}>
-                        {unitLabel[unit]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <UnitsPicker
+                units={units}
+                unitIds={editForm.unitIds}
+                defaultUnitId={editForm.defaultUnitId}
+                onChange={(unitIds, defaultUnitId) =>
+                  onFormChange({ ...editForm, unitIds, defaultUnitId })
+                }
+                locale={locale}
+                t={t}
+              />
               <div className="flex flex-col gap-2">
                 <Label>{String(t("admin.common.image"))}</Label>
                 <ImageUpload
@@ -226,7 +319,10 @@ function ItemRowActions({
             <Button variant="outline" onClick={() => setEditForm(null)}>
               {String(t("common.cancel"))}
             </Button>
-            <Button onClick={onFormSubmit} disabled={isSubmitting}>
+            <Button
+              onClick={onFormSubmit}
+              disabled={isSubmitting || !editForm?.unitIds.length}
+            >
               {String(t("common.save"))}
             </Button>
           </DialogFooter>
@@ -242,6 +338,8 @@ export function buildItemColumns(args: BuildColumnsArgs): ColumnDef<ItemRow>[] {
     locale,
     categoryOptions,
     categories,
+    units,
+    unitOptions,
     editForm,
     setEditForm,
     onFormSubmit,
@@ -249,14 +347,6 @@ export function buildItemColumns(args: BuildColumnsArgs): ColumnDef<ItemRow>[] {
     isSubmitting,
     onDelete,
   } = args;
-
-  const unitLabel: Record<Unit, string> = {
-    piece: String(t("admin.items.unitPiece")),
-    kg: String(t("admin.items.unitKg")),
-    gram: String(t("admin.items.unitGram")),
-    liter: String(t("admin.items.unitLiter")),
-    pack: String(t("admin.items.unitPack")),
-  };
 
   const dateFmt = new Intl.DateTimeFormat(locale === "ar" ? "ar-EG" : "en", {
     dateStyle: "medium",
@@ -345,24 +435,32 @@ export function buildItemColumns(args: BuildColumnsArgs): ColumnDef<ItemRow>[] {
     },
 
     {
-      id: "defaultUnit",
-      accessorKey: "defaultUnit",
+      id: "unit",
       enableSorting: false,
       enableHiding: true,
       meta: {
         label: String(t("admin.items.unit")),
         filterVariant: "multiSelect" as const,
-        options: UNITS.map((u) => ({
-          label: unitLabel[u],
-          value: u,
-        })),
+        options: unitOptions,
       },
       header: () => (
         <span className="text-xs font-medium text-muted-foreground">
           {String(t("admin.items.unit"))}
         </span>
       ),
-      cell: ({ row }) => unitLabel[row.original.defaultUnit],
+      cell: ({ row }) => {
+        const names = itemUnitNames(row.original, locale);
+        if (names.length === 0) return "—";
+        return (
+          <div className="flex flex-wrap gap-1">
+            {names.map((name, i) => (
+              <Badge key={name} variant={i === 0 ? "success" : "secondary"}>
+                {name}
+              </Badge>
+            ))}
+          </div>
+        );
+      },
     },
 
     {
@@ -464,6 +562,7 @@ export function buildItemColumns(args: BuildColumnsArgs): ColumnDef<ItemRow>[] {
           t={t}
           locale={locale}
           categories={categories}
+          units={units}
           editForm={editForm}
           setEditForm={setEditForm}
           onFormSubmit={onFormSubmit}

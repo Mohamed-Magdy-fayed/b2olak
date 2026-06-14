@@ -1,13 +1,15 @@
 "use client";
 
 import { ItemCard } from "@/features/shop/item-card";
+import type { CartUnit } from "@/features/shop/cart-store";
 
 type Item = {
   id: string;
   nameEn: string | null;
   nameAr: string | null;
   imageUrl?: string | null;
-  defaultUnit: "piece" | "kg" | "gram" | "liter" | "pack";
+  units: CartUnit[];
+  defaultUnit: string | null;
 };
 
 type ItemRowScrollerProps = {

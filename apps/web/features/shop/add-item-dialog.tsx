@@ -28,9 +28,6 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 
-const UNITS = ["piece", "kg", "gram", "liter", "pack"] as const;
-type Unit = (typeof UNITS)[number];
-
 function trpcErrorMessage(error: unknown, t: (k: string) => string): string {
   if (error instanceof TRPCClientError) {
     const msg = error.message;
@@ -50,9 +47,15 @@ export function AddItemDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [unit, setUnit] = useState<Unit>("piece");
+  const [unitId, setUnitId] = useState("");
 
   const { data: categories } = useQuery(trpc.catalog.categories.queryOptions());
+  const { data: units } = useQuery(trpc.catalog.units.queryOptions());
+
+  // Default the unit picker to the first active unit once loaded.
+  if (units && units.length > 0 && !unitId) {
+    setUnitId(units[0]!.id);
+  }
 
   const createItem = useMutation(
     trpc.items.create.mutationOptions({
@@ -61,19 +64,29 @@ export function AddItemDialog() {
           ? t("shop.addItem.foundExisting")
           : t("shop.addItem.added");
         toast.success(msg);
-        add({
-          itemId: data.item.id,
-          nameEn: data.item.nameEn,
-          nameAr: data.item.nameAr,
-          unit: data.item.defaultUnit as Unit,
-        });
+        const chosen = (units ?? []).find((u) => u.id === unitId);
+        if (chosen) {
+          add({
+            itemId: data.item.id,
+            nameEn: data.item.nameEn,
+            nameAr: data.item.nameAr,
+            units: [
+              {
+                id: chosen.id,
+                code: chosen.code,
+                nameEn: chosen.nameEn,
+                nameAr: chosen.nameAr,
+              },
+            ],
+            unitId: chosen.id,
+          });
+        }
         void queryClient.invalidateQueries({
           queryKey: trpc.catalog.search.queryKey(),
         });
         setOpen(false);
         setName("");
         setCategoryId("");
-        setUnit("piece");
       },
       onError: (err) => {
         toast.error(trpcErrorMessage(err, (k) => String(t(k as never))));
@@ -125,17 +138,14 @@ export function AddItemDialog() {
 
           <div className="flex flex-col gap-1.5">
             <Label>{t("shop.addItem.unit")}</Label>
-            <Select
-              value={unit}
-              onValueChange={(v) => setUnit(v as Unit)}
-            >
+            <Select value={unitId} onValueChange={(v) => setUnitId(v ?? "")}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {UNITS.map((u) => (
-                  <SelectItem key={u} value={u}>
-                    {t(`units.${u}` as never)}
+                {(units ?? []).map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {locale === "ar" ? u.nameAr : u.nameEn}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -144,14 +154,16 @@ export function AddItemDialog() {
 
           <Button
             onClick={() => {
-              if (!name.trim() || !categoryId) return;
+              if (!name.trim() || !categoryId || !unitId) return;
               createItem.mutate({
                 name: name.trim(),
                 categoryId,
-                defaultUnit: unit,
+                unitId,
               });
             }}
-            disabled={createItem.isPending || !name.trim() || !categoryId}
+            disabled={
+              createItem.isPending || !name.trim() || !categoryId || !unitId
+            }
           >
             {createItem.isPending
               ? t("shop.addItem.adding")

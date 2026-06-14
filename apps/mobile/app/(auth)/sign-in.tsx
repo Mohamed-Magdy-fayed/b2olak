@@ -71,7 +71,7 @@ export default function SignInScreen() {
             placeholder={t("mobile.phonePlaceholder")}
             keyboardType="phone-pad"
             autoComplete="tel"
-            style={{ textAlign: "left", writingDirection: "ltr" }}
+            style={{ textAlign: "left", writingDirection: "ltr", direction: "ltr" }}
           />
           {error ? <Text className="text-destructive">{error}</Text> : null}
           <Button

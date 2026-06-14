@@ -11,13 +11,14 @@ type ItemThumbProps = {
  * otherwise a muted square with the item's first letter centred.
  */
 export function ItemThumb({ uri, label, size = 56 }: ItemThumbProps) {
-  const fallbackLetter = label.trim()[0] ?? "🛒";
+  const fallbackLetter = label.trim()[0] ?? "؟";
+  const radius = Math.round(size * 0.25);
 
   if (uri) {
     return (
       <Image
         source={{ uri }}
-        style={{ width: size, height: size, borderRadius: 10 }}
+        style={{ width: size, height: size, borderRadius: radius }}
         resizeMode="cover"
       />
     );
@@ -25,10 +26,10 @@ export function ItemThumb({ uri, label, size = 56 }: ItemThumbProps) {
 
   return (
     <View
-      style={{ width: size, height: size, borderRadius: 10 }}
-      className="items-center justify-center bg-muted"
+      style={{ width: size, height: size, borderRadius: radius }}
+      className="items-center justify-center bg-elevated"
     >
-      <Text className="text-base font-semibold text-muted-foreground">
+      <Text className="font-display text-base font-semibold text-muted-foreground">
         {fallbackLetter}
       </Text>
     </View>

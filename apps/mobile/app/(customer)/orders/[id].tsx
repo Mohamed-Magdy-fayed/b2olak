@@ -1,9 +1,11 @@
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { Alert, ScrollView, Text, View } from "react-native";
+import { useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -55,64 +57,85 @@ export default function OrderDetailScreen() {
   const canCancel = order.status === "placed" || order.status === "assigned";
 
   return (
-    <ScrollView
-      className="flex-1 bg-background px-4 pt-16"
-      contentContainerClassName="gap-4 pb-10"
-    >
-      <View className="flex-row items-center gap-3">
-        <Pressable
-          className="size-10 items-center justify-center rounded-full bg-muted"
-          onPress={() => router.back()}
-        >
-          <Text className="text-lg">{locale === "ar" ? "→" : "←"}</Text>
-        </Pressable>
-        <Text className="text-2xl font-black text-foreground">
-          {t("shop.orderNumber", { number: String(order.orderNumber) })}
-        </Text>
-      </View>
+    <Screen padded={false}>
+      <ScrollView
+        className="flex-1 px-5"
+        contentContainerClassName="gap-4 pb-10"
+        showsVerticalScrollIndicator={false}
+      >
+        <ScreenBackHeader
+          title={t("shop.orderNumber", { number: String(order.orderNumber) })}
+        />
 
       {/* timeline */}
-      <Card className="gap-3">
+      <Card className="gap-0">
         {cancelled ? (
-          <Text className="text-lg font-bold text-destructive">
-            {t("shop.status.cancelled")}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="close-circle" size={20} color="#F0584F" />
+            <Text className="text-lg font-bold text-destructive">
+              {t("shop.status.cancelled")}
+            </Text>
+          </View>
         ) : (
-          TIMELINE.map((step) => {
+          TIMELINE.map((step, i) => {
             const reached = reachedStatuses.has(step);
             const event = order.statusEvents.find((e) => e.toStatus === step);
+            const last = i === TIMELINE.length - 1;
             return (
-              <View key={step} className="flex-row items-center gap-3">
+              <View key={step} className="flex-row gap-3">
+                {/* node + connector rail */}
+                <View className="items-center">
+                  <View
+                    className={`size-5 items-center justify-center rounded-full ${
+                      reached ? "bg-primary" : "border border-border bg-elevated"
+                    }`}
+                  >
+                    {reached ? (
+                      <Ionicons name="checkmark" size={12} color="#0E0E10" />
+                    ) : null}
+                  </View>
+                  {!last ? (
+                    <View
+                      className={`my-1 w-0.5 flex-1 ${
+                        reached ? "bg-primary/50" : "bg-border"
+                      }`}
+                    />
+                  ) : null}
+                </View>
                 <View
-                  className={`size-4 rounded-full ${
-                    reached ? "bg-primary" : "bg-muted"
-                  }`}
-                />
-                <Text
-                  className={`flex-1 ${
-                    reached
-                      ? "font-semibold text-foreground"
-                      : "text-muted-foreground"
+                  className={`flex-1 flex-row items-start justify-between ${
+                    last ? "" : "pb-4"
                   }`}
                 >
-                  {t(`shop.status.${step}`)}
-                </Text>
-                {event ? (
-                  <Text className="text-xs text-muted-foreground">
-                    {new Date(event.createdAt).toLocaleTimeString(undefined, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <Text
+                    className={`flex-1 ${
+                      reached
+                        ? "font-semibold text-foreground"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {t(`shop.status.${step}`)}
                   </Text>
-                ) : null}
+                  {event ? (
+                    <Text className="text-xs text-muted-foreground">
+                      {new Date(event.createdAt).toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             );
           })
         )}
         {order.driver?.name && !cancelled ? (
-          <Text className="text-sm text-muted-foreground">
-            🛵 {order.driver.name}
-          </Text>
+          <View className="mt-1 flex-row items-center gap-2 border-t border-border pt-3">
+            <Ionicons name="bicycle-outline" size={18} color="#9B968C" />
+            <Text className="text-sm text-muted-foreground">
+              {order.driver.name}
+            </Text>
+          </View>
         ) : null}
       </Card>
 
@@ -134,7 +157,7 @@ export default function OrderDetailScreen() {
                     : "text-foreground"
                 }`}
               >
-                {name} — {line.qty} {t(`units.${line.unit}`)}
+                {name} — {line.qty} {line.unit}
               </Text>
               {line.status !== "pending" ? (
                 <Text
@@ -184,6 +207,7 @@ export default function OrderDetailScreen() {
           }
         />
       ) : null}
-    </ScrollView>
+      </ScrollView>
+    </Screen>
   );
 }

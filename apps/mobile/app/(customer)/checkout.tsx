@@ -1,15 +1,25 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { AddressFormModal } from "@/components/address-form-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { itemDisplayName } from "@/components/item-row";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
-import { useCart } from "@/lib/cart-store";
+import { useTabBarHeight } from "@/lib/use-tab-bar-height";
+import { cartLineUnitName, useCart } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
 
 function addressDisplayName(
@@ -62,8 +72,10 @@ export default function CheckoutScreen() {
   const signedIn = useSignedIn();
   const lines = useCart((s) => s.lines);
   const clear = useCart((s) => s.clear);
+  const tabBarHeight = useTabBarHeight();
 
   const [addressId, setAddressId] = useState<string | null>(null);
+  const [addingAddress, setAddingAddress] = useState(false);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -104,22 +116,28 @@ export default function CheckoutScreen() {
   );
 
   return (
-    <ScrollView
-      className="flex-1 bg-background px-4 pt-16"
-      contentContainerClassName="gap-4 pb-10"
-    >
-      <Text className="text-2xl font-black text-foreground">
-        {t("shop.checkout")}
-      </Text>
+    <Screen padded={false}>
+      <KeyboardAvoidingView
+        className="flex-1"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          className="flex-1 px-5"
+          contentContainerClassName="gap-4 pt-1"
+          contentContainerStyle={{ paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <ScreenHeader title={t("shop.checkout")} />
 
-      <Card className="gap-2">
+          <Card className="gap-2">
         {lines.map((line) => (
           <View key={line.itemId} className="flex-row justify-between">
             <Text className="flex-1 text-foreground">
               {itemDisplayName(line, locale)}
             </Text>
             <Text className="text-muted-foreground">
-              {line.qty} × {t(`units.${line.unit}`)}
+              {line.qty} × {cartLineUnitName(line, locale)}
             </Text>
           </View>
         ))}
@@ -141,7 +159,7 @@ export default function CheckoutScreen() {
           <Text className="text-lg font-bold text-foreground">
             {t("shop.deliverTo")}
           </Text>
-          <Pressable onPress={() => router.push("/(customer)/addresses")}>
+          <Pressable onPress={() => setAddingAddress(true)}>
             <Text className="font-semibold text-primary">
               {t("address.add")}
             </Text>
@@ -151,10 +169,10 @@ export default function CheckoutScreen() {
           <Pressable
             key={address.id}
             onPress={() => setAddressId(address.id)}
-            className={`rounded-xl border p-3 ${
+            className={`rounded-2xl border p-4 ${
               selected === address.id
-                ? "border-primary bg-primary/5"
-                : "border-border bg-card"
+                ? "border-primary bg-primary/10"
+                : "border-border bg-elevated"
             }`}
           >
             <Text className="font-semibold text-foreground">
@@ -170,32 +188,51 @@ export default function CheckoutScreen() {
         ) : null}
       </View>
 
-      <View className="gap-2">
-        <Text className="font-medium text-foreground">{t("shop.orderNote")}</Text>
-        <Input value={note} onChangeText={setNote} />
-      </View>
+          <View className="gap-2">
+            <Text className="font-medium text-foreground">
+              {t("shop.orderNote")}
+            </Text>
+            <Input value={note} onChangeText={setNote} />
+          </View>
 
-      {error ? <Text className="text-destructive">{error}</Text> : null}
+          {error ? <Text className="text-destructive">{error}</Text> : null}
+        </ScrollView>
 
-      <Button
-        label={place.isPending ? t("shop.placing") : t("shop.placeOrder")}
-        loading={place.isPending}
-        disabled={!selected || lines.length === 0}
-        onPress={() => {
-          if (!selected) return;
-          setError(null);
-          place.mutate({
-            addressId: selected,
-            note: note.trim() || undefined,
-            items: lines.map((line) => ({
-              itemId: line.itemId,
-              qty: line.qty,
-              unit: line.unit,
-              note: line.note,
-            })),
-          });
+        {/* Fixed footer — keeps the primary CTA fully visible above the tab bar. */}
+        <View
+          className="border-t border-border bg-background px-5 pt-3"
+          style={{ paddingBottom: tabBarHeight + 12 }}
+        >
+          <Button
+            label={place.isPending ? t("shop.placing") : t("shop.placeOrder")}
+            loading={place.isPending}
+            disabled={!selected || lines.length === 0}
+            onPress={() => {
+              if (!selected) return;
+              setError(null);
+              place.mutate({
+                addressId: selected,
+                note: note.trim() || undefined,
+                items: lines.map((line) => ({
+                  itemId: line.itemId,
+                  qty: line.qty,
+                  unitId: line.unitId,
+                  note: line.note,
+                })),
+              });
+            }}
+          />
+        </View>
+      </KeyboardAvoidingView>
+
+      <AddressFormModal
+        visible={addingAddress}
+        onClose={() => setAddingAddress(false)}
+        onSaved={(newId) => {
+          setAddingAddress(false);
+          setAddressId(newId);
         }}
       />
-    </ScrollView>
+    </Screen>
   );
 }

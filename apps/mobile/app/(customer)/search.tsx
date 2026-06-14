@@ -12,7 +12,6 @@ import { useTranslation } from "@/lib/i18n";
 import { useCart } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
 
-const UNITS = ["piece", "kg", "gram", "liter", "pack"] as const;
 const RECENT_SEARCHES_KEY = "ba2olak-recent-searches";
 const MAX_RECENT = 6;
 
@@ -56,7 +55,7 @@ export default function SearchScreen() {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [adding, setAdding] = useState(false);
   const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [unit, setUnit] = useState<(typeof UNITS)[number]>("piece");
+  const [unitId, setUnitId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
@@ -82,6 +81,7 @@ export default function SearchScreen() {
     enabled: debouncedQuery.trim().length >= 2,
   });
   const { data: categories } = useQuery(trpc.catalog.categories.queryOptions());
+  const { data: units } = useQuery(trpc.catalog.units.queryOptions());
 
   const pushRecent = useCallback(
     async (term: string) => {
@@ -103,11 +103,16 @@ export default function SearchScreen() {
         setFeedback(
           data.matched ? t("shop.addItem.foundExisting") : t("shop.addItem.added"),
         );
+        // Build a cart line from the returned item.
+        // The server returns the item without units attached — use the
+        // unit the user chose (we have the unit object from the units list).
+        const chosenUnit = (units ?? []).find((u) => u.id === unitId);
         addToCart({
           itemId: data.item.id,
           nameEn: data.item.nameEn,
           nameAr: data.item.nameAr,
-          unit: data.item.defaultUnit,
+          units: chosenUnit ? [chosenUnit] : [],
+          unitId: chosenUnit?.id ?? "",
         });
         void queryClient.invalidateQueries({
           queryKey: trpc.catalog.search.queryKey(),
@@ -209,24 +214,24 @@ export default function SearchScreen() {
               {t("shop.addItem.unit")}
             </Text>
             <View className="flex-row flex-wrap gap-2">
-              {UNITS.map((u) => (
+              {(units ?? []).map((u) => (
                 <Pressable
-                  key={u}
-                  onPress={() => setUnit(u)}
+                  key={u.id}
+                  onPress={() => setUnitId(u.id)}
                   className={`rounded-full border px-3 py-1.5 ${
-                    unit === u
+                    unitId === u.id
                       ? "border-primary bg-primary/10"
                       : "border-border bg-card"
                   }`}
                 >
                   <Text
                     className={
-                      unit === u
+                      unitId === u.id
                         ? "font-semibold text-primary"
                         : "text-foreground"
                     }
                   >
-                    {t(`units.${u}`)}
+                    {locale === "ar" ? u.nameAr : u.nameEn}
                   </Text>
                 </Pressable>
               ))}
@@ -238,13 +243,13 @@ export default function SearchScreen() {
                   : t("shop.addItem.submit")
               }
               loading={createItem.isPending}
-              disabled={!categoryId}
+              disabled={!categoryId || !unitId}
               onPress={() => {
-                if (!categoryId) return;
+                if (!categoryId || !unitId) return;
                 createItem.mutate({
                   name: query.trim(),
                   categoryId,
-                  defaultUnit: unit,
+                  unitId,
                 });
               }}
             />

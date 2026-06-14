@@ -12,10 +12,7 @@ import { auditColumns, id } from "../../helpers";
 import { UsersTable } from "../auth/users";
 import { CategoriesTable } from "./categories";
 import { ItemAliasesTable } from "./item-aliases";
-
-export const itemUnitValues = ["piece", "kg", "gram", "liter", "pack"] as const;
-export type ItemUnit = (typeof itemUnitValues)[number];
-export const itemUnitEnum = pgEnum("item_unit", itemUnitValues);
+import { ItemUnitsTable } from "./item-units";
 
 export const itemStatusValues = ["approved", "pending_review", "merged"] as const;
 export type ItemStatus = (typeof itemStatusValues)[number];
@@ -42,7 +39,6 @@ export const ItemsTable = pgTable(
     normalizedEn: varchar({ length: 128 }),
     normalizedAr: varchar({ length: 128 }),
     imageUrl: varchar({ length: 512 }),
-    defaultUnit: itemUnitEnum().notNull().default("piece"),
     status: itemStatusEnum().notNull().default("pending_review"),
     mergedIntoItemId: uuid().references((): AnyPgColumn => ItemsTable.id),
     source: itemSourceEnum().notNull().default("customer"),
@@ -73,6 +69,7 @@ export const itemsRelations = relations(ItemsTable, ({ one, many }) => ({
     relationName: "merge",
   }),
   aliases: many(ItemAliasesTable),
+  itemUnits: many(ItemUnitsTable),
 }));
 
 export type Item = typeof ItemsTable.$inferSelect;

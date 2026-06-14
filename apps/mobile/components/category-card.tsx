@@ -22,11 +22,11 @@ export function CategoryCard({ category }: CategoryCardProps) {
 
   return (
     <Pressable
-      className="flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-card p-4 active:bg-muted"
+      className="flex-1 items-center justify-center gap-3 rounded-2xl border border-border bg-card p-5 active:bg-elevated"
       onPress={() => router.push(`/(customer)/category/${category.id}`)}
     >
-      <ItemThumb uri={category.imageUrl} label={name} size={52} />
-      <Text className="text-center text-sm font-bold text-foreground">
+      <ItemThumb uri={category.imageUrl} label={name} size={56} />
+      <Text className="font-display text-center text-sm font-bold text-foreground" numberOfLines={2}>
         {name}
       </Text>
     </Pressable>

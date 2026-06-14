@@ -1,11 +1,14 @@
 import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { ItemAliasesTable } from "@workspace/db/schemas/catalog/item-aliases";
 import { ItemMergeSuggestionsTable } from "@workspace/db/schemas/catalog/item-merge-suggestions";
+import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
+import { UnitsTable } from "@workspace/db/schemas/catalog/units";
 import { inngest } from "@workspace/integrations/inngest/client";
-import { itemNameSchema, itemUnitSchema } from "@workspace/validators/catalog";
+import { itemNameSchema } from "@workspace/validators/catalog";
 import { detectScript, normalizeText } from "@workspace/validators/normalize";
 
 import { createTRPCRouter, customerProcedure } from "../init";
@@ -25,11 +28,27 @@ export const itemsRouter = createTRPCRouter({
       z.object({
         name: itemNameSchema,
         categoryId: z.uuid(),
-        defaultUnit: itemUnitSchema.default("piece"),
+        unitId: z.uuid(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       await enforceRateLimit("item-create", ctx.session.user.id, 10, "1 h");
+
+      // Validate the chosen unit exists and is active before linking it.
+      const unit = await ctx.db.query.UnitsTable.findFirst({
+        where: and(
+          eq(UnitsTable.id, input.unitId),
+          eq(UnitsTable.isActive, true),
+          isNull(UnitsTable.deletedAt),
+        ),
+        columns: { id: true },
+      });
+      if (!unit) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "validation.unitNotFound",
+        });
+      }
 
       const normalized = normalizeText(input.name);
       const script = detectScript(input.name);
@@ -110,13 +129,22 @@ export const itemsRouter = createTRPCRouter({
           nameAr: script === "ar" ? input.name : null,
           normalizedEn: script === "en" ? normalized : null,
           normalizedAr: script === "ar" ? normalized : null,
-          defaultUnit: input.defaultUnit,
           status: "pending_review",
           source: "customer",
           createdByUserId: ctx.session.user.id,
           createdBy: ctx.session.user.id,
         })
         .returning();
+
+      if (item) {
+        await ctx.db.insert(ItemUnitsTable).values({
+          itemId: item.id,
+          unitId: input.unitId,
+          isDefault: true,
+          sortOrder: 0,
+          createdBy: ctx.session.user.id,
+        });
+      }
 
       if (item && candidates.length > 0) {
         await ctx.db.insert(ItemMergeSuggestionsTable).values(

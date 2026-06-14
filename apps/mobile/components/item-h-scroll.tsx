@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
-import { type CartLine, useCart } from "@/lib/cart-store";
+import { cartLineFromItem, type CartUnit, useCart } from "@/lib/cart-store";
 import { useTranslation } from "@/lib/i18n";
 import { itemDisplayName } from "./item-row";
 import { ItemThumb } from "./item-thumb";
@@ -10,7 +11,8 @@ type Item = {
   nameEn: string | null;
   nameAr: string | null;
   imageUrl?: string | null;
-  defaultUnit: CartLine["unit"];
+  units: CartUnit[];
+  defaultUnit: string | null;
 };
 
 type ItemHScrollProps = {
@@ -24,24 +26,25 @@ function CompactAddButton({ item }: { item: Item }) {
   const line = useCart((s) => s.lines.find((l) => l.itemId === item.id));
   const add = useCart((s) => s.add);
   const setQty = useCart((s) => s.setQty);
+  const disabled = item.units.length === 0;
 
   if (line) {
     return (
-      <View className="flex-row items-center justify-center gap-2 pt-1">
+      <View className="mt-2 flex-row items-center justify-center gap-2 rounded-xl bg-elevated px-2 py-1">
         <Pressable
-          className="size-7 items-center justify-center rounded-full bg-muted"
+          className="size-7 items-center justify-center rounded-full bg-card active:opacity-70"
           onPress={() => setQty(item.id, line.qty - 1)}
         >
-          <Text className="text-sm font-bold text-foreground">−</Text>
+          <Ionicons name="remove" size={14} color="#9B968C" />
         </Pressable>
         <Text className="min-w-5 text-center text-sm font-bold text-foreground">
           {line.qty}
         </Text>
         <Pressable
-          className="size-7 items-center justify-center rounded-full bg-primary"
+          className="size-7 items-center justify-center rounded-full bg-primary active:opacity-70"
           onPress={() => setQty(item.id, line.qty + 1)}
         >
-          <Text className="text-sm font-bold text-primary-foreground">+</Text>
+          <Ionicons name="add" size={14} color="#0E0E10" />
         </Pressable>
       </View>
     );
@@ -49,17 +52,11 @@ function CompactAddButton({ item }: { item: Item }) {
 
   return (
     <Pressable
-      className="mt-1 rounded-lg bg-primary px-3 py-1.5"
-      onPress={() =>
-        add({
-          itemId: item.id,
-          nameEn: item.nameEn,
-          nameAr: item.nameAr,
-          unit: item.defaultUnit,
-        })
-      }
+      className={`mt-2 rounded-xl px-3 py-2 active:opacity-70 ${disabled ? "bg-elevated" : "bg-primary"}`}
+      disabled={disabled}
+      onPress={() => add(cartLineFromItem(item))}
     >
-      <Text className="text-center text-xs font-semibold text-primary-foreground">
+      <Text className={`text-center text-xs font-semibold ${disabled ? "text-muted-foreground" : "text-primary-foreground"}`}>
         {t("shop.addToCart")}
       </Text>
     </Pressable>
@@ -76,8 +73,8 @@ export function ItemHScroll({ title, items }: ItemHScrollProps) {
   if (items.length === 0) return null;
 
   return (
-    <View className="mb-5">
-      <Text className="mb-2 text-lg font-bold text-foreground">{title}</Text>
+    <View className="mb-6">
+      <Text className="mb-3 font-display text-xl font-bold text-foreground">{title}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -88,11 +85,11 @@ export function ItemHScroll({ title, items }: ItemHScrollProps) {
           return (
             <View
               key={item.id}
-              className="w-[140px] rounded-xl border border-border bg-card p-3"
+              className="w-[148px] rounded-2xl border border-border bg-card p-3"
             >
-              <ItemThumb uri={item.imageUrl} label={name} size={80} />
+              <ItemThumb uri={item.imageUrl} label={name} size={84} />
               <Text
-                className="mt-2 text-sm font-semibold text-foreground"
+                className="mt-2.5 text-sm font-semibold text-foreground"
                 numberOfLines={2}
               >
                 {name}

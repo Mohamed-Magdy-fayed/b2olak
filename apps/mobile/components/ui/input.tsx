@@ -1,11 +1,28 @@
+import { forwardRef, useState } from "react";
 import { TextInput, type TextInputProps } from "react-native";
 
-export function Input({ className, ...props }: TextInputProps & { className?: string }) {
-  return (
-    <TextInput
-      placeholderTextColor="#71717a"
-      className={`h-12 w-full rounded-xl border border-input bg-card px-4 text-base text-foreground ${className ?? ""}`}
-      {...props}
-    />
-  );
-}
+/** Dark-luxury input — elevated surface, gold focus ring, warm placeholder. */
+export const Input = forwardRef<TextInput, TextInputProps & { className?: string }>(
+  function Input({ className, onFocus, onBlur, ...props }, ref) {
+    const [focused, setFocused] = useState(false);
+    return (
+      <TextInput
+        ref={ref}
+        placeholderTextColor="#9B968C"
+        selectionColor="#C9A227"
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
+        className={`h-14 w-full rounded-2xl border bg-elevated px-4 text-base text-foreground ${
+          focused ? "border-primary" : "border-input"
+        } ${className ?? ""}`}
+        {...props}
+      />
+    );
+  },
+);

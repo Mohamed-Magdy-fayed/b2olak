@@ -64,6 +64,13 @@
       "when": 1781441383157,
       "tag": "0008_fair_vulture",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1781461210379,
+      "tag": "0009_colossal_chat",
+      "breakpoints": true
     }
   ]
 }

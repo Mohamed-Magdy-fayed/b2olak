@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-import { itemUnitSchema } from "./catalog";
-
 export const placeOrderSchema = z.object({
   addressId: z.uuid(),
   note: z.string().trim().max(500).optional(),
@@ -10,7 +8,8 @@ export const placeOrderSchema = z.object({
       z.object({
         itemId: z.uuid(),
         qty: z.number().positive().max(1000),
-        unit: itemUnitSchema,
+        /** Must be one of the item's linked units — enforced server-side. */
+        unitId: z.uuid(),
         note: z.string().trim().max(200).optional(),
       }),
     )

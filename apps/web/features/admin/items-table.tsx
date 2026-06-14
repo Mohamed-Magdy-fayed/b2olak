@@ -66,12 +66,11 @@ import { useTRPC } from "@/lib/trpc/client";
 
 import {
   buildItemColumns,
+  UnitsPicker,
   type ItemFormState,
   type ItemRow,
+  type UnitOption,
 } from "./items-columns";
-
-const UNITS = ["piece", "kg", "gram", "liter", "pack"] as const;
-type Unit = (typeof UNITS)[number];
 
 // ---------------------------------------------------------------------------
 // Import review row type
@@ -81,7 +80,10 @@ type ItemImportRow = ImportReviewRow & {
   nameEn: string;
   nameAr: string;
   categorySlug: string;
+  /** Default unit code. */
   unit: string;
+  /** Optional pipe-separated list of all linked unit codes. */
+  units: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -90,47 +92,37 @@ type ItemImportRow = ImportReviewRow & {
 
 function AddItemDialog({
   categories,
+  units,
   locale,
   onCreated,
 }: {
   categories: { id: string; nameEn: string; nameAr: string }[];
+  units: UnitOption[];
   locale: string;
   onCreated: () => void;
 }) {
   const { t } = useTranslation();
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Omit<ItemFormState, "id">>({
+  const emptyForm = (): Omit<ItemFormState, "id"> => ({
     categoryId: categories[0]?.id ?? "",
     nameEn: "",
     nameAr: "",
-    defaultUnit: "piece",
+    unitIds: units[0] ? [units[0].id] : [],
+    defaultUnitId: units[0]?.id ?? "",
     imageUrl: null,
   });
+  const [form, setForm] = useState<Omit<ItemFormState, "id">>(emptyForm);
 
   const create = useMutation(
     trpc.admin.catalog.items.create.mutationOptions({
       onSuccess: () => {
         onCreated();
         setOpen(false);
-        setForm({
-          categoryId: categories[0]?.id ?? "",
-          nameEn: "",
-          nameAr: "",
-          defaultUnit: "piece",
-          imageUrl: null,
-        });
+        setForm(emptyForm());
       },
     }),
   );
-
-  const unitLabel: Record<Unit, string> = {
-    piece: String(t("admin.items.unitPiece")),
-    kg: String(t("admin.items.unitKg")),
-    gram: String(t("admin.items.unitGram")),
-    liter: String(t("admin.items.unitLiter")),
-    pack: String(t("admin.items.unitPack")),
-  };
 
   return (
     <>
@@ -138,13 +130,7 @@ function AddItemDialog({
         size="sm"
         type="button"
         onClick={() => {
-          setForm({
-            categoryId: categories[0]?.id ?? "",
-            nameEn: "",
-            nameAr: "",
-            defaultUnit: "piece",
-            imageUrl: null,
-          });
+          setForm(emptyForm());
           setOpen(true);
         }}
       >
@@ -193,26 +179,16 @@ function AddItemDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.items.unit"))}</Label>
-              <Select
-                value={form.defaultUnit}
-                onValueChange={(v) => {
-                  if (v) setForm({ ...form, defaultUnit: v as Unit });
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNITS.map((unit) => (
-                    <SelectItem key={unit} value={unit}>
-                      {unitLabel[unit]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <UnitsPicker
+              units={units}
+              unitIds={form.unitIds}
+              defaultUnitId={form.defaultUnitId}
+              onChange={(unitIds, defaultUnitId) =>
+                setForm({ ...form, unitIds, defaultUnitId })
+              }
+              locale={locale}
+              t={t}
+            />
             <div className="flex flex-col gap-2">
               <Label>{String(t("admin.common.image"))}</Label>
               <ImageUpload
@@ -228,16 +204,17 @@ function AddItemDialog({
             </Button>
             <Button
               onClick={() => {
-                if (!form.categoryId) return;
+                if (!form.categoryId || form.unitIds.length === 0) return;
                 create.mutate({
                   categoryId: form.categoryId,
                   nameEn: form.nameEn,
                   nameAr: form.nameAr,
-                  defaultUnit: form.defaultUnit,
+                  unitIds: form.unitIds,
+                  defaultUnitId: form.defaultUnitId,
                   imageUrl: form.imageUrl,
                 });
               }}
-              disabled={create.isPending}
+              disabled={create.isPending || form.unitIds.length === 0}
             >
               {String(t("common.save"))}
             </Button>
@@ -292,6 +269,32 @@ export function ItemsTable() {
         value: c.id,
       })),
     [categories, locale],
+  );
+
+  // ---- Units list (for filter options + edit/add dialog) ----
+  const { data: unitsData } = useQuery(trpc.admin.units.list.queryOptions());
+  const units: UnitOption[] = useMemo(
+    () => (unitsData ?? []).map((u) => ({
+      id: u.id,
+      code: u.code,
+      nameEn: u.nameEn,
+      nameAr: u.nameAr,
+    })),
+    [unitsData],
+  );
+
+  const unitOptions = useMemo(
+    () =>
+      units.map((u) => ({
+        label: locale === "ar" ? u.nameAr : u.nameEn,
+        value: u.id,
+      })),
+    [units, locale],
+  );
+
+  const unitCodes = useMemo(
+    () => new Set((unitsData ?? []).map((u) => u.code)),
+    [unitsData],
   );
 
   // ---- List query ----
@@ -370,16 +373,19 @@ export function ItemsTable() {
         locale,
         categoryOptions,
         categories,
+        units,
+        unitOptions,
         editForm,
         setEditForm,
         onFormSubmit: () => {
-          if (!editForm?.id) return;
+          if (!editForm?.id || editForm.unitIds.length === 0) return;
           update.mutate({
             id: editForm.id,
             categoryId: editForm.categoryId,
             nameEn: editForm.nameEn,
             nameAr: editForm.nameAr,
-            defaultUnit: editForm.defaultUnit,
+            unitIds: editForm.unitIds,
+            defaultUnitId: editForm.defaultUnitId,
             imageUrl: editForm.imageUrl,
           });
         },
@@ -392,6 +398,8 @@ export function ItemsTable() {
       locale,
       categoryOptions,
       categories,
+      units,
+      unitOptions,
       editForm,
       update,
       remove,
@@ -458,16 +466,22 @@ export function ItemsTable() {
       if (selected.length > 0) {
         // Export only the selected rows using in-memory data
         const csv = rowsToCsv(
-          ["nameEn", "nameAr", "categorySlug", "unit", "status", "source", "createdAt"],
-          selected.map((r) => ({
-            nameEn: r.original.nameEn ?? "",
-            nameAr: r.original.nameAr ?? "",
-            categorySlug: r.original.category.nameEn,
-            unit: r.original.defaultUnit,
-            status: r.original.status,
-            source: r.original.source,
-            createdAt: new Date(r.original.createdAt).toISOString(),
-          })),
+          ["nameEn", "nameAr", "categorySlug", "unit", "units", "status", "source", "createdAt"],
+          selected.map((r) => {
+            const links = [...r.original.itemUnits].sort(
+              (a, b) => a.sortOrder - b.sortOrder,
+            );
+            return {
+              nameEn: r.original.nameEn ?? "",
+              nameAr: r.original.nameAr ?? "",
+              categorySlug: r.original.category.nameEn,
+              unit: links.find((l) => l.isDefault)?.unit.code ?? links[0]?.unit.code ?? "",
+              units: links.map((l) => l.unit.code).join("|"),
+              status: r.original.status,
+              source: r.original.source,
+              createdAt: new Date(r.original.createdAt).toISOString(),
+            };
+          }),
         );
         downloadCsv("items.csv", csv);
         toast.success(String(t("dataTable.exportSuccess", { count: selected.length })));
@@ -480,12 +494,13 @@ export function ItemsTable() {
           }),
         );
         const csv = rowsToCsv(
-          ["nameEn", "nameAr", "categorySlug", "unit", "status", "source", "createdAt"],
+          ["nameEn", "nameAr", "categorySlug", "unit", "units", "status", "source", "createdAt"],
           result.rows.map((r) => ({
             nameEn: r.nameEn ?? "",
             nameAr: r.nameAr ?? "",
             categorySlug: r.categorySlug,
             unit: r.unit,
+            units: r.units,
             status: r.status,
             source: r.source,
             createdAt: r.createdAt,
@@ -518,6 +533,7 @@ export function ItemsTable() {
         const nameAr = String(raw.nameAr ?? "").trim();
         const categorySlug = String(raw.categorySlug ?? "").trim();
         const unit = String(raw.unit ?? "").trim() || "piece";
+        const units = String(raw.units ?? "").trim();
 
         const reasons: string[] = [];
 
@@ -527,7 +543,11 @@ export function ItemsTable() {
           reasons.push(String(t("dataTable.importReasonNameArRequired")));
         if (!categoryBySlug.has(categorySlug))
           reasons.push(String(t("dataTable.importReasonUnknownCategory")));
-        if (!UNITS.includes(unit as Unit))
+        const codes = units
+          ? units.split("|").map((c) => c.trim()).filter(Boolean)
+          : [];
+        if (!codes.includes(unit)) codes.push(unit);
+        if (codes.some((c) => !unitCodes.has(c)))
           reasons.push(String(t("dataTable.importReasonUnitInvalid")));
 
         const dedupKey = `${nameAr.toLowerCase()}|${categorySlug}`;
@@ -543,12 +563,13 @@ export function ItemsTable() {
           nameAr,
           categorySlug,
           unit,
+          units,
         };
       });
 
       return { rows };
     },
-    [categoryBySlug, t],
+    [categoryBySlug, unitCodes, t],
   );
 
   // ---- Import: commitFile ----
@@ -565,7 +586,8 @@ export function ItemsTable() {
         nameEn: r.nameEn,
         nameAr: r.nameAr,
         categorySlug: r.categorySlug,
-        unit: (UNITS.includes(r.unit as Unit) ? r.unit : "piece") as Unit,
+        unit: r.unit,
+        units: r.units || undefined,
       }));
 
       const result = await importRows.mutateAsync({ rows: payload });
@@ -636,7 +658,7 @@ export function ItemsTable() {
       {
         id: "unit",
         header: String(t("admin.items.unit")),
-        cell: (row) => row.unit,
+        cell: (row) => (row.units ? `${row.unit} (${row.units})` : row.unit),
       },
       {
         id: "reasons",
@@ -681,15 +703,21 @@ export function ItemsTable() {
       .rows.map((r) => r.original);
     if (rows.length === 0) return;
     const csv = rowsToCsv(
-      ["nameEn", "nameAr", "categorySlug", "defaultUnit", "status", "source"],
-      rows.map((row) => ({
-        nameEn: row.nameEn ?? "",
-        nameAr: row.nameAr ?? "",
-        categorySlug: row.category.nameEn,
-        defaultUnit: row.defaultUnit,
-        status: row.status,
-        source: row.source,
-      })),
+      ["nameEn", "nameAr", "categorySlug", "unit", "units", "status", "source"],
+      rows.map((row) => {
+        const links = [...row.itemUnits].sort(
+          (a, b) => a.sortOrder - b.sortOrder,
+        );
+        return {
+          nameEn: row.nameEn ?? "",
+          nameAr: row.nameAr ?? "",
+          categorySlug: row.category.nameEn,
+          unit: links.find((l) => l.isDefault)?.unit.code ?? links[0]?.unit.code ?? "",
+          units: links.map((l) => l.unit.code).join("|"),
+          status: row.status,
+          source: row.source,
+        };
+      }),
     );
     downloadCsv("items-selected.csv", csv);
     toast.success(
@@ -717,12 +745,9 @@ export function ItemsTable() {
                   options={categoryOptions}
                 />
                 <DataTableFacetedFilter
-                  column={table.getColumn("defaultUnit")}
+                  column={table.getColumn("unit")}
                   title={String(t("admin.items.unit"))}
-                  options={UNITS.map((u) => ({
-                    label: String(t(`units.${u}`)),
-                    value: u,
-                  }))}
+                  options={unitOptions}
                 />
                 <DataTableFacetedFilter
                   column={table.getColumn("status")}
@@ -804,6 +829,7 @@ export function ItemsTable() {
             />
             <AddItemDialog
               categories={categories}
+              units={units}
               locale={locale}
               onCreated={() => void invalidateList()}
             />

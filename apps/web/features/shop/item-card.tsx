@@ -2,7 +2,11 @@
 
 import { useTranslation } from "@workspace/i18n/react";
 
-import { useCart } from "@/features/shop/cart-store";
+import {
+  cartLineFromItem,
+  useCart,
+  type CartUnit,
+} from "@/features/shop/cart-store";
 import { itemDisplayName } from "@/features/shop/helpers";
 import { ItemImage } from "@/features/shop/item-image";
 import { QtyStepper } from "@/features/shop/qty-stepper";
@@ -13,8 +17,16 @@ type CatalogItem = {
   nameEn: string | null;
   nameAr: string | null;
   imageUrl?: string | null;
-  defaultUnit: "piece" | "kg" | "gram" | "liter" | "pack";
+  units: CartUnit[];
+  defaultUnit: string | null;
 };
+
+/** Localized label of an item's default unit (falls back to first). */
+function defaultUnitLabel(item: CatalogItem, locale: string): string {
+  const u =
+    item.units.find((x) => x.code === item.defaultUnit) ?? item.units[0];
+  return u ? (locale === "ar" ? u.nameAr : u.nameEn) : "";
+}
 
 export function ItemCard({ item }: { item: CatalogItem }) {
   const { t, locale } = useTranslation();
@@ -33,7 +45,7 @@ export function ItemCard({ item }: { item: CatalogItem }) {
           {displayName}
         </span>
         <span className="text-[10px] text-muted-foreground">
-          {t(`units.${item.defaultUnit}` as never)}
+          {defaultUnitLabel(item, locale)}
         </span>
       </div>
 
@@ -50,14 +62,8 @@ export function ItemCard({ item }: { item: CatalogItem }) {
           <Button
             size="sm"
             className="w-full text-xs"
-            onClick={() =>
-              add({
-                itemId: item.id,
-                nameEn: item.nameEn,
-                nameAr: item.nameAr,
-                unit: item.defaultUnit,
-              })
-            }
+            disabled={item.units.length === 0}
+            onClick={() => add(cartLineFromItem(item))}
           >
             {t("shop.addToCart")}
           </Button>
@@ -90,7 +96,7 @@ export function ItemCardRow({ item }: { item: CatalogItem }) {
             {itemDisplayName(item, locale)}
           </span>
           <span className="text-xs text-muted-foreground">
-            {t(`units.${item.defaultUnit}` as never)}
+            {defaultUnitLabel(item, locale)}
           </span>
         </div>
       </div>
@@ -103,14 +109,8 @@ export function ItemCardRow({ item }: { item: CatalogItem }) {
       ) : (
         <Button
           size="sm"
-          onClick={() =>
-            add({
-              itemId: item.id,
-              nameEn: item.nameEn,
-              nameAr: item.nameAr,
-              unit: item.defaultUnit,
-            })
-          }
+          disabled={item.units.length === 0}
+          onClick={() => add(cartLineFromItem(item))}
         >
           {t("shop.addToCart")}
         </Button>

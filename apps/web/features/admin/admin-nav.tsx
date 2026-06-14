@@ -13,6 +13,7 @@ const links = [
   { href: "/admin/users", key: "admin.nav.users" },
   { href: "/admin/categories", key: "admin.nav.categories" },
   { href: "/admin/items", key: "admin.nav.items" },
+  { href: "/admin/units", key: "admin.nav.units" },
   { href: "/admin/items/review", key: "admin.nav.review" },
   { href: "/admin/geo", key: "admin.nav.geo" },
   { href: "/admin/settings", key: "admin.nav.settings" },

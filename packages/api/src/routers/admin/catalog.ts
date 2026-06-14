@@ -10,18 +10,21 @@ import {
   inArray,
   isNull,
   lte,
+  notInArray,
   or,
+  sql,
   type SQL,
 } from "drizzle-orm";
 import { z } from "zod";
 
 import { CategoriesTable } from "@workspace/db/schemas/catalog/categories";
+import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import {
   ItemsTable,
   itemSourceValues,
   itemStatusValues,
-  itemUnitValues,
 } from "@workspace/db/schemas/catalog/items";
+import { UnitsTable } from "@workspace/db/schemas/catalog/units";
 import {
   ImageValidationError,
   uploadImage,
@@ -60,10 +63,18 @@ function itemsWhere(input: {
     } else if (filter.id === "status") {
       const values = facetValues(filter.value, itemStatusValues);
       if (values.length) conditions.push(inArray(ItemsTable.status, values));
-    } else if (filter.id === "defaultUnit") {
-      const values = facetValues(filter.value, itemUnitValues);
-      if (values.length) {
-        conditions.push(inArray(ItemsTable.defaultUnit, values));
+    } else if (filter.id === "unit") {
+      const ids = Array.isArray(filter.value)
+        ? filter.value.map(String).filter(Boolean)
+        : [];
+      if (ids.length) {
+        const idList = sql.join(
+          ids.map((unitId) => sql`${unitId}::uuid`),
+          sql`, `,
+        );
+        conditions.push(
+          sql`EXISTS (SELECT 1 FROM ${ItemUnitsTable} WHERE ${ItemUnitsTable.itemId} = ${ItemsTable.id} AND ${ItemUnitsTable.unitId} IN (${idList}))`,
+        );
       }
     } else if (filter.id === "source") {
       const values = facetValues(filter.value, itemSourceValues);
@@ -108,7 +119,10 @@ const importItemRowSchema = z.object({
   nameEn: z.string().trim().min(2).max(80),
   nameAr: z.string().trim().min(2).max(80),
   categorySlug: z.string().trim().min(1).max(128),
-  unit: z.enum(itemUnitValues).default("piece"),
+  /** Default unit code. */
+  unit: z.string().trim().min(1).max(32).default("piece"),
+  /** Optional pipe-separated list of all linked unit codes (default included). */
+  units: z.string().trim().max(256).optional(),
 });
 
 const importCategoryRowSchema = z.object({
@@ -284,7 +298,10 @@ export const adminCatalogRouter = createTRPCRouter({
 
         const rows = await ctx.db.query.ItemsTable.findMany({
           where,
-          with: { category: true },
+          with: {
+            category: true,
+            itemUnits: { with: { unit: true } },
+          },
           orderBy: itemsOrderBy(input.sorting),
           offset,
           limit: input.perPage,
@@ -298,21 +315,30 @@ export const adminCatalogRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const rows = await ctx.db.query.ItemsTable.findMany({
           where: itemsWhere(input),
-          with: { category: { columns: { slug: true } } },
+          with: {
+            category: { columns: { slug: true } },
+            itemUnits: { with: { unit: { columns: { code: true } } } },
+          },
           orderBy: itemsOrderBy(input.sorting),
           limit: EXPORT_ROW_CAP,
         });
 
         return {
-          rows: rows.map((item) => ({
-            nameEn: item.nameEn,
-            nameAr: item.nameAr,
-            categorySlug: item.category?.slug ?? "",
-            unit: item.defaultUnit,
-            status: item.status,
-            source: item.source,
-            createdAt: item.createdAt.toISOString(),
-          })),
+          rows: rows.map((item) => {
+            const sorted = [...item.itemUnits].sort(
+              (a, b) => a.sortOrder - b.sortOrder,
+            );
+            return {
+              nameEn: item.nameEn,
+              nameAr: item.nameAr,
+              categorySlug: item.category?.slug ?? "",
+              unit: sorted.find((iu) => iu.isDefault)?.unit.code ?? "",
+              units: sorted.map((iu) => iu.unit.code).join("|"),
+              status: item.status,
+              source: item.source,
+              createdAt: item.createdAt.toISOString(),
+            };
+          }),
         };
       }),
 
@@ -326,7 +352,55 @@ export const adminCatalogRouter = createTRPCRouter({
         });
         const categoryBySlug = new Map(categories.map((c) => [c.slug, c.id]));
 
+        const units = await ctx.db.query.UnitsTable.findMany({
+          where: isNull(UnitsTable.deletedAt),
+          columns: { id: true, code: true },
+        });
+        const unitIdByCode = new Map(units.map((u) => [u.code, u.id]));
+
+        const userId = ctx.session.user.id;
         const results: { index: number; action: "created" | "updated" | "error"; message?: string }[] = [];
+
+        /** Replace an item's unit links: prune, add, then flip the default. */
+        const syncLinks = async (
+          itemId: string,
+          unitIds: string[],
+          defaultUnitId: string,
+        ) => {
+          await ctx.db
+            .delete(ItemUnitsTable)
+            .where(
+              and(
+                eq(ItemUnitsTable.itemId, itemId),
+                notInArray(ItemUnitsTable.unitId, unitIds),
+              ),
+            );
+          await ctx.db
+            .insert(ItemUnitsTable)
+            .values(
+              unitIds.map((unitId, i) => ({
+                itemId,
+                unitId,
+                isDefault: false,
+                sortOrder: i,
+                createdBy: userId,
+              })),
+            )
+            .onConflictDoNothing();
+          await ctx.db
+            .update(ItemUnitsTable)
+            .set({ isDefault: false, updatedBy: userId })
+            .where(eq(ItemUnitsTable.itemId, itemId));
+          await ctx.db
+            .update(ItemUnitsTable)
+            .set({ isDefault: true, updatedBy: userId })
+            .where(
+              and(
+                eq(ItemUnitsTable.itemId, itemId),
+                eq(ItemUnitsTable.unitId, defaultUnitId),
+              ),
+            );
+        };
 
         for (const [index, row] of input.rows.entries()) {
           const categoryId = categoryBySlug.get(row.categorySlug);
@@ -338,6 +412,32 @@ export const adminCatalogRouter = createTRPCRouter({
             });
             continue;
           }
+
+          // Resolve unit codes (default + optional pipe-list) → unit ids.
+          const codes = row.units
+            ? row.units.split("|").map((c) => c.trim()).filter(Boolean)
+            : [];
+          if (!codes.includes(row.unit)) codes.unshift(row.unit);
+          const unitIds: string[] = [];
+          let unknownCode = false;
+          for (const code of codes) {
+            const unitId = unitIdByCode.get(code);
+            if (!unitId) {
+              unknownCode = true;
+              break;
+            }
+            if (!unitIds.includes(unitId)) unitIds.push(unitId);
+          }
+          if (unknownCode || unitIds.length === 0) {
+            results.push({
+              index,
+              action: "error",
+              message: "dataTable.importReasonUnknownUnit",
+            });
+            continue;
+          }
+          const defaultUnitId = unitIdByCode.get(row.unit)!;
+
           const normalizedAr = normalizeText(row.nameAr);
           const existing = await ctx.db.query.ItemsTable.findFirst({
             where: and(
@@ -354,24 +454,27 @@ export const adminCatalogRouter = createTRPCRouter({
                 nameAr: row.nameAr,
                 normalizedEn: normalizeText(row.nameEn),
                 normalizedAr,
-                defaultUnit: row.unit,
-                updatedBy: ctx.session.user.id,
+                updatedBy: userId,
               })
               .where(eq(ItemsTable.id, existing.id));
+            await syncLinks(existing.id, unitIds, defaultUnitId);
             results.push({ index, action: "updated" });
           } else {
-            await ctx.db.insert(ItemsTable).values({
-              categoryId,
-              nameEn: row.nameEn,
-              nameAr: row.nameAr,
-              normalizedEn: normalizeText(row.nameEn),
-              normalizedAr,
-              defaultUnit: row.unit,
-              status: "approved",
-              source: "admin",
-              createdByUserId: ctx.session.user.id,
-              createdBy: ctx.session.user.id,
-            });
+            const [created] = await ctx.db
+              .insert(ItemsTable)
+              .values({
+                categoryId,
+                nameEn: row.nameEn,
+                nameAr: row.nameAr,
+                normalizedEn: normalizeText(row.nameEn),
+                normalizedAr,
+                status: "approved",
+                source: "admin",
+                createdByUserId: userId,
+                createdBy: userId,
+              })
+              .returning({ id: ItemsTable.id });
+            if (created) await syncLinks(created.id, unitIds, defaultUnitId);
             results.push({ index, action: "created" });
           }
         }
@@ -410,41 +513,110 @@ export const adminCatalogRouter = createTRPCRouter({
     create: adminProcedure
       .input(adminItemUpsertSchema)
       .mutation(async ({ ctx, input }) => {
-        const [row] = await ctx.db
-          .insert(ItemsTable)
-          .values({
-            ...input,
-            normalizedEn: normalizeText(input.nameEn),
-            normalizedAr: normalizeText(input.nameAr),
-            status: "approved",
-            source: "admin",
-            createdByUserId: ctx.session.user.id,
-            createdBy: ctx.session.user.id,
-          })
-          .returning();
-        return row;
+        if (!input.unitIds.includes(input.defaultUnitId)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "validation.defaultUnitNotLinked",
+          });
+        }
+        const userId = ctx.session.user.id;
+        return ctx.db.transaction(async (tx) => {
+          const [row] = await tx
+            .insert(ItemsTable)
+            .values({
+              categoryId: input.categoryId,
+              nameEn: input.nameEn,
+              nameAr: input.nameAr,
+              imageUrl: input.imageUrl ?? null,
+              normalizedEn: normalizeText(input.nameEn),
+              normalizedAr: normalizeText(input.nameAr),
+              status: "approved",
+              source: "admin",
+              createdByUserId: userId,
+              createdBy: userId,
+            })
+            .returning();
+          if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+          await tx.insert(ItemUnitsTable).values(
+            input.unitIds.map((unitId, i) => ({
+              itemId: row.id,
+              unitId,
+              isDefault: unitId === input.defaultUnitId,
+              sortOrder: i,
+              createdBy: userId,
+            })),
+          );
+          return row;
+        });
       }),
 
     update: adminProcedure
       .input(adminItemUpsertSchema.partial().extend({ id: z.uuid() }))
       .mutation(async ({ ctx, input }) => {
-        const { id, ...changes } = input;
-        const [row] = await ctx.db
-          .update(ItemsTable)
-          .set({
-            ...changes,
-            ...(changes.nameEn
-              ? { normalizedEn: normalizeText(changes.nameEn) }
-              : {}),
-            ...(changes.nameAr
-              ? { normalizedAr: normalizeText(changes.nameAr) }
-              : {}),
-            updatedBy: ctx.session.user.id,
-          })
-          .where(eq(ItemsTable.id, id))
-          .returning();
-        if (!row) throw new TRPCError({ code: "NOT_FOUND" });
-        return row;
+        const { id, unitIds, defaultUnitId, ...changes } = input;
+        if (unitIds && unitIds.length) {
+          if (!defaultUnitId || !unitIds.includes(defaultUnitId)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "validation.defaultUnitNotLinked",
+            });
+          }
+        }
+        const userId = ctx.session.user.id;
+        return ctx.db.transaction(async (tx) => {
+          const [row] = await tx
+            .update(ItemsTable)
+            .set({
+              ...changes,
+              ...(changes.nameEn
+                ? { normalizedEn: normalizeText(changes.nameEn) }
+                : {}),
+              ...(changes.nameAr
+                ? { normalizedAr: normalizeText(changes.nameAr) }
+                : {}),
+              updatedBy: userId,
+            })
+            .where(eq(ItemsTable.id, id))
+            .returning();
+          if (!row) throw new TRPCError({ code: "NOT_FOUND" });
+
+          if (unitIds && unitIds.length && defaultUnitId) {
+            await tx
+              .delete(ItemUnitsTable)
+              .where(
+                and(
+                  eq(ItemUnitsTable.itemId, id),
+                  notInArray(ItemUnitsTable.unitId, unitIds),
+                ),
+              );
+            await tx
+              .insert(ItemUnitsTable)
+              .values(
+                unitIds.map((unitId, i) => ({
+                  itemId: id,
+                  unitId,
+                  isDefault: false,
+                  sortOrder: i,
+                  createdBy: userId,
+                })),
+              )
+              .onConflictDoNothing();
+            await tx
+              .update(ItemUnitsTable)
+              .set({ isDefault: false, updatedBy: userId })
+              .where(eq(ItemUnitsTable.itemId, id));
+            await tx
+              .update(ItemUnitsTable)
+              .set({ isDefault: true, updatedBy: userId })
+              .where(
+                and(
+                  eq(ItemUnitsTable.itemId, id),
+                  eq(ItemUnitsTable.unitId, defaultUnitId),
+                ),
+              );
+          }
+          return row;
+        });
       }),
 
     delete: adminProcedure

@@ -204,7 +204,7 @@ export default function DriverOrderScreen() {
                       : "text-foreground"
                   }`}
                 >
-                  {lineName(line)} — {line.qty} {t(`units.${line.unit}`)}
+                  {lineName(line)} — {line.qty} {line.unit}
                 </Text>
                 {resolved ? (
                   <Text

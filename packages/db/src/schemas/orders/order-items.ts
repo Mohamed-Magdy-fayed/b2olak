@@ -9,7 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import { auditColumns, id } from "../../helpers";
-import { ItemsTable, itemUnitEnum } from "../catalog/items";
+import { ItemsTable } from "../catalog/items";
 import { orderItemStatusEnum } from "./enums";
 import { OrdersTable } from "./orders";
 
@@ -31,7 +31,8 @@ export const OrderItemsTable = pgTable(
     nameSnapshotEn: varchar({ length: 128 }),
     nameSnapshotAr: varchar({ length: 128 }),
     qty: numeric({ precision: 10, scale: 3 }).notNull(),
-    unit: itemUnitEnum().notNull(),
+    /** Snapshot of the unit `code` at order time (catalog edits never rewrite history). */
+    unit: varchar({ length: 32 }).notNull(),
     customerNote: text(),
     status: orderItemStatusEnum().notNull().default("pending"),
     actualUnitPrice: numeric({ precision: 10, scale: 2 }),

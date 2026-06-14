@@ -12,6 +12,7 @@ import { adminGeoRouter } from "./geo";
 import { adminOrdersRouter } from "./orders";
 import { adminReviewRouter } from "./review";
 import { adminSettingsRouter } from "./settings";
+import { adminUnitsRouter } from "./units";
 import { adminUsersRouter } from "./users";
 
 export const adminRouter = createTRPCRouter({
@@ -21,6 +22,7 @@ export const adminRouter = createTRPCRouter({
   orders: adminOrdersRouter,
   review: adminReviewRouter,
   settings: adminSettingsRouter,
+  units: adminUnitsRouter,
   users: adminUsersRouter,
 
   dashboard: adminProcedure.query(async ({ ctx }) => {

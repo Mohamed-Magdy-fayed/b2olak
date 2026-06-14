@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Db } from "@workspace/db/client";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
 import { AddressesTable } from "@workspace/db/schemas/orders/addresses";
+import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
 import { inngest } from "@workspace/integrations/inngest/client";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
@@ -81,6 +82,33 @@ export const ordersRouter = createTRPCRouter({
         }
       }
 
+      // Security: a unit may only be ordered if it is linked to the (canonical)
+      // item. Build (itemId:unitId) → unit code for the snapshot, then reject
+      // any line whose chosen unit isn't an allowed unit for that item.
+      const canonicalIds = [
+        ...new Set([...itemMap.values()].map((item) => item.id)),
+      ];
+      const links = await ctx.db.query.ItemUnitsTable.findMany({
+        where: inArray(ItemUnitsTable.itemId, canonicalIds),
+        with: { unit: { columns: { code: true } } },
+      });
+      const unitCodeByKey = new Map(
+        links.map((link) => [`${link.itemId}:${link.unitId}`, link.unit.code]),
+      );
+      const unitCodeForLine = (line: { itemId: string; unitId: string }) => {
+        const item = itemMap.get(line.itemId)!;
+        const code = unitCodeByKey.get(`${item.id}:${line.unitId}`);
+        if (!code) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "orders.unitNotAllowed",
+          });
+        }
+        return code;
+      };
+      // Validate up-front so a bad line fails before we open the transaction.
+      for (const line of input.items) unitCodeForLine(line);
+
       // settings lib import kept local to avoid cycle noise
       const { getDeliveryFeeEgp } = await import("../lib/settings");
       const deliveryFee = await getDeliveryFeeEgp(ctx.db);
@@ -117,7 +145,7 @@ export const ordersRouter = createTRPCRouter({
               nameSnapshotEn: item.nameEn,
               nameSnapshotAr: item.nameAr,
               qty: String(line.qty),
-              unit: line.unit,
+              unit: unitCodeForLine(line),
               customerNote: line.note,
               createdBy: ctx.session.user.id,
             };

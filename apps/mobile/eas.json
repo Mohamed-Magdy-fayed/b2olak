@@ -19,12 +19,24 @@
     },
     "production": {
       "autoIncrement": true,
+      "android": {
+        "buildType": "apk"
+      },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://ba2olak.gateling.com"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "applicationId": "6503310289294406656",
+        "releaseStatus": "completed",
+        "track": "production",
+        "changesNotSentForReview": false,
+        "rollout": 0,
+        "serviceAccountKeyPath": ""
+      }
+    }
   }
 }

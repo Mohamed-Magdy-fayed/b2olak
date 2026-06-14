@@ -1,8 +1,22 @@
-import { and, asc, count, desc, eq, ilike, isNull, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+  sql,
+} from "drizzle-orm";
 import { z } from "zod";
 
 import { CategoriesTable } from "@workspace/db/schemas/catalog/categories";
+import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
+import { UnitsTable } from "@workspace/db/schemas/catalog/units";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { cached } from "@workspace/integrations/redis";
@@ -10,6 +24,7 @@ import { normalizeText } from "@workspace/validators/normalize";
 
 import { baseProcedure, createTRPCRouter, protectedProcedure } from "../init";
 import { enforceRateLimit, ipFromHeaders } from "../ratelimit";
+import type { Context } from "../init";
 
 /** Public catalog reads — consumed by mobile (P6) and the admin item pickers. */
 
@@ -17,6 +32,54 @@ const visibleItem = and(
   isNull(ItemsTable.deletedAt),
   ne(ItemsTable.status, "merged"),
 );
+
+type CatalogUnit = {
+  id: string;
+  code: string;
+  nameEn: string;
+  nameAr: string;
+};
+
+/**
+ * Enrich a list of items with the units they can be ordered in plus the
+ * default unit code (preselected at checkout). One query for the whole batch.
+ */
+async function attachUnits<T extends { id: string }>(
+  db: Context["db"],
+  items: T[],
+): Promise<(T & { units: CatalogUnit[]; defaultUnit: string | null })[]> {
+  if (items.length === 0) return [];
+  const links = await db.query.ItemUnitsTable.findMany({
+    where: inArray(
+      ItemUnitsTable.itemId,
+      items.map((i) => i.id),
+    ),
+    orderBy: [asc(ItemUnitsTable.sortOrder)],
+    with: { unit: true },
+  });
+
+  const byItem = new Map<string, { units: CatalogUnit[]; defaultUnit: string | null }>();
+  for (const link of links) {
+    const entry = byItem.get(link.itemId) ?? { units: [], defaultUnit: null };
+    entry.units.push({
+      id: link.unit.id,
+      code: link.unit.code,
+      nameEn: link.unit.nameEn,
+      nameAr: link.unit.nameAr,
+    });
+    if (link.isDefault) entry.defaultUnit = link.unit.code;
+    byItem.set(link.itemId, entry);
+  }
+
+  return items.map((item) => {
+    const entry = byItem.get(item.id) ?? { units: [], defaultUnit: null };
+    return {
+      ...item,
+      units: entry.units,
+      defaultUnit: entry.defaultUnit ?? entry.units[0]?.code ?? null,
+    };
+  });
+}
 
 export const catalogRouter = createTRPCRouter({
   /** Public so the checkout screen can show the fee before placing. */
@@ -45,6 +108,19 @@ export const catalogRouter = createTRPCRouter({
     ),
   ),
 
+  /** Active units — powers the unit picker when adding a brand-new item. */
+  units: baseProcedure.query(({ ctx }) =>
+    cached("catalog:units", 60, () =>
+      ctx.db.query.UnitsTable.findMany({
+        where: and(
+          eq(UnitsTable.isActive, true),
+          isNull(UnitsTable.deletedAt),
+        ),
+        orderBy: [asc(UnitsTable.sortOrder)],
+      }),
+    ),
+  ),
+
   itemsByCategory: baseProcedure
     .input(
       z.object({
@@ -62,8 +138,9 @@ export const catalogRouter = createTRPCRouter({
       });
 
       const hasMore = items.length > input.limit;
+      const page = hasMore ? items.slice(0, input.limit) : items;
       return {
-        items: hasMore ? items.slice(0, input.limit) : items,
+        items: await attachUnits(ctx.db, page),
         nextCursor: hasMore ? input.cursor + input.limit : null,
       };
     }),
@@ -90,7 +167,7 @@ export const catalogRouter = createTRPCRouter({
         limit: 30,
       });
 
-      return { items };
+      return { items: await attachUnits(ctx.db, items) };
     }),
 
   /**
@@ -105,7 +182,6 @@ export const catalogRouter = createTRPCRouter({
           nameEn: ItemsTable.nameEn,
           nameAr: ItemsTable.nameAr,
           imageUrl: ItemsTable.imageUrl,
-          defaultUnit: ItemsTable.defaultUnit,
           categoryId: ItemsTable.categoryId,
           orderCount: count(OrderItemsTable.id).as("orderCount"),
         })
@@ -117,13 +193,15 @@ export const catalogRouter = createTRPCRouter({
           ItemsTable.nameEn,
           ItemsTable.nameAr,
           ItemsTable.imageUrl,
-          ItemsTable.defaultUnit,
           ItemsTable.categoryId,
         )
         .orderBy(desc(sql`"orderCount"`))
         .limit(12);
 
-      return rows.map(({ orderCount: _oc, ...item }) => item);
+      return attachUnits(
+        ctx.db,
+        rows.map(({ orderCount: _oc, ...item }) => item),
+      );
     }),
   ),
 
@@ -141,7 +219,6 @@ export const catalogRouter = createTRPCRouter({
         nameEn: ItemsTable.nameEn,
         nameAr: ItemsTable.nameAr,
         imageUrl: ItemsTable.imageUrl,
-        defaultUnit: ItemsTable.defaultUnit,
         categoryId: ItemsTable.categoryId,
         lastOrderedAt: OrdersTable.createdAt,
       })
@@ -166,6 +243,9 @@ export const catalogRouter = createTRPCRouter({
       return b.lastOrderedAt.getTime() - a.lastOrderedAt.getTime();
     });
 
-    return rows.map(({ lastOrderedAt: _la, ...item }) => item);
+    return attachUnits(
+      ctx.db,
+      rows.map(({ lastOrderedAt: _la, ...item }) => item),
+    );
   }),
 });
