@@ -109,7 +109,7 @@ export default function CartScreen() {
           />
           <View
             className="gap-3 border-t border-border pt-4"
-            style={{ paddingBottom: tabBarHeight + 8 }}
+            style={{ paddingBottom: tabBarHeight + 12 }}
           >
             <Text className="text-muted-foreground">
               {t("shop.itemsAtMarketPrice")}

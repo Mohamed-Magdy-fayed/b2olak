@@ -1,4 +1,5 @@
 import { FlatList, Text } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
@@ -10,6 +11,7 @@ import { useTRPC } from "@/lib/trpc";
 export default function CategoryScreen() {
   const trpc = useTRPC();
   const { t, locale } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const { data: categories } = useQuery(trpc.catalog.categories.queryOptions());
@@ -51,7 +53,7 @@ export default function CategoryScreen() {
             </Text>
           )
         }
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: insets.bottom + 24 }}
       />
     </Screen>
   );
