@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
 
 import { LanguageToggle } from "@/components/language-toggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { useSignedIn } from "@/lib/auth-gate";
 import { authenticate, isBiometricAvailable } from "@/lib/biometric";
 import {
@@ -21,6 +24,7 @@ import {
   removeAccount,
   removeActiveAccount,
   setAccountBiometric,
+  updateAccountName,
 } from "@/lib/session";
 import { useTRPC } from "@/lib/trpc";
 
@@ -37,6 +41,8 @@ export default function AccountScreen() {
   const [biometricOn, setBiometricOn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [trusted, setTrusted] = useState<TrustedAccount | null>(null);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -74,6 +80,25 @@ export default function AccountScreen() {
     }
   };
 
+  const updateProfile = useMutation(
+    trpc.auth.updateProfile.mutationOptions({
+      onSuccess: async (res) => {
+        // Keep the locally cached account name (account picker, trusted device)
+        // in sync with the server, then refresh the profile query.
+        await updateAccountName(res.user.id, res.user.name ?? "");
+        await queryClient.invalidateQueries({
+          queryKey: trpc.auth.me.queryKey(),
+        });
+        setEditingName(false);
+      },
+    }),
+  );
+
+  const startEditName = () => {
+    setNameDraft(data?.user.name ?? "");
+    setEditingName(true);
+  };
+
   const continueAsTrusted = async () => {
     // Route straight to the role shell — going via "/" would make index prompt
     // for biometrics a second time (we just authenticated).
@@ -99,71 +124,108 @@ export default function AccountScreen() {
 
   if (signedIn === false) {
     return (
-      <View className="flex-1 gap-4 bg-background px-4 pt-16">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-black text-foreground">
-            {t("shop.tabAccount")}
-          </Text>
-          <LanguageToggle />
-        </View>
+      <Screen className="gap-4">
+        <ScreenHeader title={t("shop.tabAccount")} right={<LanguageToggle />} />
         <Card className="gap-2">
-          <Text className="text-lg font-black text-foreground">
+          <Text className="font-display text-lg text-foreground">
             {t("shop.guestAccountTitle")}
           </Text>
           <Text className="text-muted-foreground">
             {t("shop.guestAccountSubtitle")}
           </Text>
-          {trusted ? (
+          <View className="gap-3 pt-1">
+            {trusted ? (
+              <Button
+                label={t("shop.continueAs", {
+                  name: trusted.name || trusted.phone,
+                })}
+                onPress={() => void continueAsTrusted()}
+              />
+            ) : null}
             <Button
-              label={t("shop.continueAs", {
-                name: trusted.name || trusted.phone,
-              })}
-              onPress={() => void continueAsTrusted()}
+              variant={trusted ? "outline" : "default"}
+              label={t("shop.signInCta")}
+              onPress={() => router.push("/(auth)/sign-in")}
             />
-          ) : null}
-          <Button
-            variant={trusted ? "outline" : "default"}
-            label={t("shop.signInCta")}
-            onPress={() => router.push("/(auth)/sign-in")}
-          />
+          </View>
         </Card>
-      </View>
+      </Screen>
     );
   }
 
   return (
-    <View className="flex-1 gap-4 bg-background px-4 pt-16">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-2xl font-black text-foreground">
-          {t("shop.tabAccount")}
-        </Text>
-        <LanguageToggle />
-      </View>
+    <Screen className="gap-4">
+      <ScreenHeader title={t("shop.tabAccount")} right={<LanguageToggle />} />
 
-      <Card className="gap-1">
-        <Text className="text-lg font-bold text-foreground">
-          {data?.user.name ?? "—"}
-        </Text>
-        {data?.user.phone ? (
-          <Text className="text-muted-foreground">{data.user.phone}</Text>
-        ) : null}
+      <Card className="gap-2">
+        {editingName ? (
+          <View className="gap-3">
+            <Input
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              placeholder={t("shop.namePlaceholder")}
+              autoFocus
+              maxLength={100}
+            />
+            <View className="flex-row gap-3">
+              <Button
+                className="flex-1"
+                label={t("shop.save")}
+                loading={updateProfile.isPending}
+                disabled={nameDraft.trim().length < 2}
+                onPress={() =>
+                  updateProfile.mutate({ name: nameDraft.trim() })
+                }
+              />
+              <Button
+                className="flex-1"
+                variant="outline"
+                label={t("shop.cancel")}
+                onPress={() => setEditingName(false)}
+              />
+            </View>
+          </View>
+        ) : (
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-1 gap-1">
+              <Text className="font-display text-lg text-foreground">
+                {data?.user.name ?? "—"}
+              </Text>
+              {data?.user.phone ? (
+                <Text className="text-muted-foreground">{data.user.phone}</Text>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={startEditName}
+              hitSlop={8}
+              className="size-10 items-center justify-center rounded-full bg-elevated active:opacity-80"
+              accessibilityLabel={t("shop.editName")}
+            >
+              <Ionicons name="pencil" size={18} color="#C9A227" />
+            </Pressable>
+          </View>
+        )}
       </Card>
 
       <Pressable
-        className="rounded-xl border border-border bg-card p-4 active:bg-muted"
+        className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-4 active:bg-elevated"
         onPress={() => router.push("/(customer)/addresses")}
       >
+        <Ionicons name="location-outline" size={20} color="#C9A227" />
         <Text className="font-semibold text-foreground">
-          📍 {t("address.title")}
+          {t("address.title")}
         </Text>
       </Pressable>
 
       {biometricAvailable ? (
         <Card className="flex-row items-center justify-between gap-3">
           <View className="flex-1 gap-1">
-            <Text className="font-semibold text-foreground">
-              🔒 {t("auth.biometric.accountToggleLabel")}
-            </Text>
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="finger-print-outline" size={18} color="#F5F2EC" />
+              <Text className="font-semibold text-foreground">
+                {t("auth.biometric.accountToggleLabel")}
+              </Text>
+            </View>
             <Text className="text-sm text-muted-foreground">
               {t("auth.biometric.accountToggleHint")}
             </Text>
@@ -171,7 +233,7 @@ export default function AccountScreen() {
           <Switch
             value={biometricOn}
             onValueChange={(next) => void toggleBiometric(next)}
-            trackColor={{ true: "#7c3aed" }}
+            trackColor={{ true: "#C9A227" }}
           />
         </Card>
       ) : null}
@@ -182,6 +244,6 @@ export default function AccountScreen() {
         loading={signOut.isPending}
         onPress={() => signOut.mutate()}
       />
-    </View>
+    </Screen>
   );
 }

@@ -120,6 +120,16 @@ export async function setActiveAccount(userId: string): Promise<void> {
   if (account) await setToken(account.token);
 }
 
+/** Update the cached display name for a stored account (e.g. after profile edit). */
+export async function updateAccountName(
+  userId: string,
+  name: string,
+): Promise<void> {
+  const accounts = await readAccounts();
+  const next = accounts.map((a) => (a.userId === userId ? { ...a, name } : a));
+  await writeAccounts(next);
+}
+
 /** Toggle the biometric-unlock preference for a single stored account. */
 export async function setAccountBiometric(
   userId: string,

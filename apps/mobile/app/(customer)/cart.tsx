@@ -78,7 +78,7 @@ export default function CartScreen() {
                 </View>
 
                 {/* Unit picker — shown only when the item has more than one unit */}
-                {line.units.length > 1 ? (
+                {(line.units?.length ?? 0) > 1 ? (
                   <View className="flex-row flex-wrap gap-1.5">
                     {line.units.map((u) => (
                       <Pressable

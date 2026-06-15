@@ -79,6 +79,14 @@ export const useCart = create<CartState>()(
     {
       name: "ba2olak-cart",
       storage: createJSONStorage(() => AsyncStorage),
+      // v1 introduced multi-unit lines (`units`/`unitId`). Carts persisted
+      // before that lack those fields and crash the cart screen, so drop any
+      // pre-v1 state instead of trying to reshape it.
+      version: 1,
+      migrate: (persisted, version) => {
+        if (version < 1) return { lines: [] } as Partial<CartState>;
+        return persisted as Partial<CartState>;
+      },
     },
   ),
 );
@@ -109,6 +117,7 @@ export function cartLineFromItem(
 
 /** Localized name of a cart line's currently-selected unit. */
 export function cartLineUnitName(line: CartLine, locale: string): string {
-  const u = line.units.find((x) => x.id === line.unitId) ?? line.units[0];
+  const units = line.units ?? [];
+  const u = units.find((x) => x.id === line.unitId) ?? units[0];
   return u ? (locale === "ar" ? u.nameAr : u.nameEn) : "";
 }
