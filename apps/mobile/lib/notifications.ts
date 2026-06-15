@@ -77,7 +77,7 @@ export async function getExpoPushToken(): Promise<string | null> {
         name: "default",
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: "#7c3aed",
+        lightColor: "#C9A227",
       });
     }
 

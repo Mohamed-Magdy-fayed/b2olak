@@ -1,8 +1,9 @@
-import { FlatList, Pressable, Text, View } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { FlatList, Text } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { ItemRow } from "@/components/item-row";
+import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -28,18 +29,11 @@ export default function CategoryScreen() {
   const allItems = items.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <View className="flex-1 bg-background px-4 pt-16">
-      <View className="mb-3 flex-row items-center gap-3">
-        <Pressable
-          className="size-10 items-center justify-center rounded-full bg-muted"
-          onPress={() => router.back()}
-        >
-          <Text className="text-lg">{locale === "ar" ? "→" : "←"}</Text>
-        </Pressable>
-        <Text className="text-2xl font-black text-foreground">
-          {category ? (locale === "ar" ? category.nameAr : category.nameEn) : ""}
-        </Text>
-      </View>
+    <Screen padded={false}>
+      <ScreenBackHeader
+        title={category ? ((locale === "ar" ? category.nameAr : category.nameEn) ?? "") : ""}
+        className="px-5"
+      />
       <FlatList
         data={allItems}
         keyExtractor={(item) => item.id}
@@ -49,6 +43,7 @@ export default function CategoryScreen() {
             void items.fetchNextPage();
           }
         }}
+        showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           items.isLoading ? null : (
             <Text className="py-12 text-center text-muted-foreground">
@@ -56,8 +51,8 @@ export default function CategoryScreen() {
             </Text>
           )
         }
-        contentContainerClassName="pb-6"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
       />
-    </View>
+    </Screen>
   );
 }

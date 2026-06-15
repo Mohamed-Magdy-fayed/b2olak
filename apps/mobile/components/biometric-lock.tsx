@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import { Button } from "@/components/ui/button";
 import { authenticate } from "@/lib/biometric";
@@ -36,20 +37,39 @@ export function BiometricLock({ onUnlocked }: { onUnlocked: () => void }) {
   }, []);
 
   return (
-    <View className="flex-1 items-center justify-center gap-6 bg-background p-6">
-      <Text className="text-3xl font-black text-primary">
+    <View className="flex-1 items-center justify-center gap-8 bg-background px-6">
+      {/* Wordmark */}
+      <Text className="font-display text-4xl text-primary">
         {t("mobile.welcomeTitle")}
       </Text>
-      <Text className="text-center text-muted-foreground">
-        {t("auth.biometric.locked")}
-      </Text>
-      {busy ? <ActivityIndicator size="large" color="#7c3aed" /> : null}
+
+      {/* Biometric icon + status */}
+      <View className="items-center gap-4">
+        <View className="size-24 items-center justify-center rounded-2xl bg-card">
+          <Ionicons
+            name={busy ? "scan-outline" : "finger-print-outline"}
+            size={52}
+            color="#C9A227"
+          />
+        </View>
+        <Text className="text-center text-base text-muted-foreground">
+          {t("auth.biometric.locked")}
+        </Text>
+        {busy ? (
+          <ActivityIndicator size="large" color="#C9A227" />
+        ) : null}
+      </View>
+
+      {/* Failure actions */}
       {failed ? (
         <View className="w-full gap-3">
-          <Text className="text-center text-destructive">
+          <Text className="text-center text-sm text-destructive">
             {t("auth.biometric.unlockFailed")}
           </Text>
-          <Button label={t("auth.biometric.unlock")} onPress={() => void tryUnlock()} />
+          <Button
+            label={t("auth.biometric.unlock")}
+            onPress={() => void tryUnlock()}
+          />
           <Button
             variant="ghost"
             label={t("auth.biometric.useOtpInstead")}

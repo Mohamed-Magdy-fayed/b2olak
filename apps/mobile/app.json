@@ -33,6 +33,7 @@
       "backgroundColor": "#0E0E10",
       "softwareKeyboardLayoutMode": "pan",
       "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json",
       "package": "com.gatelingsolutions.ba2olak"
     },
     "web": {

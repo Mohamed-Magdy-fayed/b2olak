@@ -28,15 +28,6 @@
     }
   },
   "submit": {
-    "production": {
-      "android": {
-        "applicationId": "6503310289294406656",
-        "releaseStatus": "completed",
-        "track": "production",
-        "changesNotSentForReview": false,
-        "rollout": 0,
-        "serviceAccountKeyPath": ""
-      }
-    }
+    "production": {}
   }
 }

@@ -3,32 +3,20 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
+import { Screen, ScreenHeader } from "@/components/ui/screen";
+import { StatusChip } from "@/components/ui/status-chip";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
+import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTRPC } from "@/lib/trpc";
 
 const ACTIVE = ["placed", "assigned", "shopping", "purchased", "delivering"];
-
-export function StatusChip({ status }: { status: string }) {
-  const { t } = useTranslation();
-  const tone = ACTIVE.includes(status)
-    ? "bg-primary/10 text-primary"
-    : status === "delivered"
-      ? "bg-success/10 text-success"
-      : "bg-muted text-muted-foreground";
-  return (
-    <View className={`rounded-full px-3 py-1 ${tone.split(" ")[0]}`}>
-      <Text className={`text-xs font-semibold ${tone.split(" ")[1]}`}>
-        {t(`shop.status.${status}` as never)}
-      </Text>
-    </View>
-  );
-}
 
 export default function OrdersScreen() {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const signedIn = useSignedIn();
+  const tabBarHeight = useTabBarHeight();
 
   const { data } = useQuery({
     ...trpc.orders.mine.queryOptions({ cursor: 0 }),
@@ -38,8 +26,8 @@ export default function OrdersScreen() {
 
   if (signedIn === false) {
     return (
-      <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
-        <Text className="text-center text-xl font-black text-foreground">
+      <Screen className="items-center justify-center gap-4">
+        <Text className="text-center font-display text-xl text-foreground">
           {t("shop.guestOrdersTitle")}
         </Text>
         <Text className="text-center text-muted-foreground">
@@ -49,7 +37,7 @@ export default function OrdersScreen() {
           label={t("shop.signInCta")}
           onPress={() => router.push("/(auth)/sign-in")}
         />
-      </View>
+      </Screen>
     );
   }
 
@@ -60,16 +48,16 @@ export default function OrdersScreen() {
   });
 
   return (
-    <View className="flex-1 bg-background px-4 pt-16">
-      <Text className="mb-3 text-2xl font-black text-foreground">
-        {t("shop.ordersTitle")}
-      </Text>
+    <Screen padded={false}>
+      <ScreenHeader title={t("shop.ordersTitle")} className="px-5" />
       <FlatList
         data={orders}
         keyExtractor={(o) => o.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarHeight + 16 }}
         renderItem={({ item: order }) => (
           <Pressable
-            className="mb-3 rounded-xl border border-border bg-card p-4 active:bg-muted"
+            className="mb-3 rounded-2xl border border-border bg-card p-4 active:bg-elevated"
             onPress={() => router.push(`/(customer)/orders/${order.id}`)}
           >
             <View className="flex-row items-center justify-between">
@@ -78,7 +66,7 @@ export default function OrdersScreen() {
               </Text>
               <StatusChip status={order.status} />
             </View>
-            <Text className="mt-1 text-sm text-muted-foreground">
+            <Text className="mt-1.5 text-sm text-muted-foreground">
               {order.items.length} • {new Date(order.createdAt).toLocaleDateString()}
             </Text>
           </Pressable>
@@ -88,8 +76,7 @@ export default function OrdersScreen() {
             {t("shop.noOrders")}
           </Text>
         }
-        contentContainerClassName="pb-6"
       />
-    </View>
+    </Screen>
   );
 }

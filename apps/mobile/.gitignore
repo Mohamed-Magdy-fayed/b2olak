@@ -32,6 +32,7 @@ yarn-error.*
 
 # local env files
 .env*.local
+megz-courses-firebase-adminsdk-96ihy-820ea67f82.json
 
 # typescript
 *.tsbuildinfo

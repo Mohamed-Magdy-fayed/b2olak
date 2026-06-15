@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
   AddressFormModal,
@@ -9,6 +10,7 @@ import {
 } from "@/components/address-form-modal";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { useTabBarHeight } from "@/lib/use-tab-bar-height";
@@ -94,57 +96,55 @@ export default function AddressesScreen() {
 
   return (
     <>
-      <ScrollView
-        className="flex-1 bg-background px-4 pt-16"
-        contentContainerClassName="gap-3"
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View className="flex-row items-center gap-3">
-          <Pressable
-            className="size-10 items-center justify-center rounded-full bg-muted"
-            onPress={() => router.back()}
-          >
-            <Text className="text-lg">{locale === "ar" ? "→" : "←"}</Text>
-          </Pressable>
-          <Text className="text-2xl font-black text-foreground">
-            {t("address.title")}
-          </Text>
-        </View>
-
-        {(addresses ?? []).map((address) => (
-          <Card key={address.id} className="gap-1">
-            <View className="flex-row items-center justify-between">
-              <Text className="font-bold text-foreground">
-                {addressLabel(address, locale)}
-                {address.isDefault ? " ⭐" : ""}
-              </Text>
-              <View className="flex-row gap-3">
-                <Pressable onPress={() => setEditing(address)}>
-                  <Text className="font-semibold text-primary">
+      <Screen padded={false}>
+        <ScreenBackHeader title={t("address.title")} className="px-5" />
+        <ScrollView
+          className="flex-1 px-5"
+          contentContainerClassName="gap-3"
+          contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {(addresses ?? []).map((address) => (
+            <Card key={address.id} className="gap-1">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1 flex-row items-center gap-1.5 me-2">
+                  <Text className="font-bold text-foreground">
+                    {addressLabel(address, locale)}
+                  </Text>
+                  {address.isDefault ? (
+                    <Ionicons name="star" size={14} color="#C9A227" />
+                  ) : null}
+                </View>
+                <View className="flex-row gap-4">
+                  <Text
+                    className="font-semibold text-primary"
+                    onPress={() => setEditing(address)}
+                  >
                     {t("admin.common.edit")}
                   </Text>
-                </Pressable>
-                <Pressable onPress={() => remove.mutate({ id: address.id })}>
-                  <Text className="font-semibold text-destructive">
+                  <Text
+                    className="font-semibold text-destructive"
+                    onPress={() => remove.mutate({ id: address.id })}
+                  >
                     {t("address.delete")}
                   </Text>
-                </Pressable>
+                </View>
               </View>
-            </View>
-            <Text className="text-sm text-muted-foreground">
-              {addressSummary(address, locale)}
-              {address.building ? `، ${address.building}` : ""}
+              <Text className="text-sm text-muted-foreground">
+                {addressSummary(address, locale)}
+                {address.building ? `، ${address.building}` : ""}
+              </Text>
+            </Card>
+          ))}
+          {addresses?.length === 0 ? (
+            <Text className="py-6 text-center text-muted-foreground">
+              {t("address.none")}
             </Text>
-          </Card>
-        ))}
-        {addresses?.length === 0 ? (
-          <Text className="py-6 text-center text-muted-foreground">
-            {t("address.none")}
-          </Text>
-        ) : null}
-        <Button label={t("address.add")} onPress={() => setEditing("new")} />
-      </ScrollView>
+          ) : null}
+          <Button label={t("address.add")} onPress={() => setEditing("new")} />
+        </ScrollView>
+      </Screen>
 
       <AddressFormModal
         visible={editing !== null}
