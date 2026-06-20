@@ -1,20 +1,12 @@
-import { z } from "zod";
-
 import { inngest } from "@workspace/integrations/inngest/client";
+import { trackEventSchema } from "@workspace/validators/analytics";
 
 import { baseProcedure, createTRPCRouter } from "../init";
 import { enforceRateLimit, ipFromHeaders } from "../ratelimit";
 
 export const analyticsRouter = createTRPCRouter({
   track: baseProcedure
-    .input(
-      z.object({
-        event: z.enum(["begin_checkout"]),
-        value: z.number().nonnegative().optional(),
-        currency: z.string().length(3).optional(),
-        itemCount: z.number().int().nonnegative().optional(),
-      }),
-    )
+    .input(trackEventSchema)
     .mutation(async ({ ctx, input }) => {
       await enforceRateLimit("analytics-track", ipFromHeaders(ctx.headers), 120, "1 m");
 

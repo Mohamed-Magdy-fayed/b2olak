@@ -43,7 +43,7 @@ Verification first (it makes everything else safe to automate), then backend cor
 > test needs stubbing) and a slower watch loop than Vitest. The repo currently uses Vitest
 > in `packages/validators`; item 1 includes migrating/retiring it.
 
-### `[ ]` 1. Domain test suite (Playwright Test, headless / no browser)
+### `[~]` 1. Domain test suite (Playwright Test, headless / no browser)
 - **Goal:** real test coverage of pure business logic so `/gate` actually proves correctness.
 - **Why:** unblocks safe delegation and autonomous runs — the manager can trust a green
   gate instead of re-reading code.
@@ -61,8 +61,22 @@ Verification first (it makes everything else safe to automate), then backend cor
   needs it.
 - **Done when:** logic tests pass via the Playwright runner; `npm run test` / `/gate`
   point at it; Vitest removed (or a dated note on why it's staying).
+- **Status (2026-06-20) — round one done; Vitest kept until item 4 (decided at kickoff):**
+  - Stood up `@playwright/test` at the repo root: `playwright.config.ts` with a non-browser
+    `logic` project (`tests/logic/`), `npm run test:logic` script. 16 tests, all green.
+  - Extracted the previously-inline pure logic into `packages/validators` and pointed the
+    server callers at it (behavior-preserving):
+    - `src/totals.ts` — COD money math (`lineTotal`, `itemsTotal`, `codTotal`, `round2`,
+      `toMoney`); now used by `packages/api/src/routers/driver.ts`.
+    - `src/dedup.ts` — `decideItemMerge` + `AUTO_MERGE_MIN_SIMILARITY` (the trgm/AI
+      auto-merge gate); now used by `packages/integrations/.../item-created.ts`.
+  - The existing Vitest specs (`normalize.test.ts`, `order-status.test.ts`) stay on Vitest
+    and still pass; `npm run test` / `/gate` are unchanged this round.
+  - **Deferred to item 4 (consolidation):** port those two specs into the Playwright `logic`
+    project, remove Vitest from `packages/validators`, and repoint `npm run test` + the
+    `/gate` skill at the Playwright runner. Until then the repo runs two runners by design.
 
-### `[ ]` 2. tRPC best-practices pass
+### `[x]` 2. tRPC best-practices pass
 - **Goal:** confirm every procedure uses the right tier, validates input with Zod, and
   follows the repo idiom; fix the stragglers.
 - **Why:** the API is the contract for web + mobile; inconsistencies here leak everywhere.
@@ -74,6 +88,25 @@ Verification first (it makes everything else safe to automate), then backend cor
   `trpc-builder` subagent → `/gate`.
 - **Decisions at kickoff:** fix-as-you-find vs. report-then-batch.
 - **Done when:** audit report + fixes merged; `/gate` green.
+- **Status (2026-06-20) — done; report-then-batch (decided at kickoff):** audited all 19
+  router files + `init.ts`/`root.ts`. **Tiers, authZ, error codes, and Inngest-for-async
+  were all already correct** — incl. the exemplary multi-role `orders.byId` and the
+  timing-safe `auth.deviceLogin`. Fixes applied:
+  - **Idiom (hard rule #7):** moved the db-enum-free domain input schemas out of routers
+    into `packages/validators` — `driver.ts` (`updateLineSchema`, `markDeliveredSchema`),
+    `analytics.ts` (`trackEventSchema`), `geo.ts` (geo name/import/bulk), and added
+    `storeLinksUpdateSchema` + `importItem/CategoryRowSchema` to `catalog.ts`. **Kept
+    `admin/drivers` + `admin/users` schemas inline by design** — they reference db enum
+    arrays (`vehicleTypeValues`, etc.) and moving them would couple validators→db,
+    breaking hard rule #6 (validators is client-shared). Trivial `{ id }` inputs stay inline.
+  - **Correctness:** `auth.registerPushToken` token now `.min(1)` (was clobberable by an
+    empty string); dropped a redundant `ne(status,'merged')` predicate (the
+    `eq(status,'approved')` already covers it) in `catalog.popularItems`/`reorderItems`;
+    `catalog.reorderItems` tightened `protected → customer` (it's customer-scoped data).
+  - **Decision:** `orders.byId` returning the driver's phone to the customer was a stale
+    comment, not a leak — comment corrected (customers keep the driver contact during an
+    active delivery).
+  - `/gate` green: typecheck (12 pkgs) · test 15/15 · lint 0 errors · build.
 
 ### `[ ]` 3. Backend security hardening
 - **Goal:** make the backend resilient to abuse and common attacks.
@@ -97,7 +130,10 @@ Verification first (it makes everything else safe to automate), then backend cor
   second project) in `apps/web`; cover admin sign-in, an admin data-table flow (after
   item 6), and the marketing/legal pages. Add a `test:e2e` script; wire into the gate/CI
   when ready. Pure-logic tests stay in the non-browser project (item 1) — same tool, two
-  projects.
+  projects. **Carried over from item 1:** port the two remaining Vitest specs
+  (`packages/validators/src/{normalize,order-status}.test.ts`) into the `logic` project,
+  remove Vitest from `packages/validators`, and repoint `npm run test` + `/gate` at
+  Playwright (the repo runs two runners until this lands).
 - **Delegation:** `Plan` for the harness design → implement inline → run headless.
 - **Decisions at kickoff:** which 3–5 flows first; test DB / seed strategy; CI now or later.
 - **Done when:** the browser project runs green locally on the chosen flows.

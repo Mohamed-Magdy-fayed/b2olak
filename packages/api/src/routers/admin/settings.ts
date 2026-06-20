@@ -1,7 +1,6 @@
-import { z } from "zod";
-
 import {
   settingsUpdateSchema,
+  storeLinksUpdateSchema,
   whatsappSettingsUpdateSchema,
 } from "@workspace/validators/catalog";
 
@@ -46,26 +45,7 @@ export const adminSettingsRouter = createTRPCRouter({
   ),
 
   updateStoreLinks: adminProcedure
-    .input(
-      z.object({
-        playStoreUrl: z
-          .string()
-          .trim()
-          .max(512)
-          .refine((v) => v === "" || z.url().safeParse(v).success, {
-            message: "validation.urlInvalid",
-          })
-          .transform((v) => (v === "" ? null : v)),
-        appStoreUrl: z
-          .string()
-          .trim()
-          .max(512)
-          .refine((v) => v === "" || z.url().safeParse(v).success, {
-            message: "validation.urlInvalid",
-          })
-          .transform((v) => (v === "" ? null : v)),
-      }),
-    )
+    .input(storeLinksUpdateSchema)
     .mutation(async ({ ctx, input }) => {
       await Promise.all([
         upsertSetting(

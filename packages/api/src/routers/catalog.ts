@@ -22,7 +22,7 @@ import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { cached } from "@workspace/integrations/redis";
 import { normalizeText } from "@workspace/validators/normalize";
 
-import { baseProcedure, createTRPCRouter, protectedProcedure } from "../init";
+import { baseProcedure, createTRPCRouter, customerProcedure } from "../init";
 import { enforceRateLimit, ipFromHeaders } from "../ratelimit";
 import type { Context } from "../init";
 
@@ -187,7 +187,7 @@ export const catalogRouter = createTRPCRouter({
         })
         .from(OrderItemsTable)
         .innerJoin(ItemsTable, eq(OrderItemsTable.itemId, ItemsTable.id))
-        .where(and(isNull(ItemsTable.deletedAt), ne(ItemsTable.status, "merged"), eq(ItemsTable.status, "approved")))
+        .where(and(isNull(ItemsTable.deletedAt), eq(ItemsTable.status, "approved")))
         .groupBy(
           ItemsTable.id,
           ItemsTable.nameEn,
@@ -209,7 +209,7 @@ export const catalogRouter = createTRPCRouter({
    * Items the current user has ordered before — distinct, most-recent-order
    * first, limit 12. Not cached (user-specific).
    */
-  reorderItems: protectedProcedure.query(async ({ ctx }) => {
+  reorderItems: customerProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
 
     // Subquery to get the most recent order date per item for this user
@@ -229,7 +229,6 @@ export const catalogRouter = createTRPCRouter({
         and(
           eq(OrdersTable.customerId, userId),
           isNull(ItemsTable.deletedAt),
-          ne(ItemsTable.status, "merged"),
           eq(ItemsTable.status, "approved"),
         ),
       )

@@ -76,6 +76,40 @@ export const settingsUpdateSchema = z.object({
   supportWhatsappNumber: z.string().trim().max(20),
 });
 
+/** Empty string clears the link; otherwise must be a valid URL. */
+const storeUrlSchema = z
+  .string()
+  .trim()
+  .max(512)
+  .refine((v) => v === "" || z.url().safeParse(v).success, {
+    error: "validation.urlInvalid",
+  })
+  .transform((v) => (v === "" ? null : v));
+
+export const storeLinksUpdateSchema = z.object({
+  playStoreUrl: storeUrlSchema,
+  appStoreUrl: storeUrlSchema,
+});
+
+/** Bulk catalog import — one item row (default unit + optional pipe-list). */
+export const importItemRowSchema = z.object({
+  nameEn: z.string().trim().min(2).max(80),
+  nameAr: z.string().trim().min(2).max(80),
+  categorySlug: z.string().trim().min(1).max(128),
+  /** Default unit code. */
+  unit: z.string().trim().min(1).max(32).default("piece"),
+  /** Optional pipe-separated list of all linked unit codes (default included). */
+  units: z.string().trim().max(256).optional(),
+});
+
+/** Bulk category import — one row, upserted by slug. */
+export const importCategoryRowSchema = z.object({
+  nameEn: z.string().trim().min(2).max(128),
+  nameAr: z.string().trim().min(2).max(128),
+  slug: z.string().trim().min(1).max(128),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+});
+
 export const whatsappProviderSchema = z.enum(["wapilot", "twilio", "console"]);
 
 export const whatsappSettingsUpdateSchema = z.object({

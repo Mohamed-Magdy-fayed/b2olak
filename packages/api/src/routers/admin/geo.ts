@@ -5,24 +5,14 @@ import { z } from "zod";
 import { AreasTable } from "@workspace/db/schemas/geo/areas";
 import { CitiesTable } from "@workspace/db/schemas/geo/cities";
 import { DistrictsTable } from "@workspace/db/schemas/geo/districts";
+import {
+  geoBulkActiveSchema as bulkActiveSchema,
+  geoBulkIdsSchema as bulkIdsSchema,
+  geoImportRowSchema,
+  geoNameSchema,
+} from "@workspace/validators/geo";
 
 import { adminProcedure, createTRPCRouter } from "../../init";
-
-const geoNameSchema = z.object({
-  nameEn: z.string().min(2).max(128),
-  nameAr: z.string().min(2).max(128),
-  sortOrder: z.int().min(0).optional().default(0),
-  isActive: z.boolean().optional().default(true),
-});
-
-const geoImportRowSchema = z.object({
-  nameEn: z.string().trim().min(2).max(128),
-  nameAr: z.string().trim().min(2).max(128),
-  sortOrder: z.coerce.number().int().min(0).default(0),
-});
-
-const bulkIdsSchema = z.object({ ids: z.array(z.uuid()).min(1).max(200) });
-const bulkActiveSchema = bulkIdsSchema.extend({ isActive: z.boolean() });
 
 export const adminGeoRouter = createTRPCRouter({
   /**

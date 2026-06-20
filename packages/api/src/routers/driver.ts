@@ -5,6 +5,8 @@ import { z } from "zod";
 import { DriverProfilesTable } from "@workspace/db/schemas/drivers/driver-profiles";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
+import { markDeliveredSchema, updateLineSchema } from "@workspace/validators/driver";
+import { codTotal, lineTotal, toMoney } from "@workspace/validators/totals";
 
 import { createTRPCRouter, driverProcedure } from "../init";
 import { applyTransition } from "../lib/order-transitions";
@@ -51,18 +53,18 @@ async function recomputeTotals(
   if (!order) return;
 
   const itemsTotal = Number(sums?.itemsTotal ?? 0);
-  const codTotal = itemsTotal + Number(order.deliveryFee);
+  const cod = codTotal(itemsTotal, Number(order.deliveryFee));
 
   await db
     .update(OrdersTable)
     .set({
-      actualItemsTotal: itemsTotal.toFixed(2),
-      codTotal: codTotal.toFixed(2),
+      actualItemsTotal: toMoney(itemsTotal),
+      codTotal: toMoney(cod),
       updatedBy: actor,
     })
     .where(eq(OrdersTable.id, orderId));
 
-  return { itemsTotal, codTotal };
+  return { itemsTotal, codTotal: cod };
 }
 
 export const driverRouter = createTRPCRouter({
@@ -131,13 +133,7 @@ export const driverRouter = createTRPCRouter({
 
   /** Shopping checklist (journey D4) — price required for found/substituted. */
   updateLine: driverProcedure
-    .input(
-      z.object({
-        orderItemId: z.uuid(),
-        status: z.enum(["found", "unavailable", "substituted", "pending"]),
-        actualUnitPrice: z.number().positive().max(100_000).optional(),
-      }),
-    )
+    .input(updateLineSchema)
     .mutation(async ({ ctx, input }) => {
       const line = await ctx.db.query.OrderItemsTable.findFirst({
         where: eq(OrderItemsTable.id, input.orderItemId),
@@ -156,8 +152,8 @@ export const driverRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "driver.priceRequired" });
       }
 
-      const lineTotal = needsPrice
-        ? (input.actualUnitPrice! * Number(line.qty)).toFixed(2)
+      const lineTotalStr = needsPrice
+        ? toMoney(lineTotal(input.actualUnitPrice!, Number(line.qty)))
         : null;
 
       await ctx.db
@@ -165,9 +161,9 @@ export const driverRouter = createTRPCRouter({
         .set({
           status: input.status,
           actualUnitPrice: needsPrice
-            ? input.actualUnitPrice!.toFixed(2)
+            ? toMoney(input.actualUnitPrice!)
             : null,
-          actualLineTotal: lineTotal,
+          actualLineTotal: lineTotalStr,
           updatedBy: ctx.session.user.id,
         })
         .where(eq(OrderItemsTable.id, input.orderItemId));
@@ -218,7 +214,7 @@ export const driverRouter = createTRPCRouter({
     }),
 
   markDelivered: driverProcedure
-    .input(z.object({ orderId: z.uuid(), amountCollected: z.number().positive().max(100_000) }))
+    .input(markDeliveredSchema)
     .mutation(async ({ ctx, input }) => {
       const order = await ownedOrder(ctx.db, input.orderId, ctx.session.user.id);
       await applyTransition(

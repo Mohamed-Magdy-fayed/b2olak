@@ -230,7 +230,8 @@ export const ordersRouter = createTRPCRouter({
         (user.role === "driver" && order.driverId === user.id);
       if (!allowed) throw new TRPCError({ code: "FORBIDDEN" });
 
-      // Customers don't get the driver's phone until P8 decides otherwise
+      // The assigned driver's name + phone ride along so the customer can
+      // reach them during an active delivery.
       return order;
     }),
 

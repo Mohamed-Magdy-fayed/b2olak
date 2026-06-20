@@ -212,7 +212,7 @@ export const authRouter = createTRPCRouter({
     }),
 
   registerPushToken: protectedProcedure
-    .input(z.object({ token: z.string().max(512) }))
+    .input(z.object({ token: z.string().min(1).max(512) }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db
         .update(UsersTable)

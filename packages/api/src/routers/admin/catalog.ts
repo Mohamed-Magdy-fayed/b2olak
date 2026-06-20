@@ -33,6 +33,8 @@ import { invalidate } from "@workspace/integrations/redis";
 import {
   adminItemUpsertSchema,
   categoryUpsertSchema,
+  importCategoryRowSchema,
+  importItemRowSchema,
   uploadImageSchema,
 } from "@workspace/validators/catalog";
 import { normalizeText } from "@workspace/validators/normalize";
@@ -114,23 +116,6 @@ function itemsOrderBy(sorting: { id: string; desc: boolean }[]) {
     .map((s) => (s.desc ? desc(ITEM_SORTABLE[s.id]) : asc(ITEM_SORTABLE[s.id])));
   return explicit.length ? explicit : [desc(ItemsTable.createdAt)];
 }
-
-const importItemRowSchema = z.object({
-  nameEn: z.string().trim().min(2).max(80),
-  nameAr: z.string().trim().min(2).max(80),
-  categorySlug: z.string().trim().min(1).max(128),
-  /** Default unit code. */
-  unit: z.string().trim().min(1).max(32).default("piece"),
-  /** Optional pipe-separated list of all linked unit codes (default included). */
-  units: z.string().trim().max(256).optional(),
-});
-
-const importCategoryRowSchema = z.object({
-  nameEn: z.string().trim().min(2).max(128),
-  nameAr: z.string().trim().min(2).max(128),
-  slug: z.string().trim().min(1).max(128),
-  sortOrder: z.coerce.number().int().min(0).default(0),
-});
 
 async function invalidateCatalogCache() {
   try {

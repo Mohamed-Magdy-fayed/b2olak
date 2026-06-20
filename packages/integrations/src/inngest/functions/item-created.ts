@@ -5,14 +5,12 @@ import { ItemAliasesTable } from "@workspace/db/schemas/catalog/item-aliases";
 import { ItemMergeSuggestionsTable } from "@workspace/db/schemas/catalog/item-merge-suggestions";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
 import { CategoriesTable } from "@workspace/db/schemas/catalog/categories";
+import { decideItemMerge } from "@workspace/validators/dedup";
 import { normalizeText } from "@workspace/validators/normalize";
 
 import { judgeItemMatch } from "../../ai/claude";
 import { mergeItemInto } from "../../catalog/merge";
 import { inngest } from "../client";
-
-/** Conservative auto-merge: trgm AND the AI must agree (docs/05 stage 3). */
-const AUTO_MERGE_MIN_SIMILARITY = 0.7;
 
 export const onItemCreated = inngest.createFunction(
   { id: "catalog-item-created", retries: 3 },
@@ -73,27 +71,28 @@ export const onItemCreated = inngest.createFunction(
         );
     });
 
-    if (verdict.verdict === "match" && verdict.matchedItemId) {
-      const matched = suggestions.find(
-        (s) => s.candidateItemId === verdict.matchedItemId,
-      );
-      const similarity = matched ? Number(matched.similarityScore) : 0;
+    const matched = suggestions.find(
+      (s) => s.candidateItemId === verdict.matchedItemId,
+    );
+    const similarity = matched ? Number(matched.similarityScore) : 0;
+    const action = decideItemMerge({
+      verdict: verdict.verdict,
+      matchedItemId: verdict.matchedItemId,
+      similarity,
+    });
 
-      if (similarity >= AUTO_MERGE_MIN_SIMILARITY) {
-        await step.run("auto-merge", async () => {
-          await mergeItemInto(db, itemId, verdict.matchedItemId!, "ai");
-          await db
-            .update(ItemMergeSuggestionsTable)
-            .set({ status: "accepted", updatedBy: "ai" })
-            .where(eq(ItemMergeSuggestionsTable.newItemId, itemId));
-        });
-        return { merged: true as const, into: verdict.matchedItemId };
-      }
-      // AI says match but similarity is low → leave for the admin queue.
-      return { pending: true as const };
+    if (action === "merge") {
+      await step.run("auto-merge", async () => {
+        await mergeItemInto(db, itemId, verdict.matchedItemId!, "ai");
+        await db
+          .update(ItemMergeSuggestionsTable)
+          .set({ status: "accepted", updatedBy: "ai" })
+          .where(eq(ItemMergeSuggestionsTable.newItemId, itemId));
+      });
+      return { merged: true as const, into: verdict.matchedItemId };
     }
 
-    if (verdict.verdict === "no_match") {
+    if (action === "approve") {
       await step.run("approve-with-canonical-names", async () => {
         const nameEn = verdict.canonicalNameEn || item.nameEn;
         const nameAr = verdict.canonicalNameAr || item.nameAr;
