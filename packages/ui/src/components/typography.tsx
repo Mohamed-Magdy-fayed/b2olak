@@ -1,6 +1,11 @@
 import type { HTMLAttributes } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 
+// Heading scale — responsive sizing is baked in via Tailwind breakpoint steps
+// (md:/lg:/xl:) so "scale with screen width" is encoded in the component, not
+// re-typed per page. `className` is merged last so a consumer can still override.
+// See docs/10-design-system.md.
+
 export function H1({
   className,
   children,
@@ -9,7 +14,7 @@ export function H1({
   return (
     <h1
       className={cn(
-        "scroll-m-20 text-balance font-extrabold text-4xl tracking-tight lg:text-5xl",
+        "scroll-m-20 text-balance font-extrabold tracking-tight text-3xl md:text-4xl lg:text-5xl xl:text-6xl",
         className,
       )}
       {...props}
@@ -27,7 +32,9 @@ export function H2({
   return (
     <h2
       className={cn(
-        "scroll-m-20 border-b pb-2 font-semibold text-3xl tracking-tight first:mt-0",
+        // `border-b pb-2` is the doc/article style; app section headings can
+        // drop it with `className="border-0 pb-0"`.
+        "scroll-m-20 border-b pb-2 font-bold tracking-tight first:mt-0 text-2xl md:text-3xl lg:text-4xl",
         className,
       )}
       {...props}
@@ -45,7 +52,7 @@ export function H3({
   return (
     <h3
       className={cn(
-        "scroll-m-20 font-semibold text-2xl tracking-tight",
+        "scroll-m-20 font-semibold tracking-tight text-xl md:text-2xl lg:text-3xl",
         className,
       )}
       {...props}
@@ -63,13 +70,49 @@ export function H4({
   return (
     <h4
       className={cn(
-        "scroll-m-20 font-semibold text-xl tracking-tight",
+        "scroll-m-20 font-semibold tracking-tight text-lg md:text-xl lg:text-2xl",
         className,
       )}
       {...props}
     >
       {children}
     </h4>
+  );
+}
+
+export function H5({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h5
+      className={cn(
+        "scroll-m-20 font-semibold tracking-tight text-base md:text-lg lg:text-xl",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </h5>
+  );
+}
+
+export function H6({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLHeadingElement>) {
+  return (
+    <h6
+      className={cn(
+        "scroll-m-20 font-semibold tracking-tight text-sm md:text-base lg:text-lg",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </h6>
   );
 }
 
