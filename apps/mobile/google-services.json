@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "636607862031",
+    "project_id": "megz-courses",
+    "storage_bucket": "megz-courses.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:636607862031:android:36c6b725954cbc86795a7a",
+        "android_client_info": {
+          "package_name": "com.gatelingsolutions.ba2olak"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "636607862031-92lfkpjgoclkrvtmnokspp8obs193ag3.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvDwSNng3Ah_im71tH-7XOoG-OcGv6c_U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "636607862031-92lfkpjgoclkrvtmnokspp8obs193ag3.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

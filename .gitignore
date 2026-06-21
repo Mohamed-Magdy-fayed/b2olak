@@ -43,9 +43,6 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
-# Firebase native config (contains client API keys; supply via EAS build)
-google-services.json
-GoogleService-Info.plist
 
 # vercel
 .vercel
