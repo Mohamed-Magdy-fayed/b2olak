@@ -22,5 +22,7 @@ Steps:
 Notes:
 - The shell is Windows / PowerShell; prefer the `npm run …` scripts (Turbo handles
   fan-out and caching) over invoking tools directly.
-- `npm run test` is Vitest (normalization + order status machine). It's fast — always
-  include it; it's the cheapest signal when `packages/validators` changed.
+- `npm run test` runs Playwright (`--project=logic`) — pure domain tests, no browser,
+  ~45 s. Always include it; cheapest signal when `packages/validators` changed.
+- `npm run test:e2e` runs the browser E2E project against apps/web (requires the dev
+  server). Run this only when asked or when touching web UI flows.

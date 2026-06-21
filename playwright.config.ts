@@ -1,20 +1,38 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 /**
- * Single Playwright runner for the monorepo (docs/12 item 1 → item 4).
+ * Single Playwright runner for the monorepo (docs/12 items 1 & 4).
  *
- * - `logic`: pure domain tests, no browser — totals math, dedup gate, etc.
- *   These run in plain Node (no `page` fixture, no browser download needed).
+ * Projects:
+ * - `logic`  — pure domain tests, no browser (totals, dedup, normalize, order-status).
+ * - `web`    — browser E2E against apps/web (marketing pages, auth redirects, admin flows).
  *
- * Item 4 will add a second `web` project that drives a real browser against
- * apps/web. The existing Vitest specs in packages/validators (normalize,
- * order-status) stay on Vitest until item 4 consolidates everything here.
+ * The `web` project requires apps/web to be running (webServer below starts it
+ * automatically; set BASE_URL to target a different environment).
  */
+
+const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
+
 export default defineConfig({
   projects: [
     {
       name: "logic",
       testDir: "./tests/logic",
     },
+    {
+      name: "web",
+      testDir: "./tests/e2e",
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: BASE_URL,
+      },
+    },
   ],
+
+  webServer: {
+    command: "npm run dev --workspace web",
+    url: BASE_URL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
 });

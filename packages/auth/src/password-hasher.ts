@@ -1,3 +1,5 @@
+import "server-only";
+
 import crypto from "node:crypto";
 
 /** scrypt password hashing — ported from the reference app. */

@@ -14,7 +14,8 @@
   "dependencies": {
     "@workspace/validators": "*",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^20",

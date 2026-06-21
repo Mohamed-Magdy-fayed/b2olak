@@ -7,6 +7,8 @@ Full detail lives in **[docs/](docs/00-product-overview.md)** — read these bef
 [API contracts](docs/04-api-contracts.md) · [dedup pipeline](docs/05-item-dedup-pipeline.md) ·
 [security](docs/06-security.md) · [i18n & RTL](docs/07-i18n-and-rtl.md) ·
 [file structure](docs/08-file-structure.md) · [design system](docs/10-design-system.md) ·
+[shadcn/ui catalog](docs/13-shadcn.md) ·
+[admin data-table pattern](docs/13-admin-data-table.md) ·
 [AI workflow & delegation](docs/11-ai-workflow.md).
 
 > This file is the operating manual. It overrides the global `~/.claude/CLAUDE.md` where
@@ -76,7 +78,8 @@ Scope to one app for speed: `npm run typecheck --workspace apps/web`.
     `@workspace/ui/components/typography` `H1`–`H6`; mobile `@/components/ui/typography`),
     never raw `<h1 className>` or ad-hoc `<Text text-3xl>`. Buttons/menus = the shared
     components (add a variant, don't fork inline). Semantic, accessible, RTL-safe layout.
-    → see **[docs/10-design-system.md](docs/10-design-system.md)**, audit with **`ui-auditor`**.
+    → see **[docs/10-design-system.md](docs/10-design-system.md)** and
+    **[docs/13-shadcn.md](docs/13-shadcn.md)**, audit with **`ui-auditor`**.
 
 ## Token economy & delegation
 

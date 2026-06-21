@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { db } from "../src/client";
 import { UserCredentialsTable } from "../src/schemas/auth/user-credentials";
 import { UsersTable } from "../src/schemas/auth/users";
+import { db } from "./db";
 
 /**
  * Seeds the first admin account.

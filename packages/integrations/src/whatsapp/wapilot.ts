@@ -1,3 +1,5 @@
+import "server-only";
+
 /** Wapilot WhatsApp API wrapper — ported from the reference app. */
 
 const baseUrl = "https://api.wapilot.net/api/v2/";

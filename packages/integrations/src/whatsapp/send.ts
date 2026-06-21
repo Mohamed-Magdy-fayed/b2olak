@@ -1,3 +1,5 @@
+import "server-only";
+
 import { db } from "@workspace/db/client";
 
 import { getWhatsAppConfig, type WhatsAppConfig } from "./config";

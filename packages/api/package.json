@@ -14,6 +14,7 @@
     "@workspace/i18n": "*",
     "@workspace/integrations": "*",
     "@workspace/validators": "*",
+    "server-only": "^0.0.1",
     "superjson": "^2.2.2",
     "zod": "^4.4.3"
   },

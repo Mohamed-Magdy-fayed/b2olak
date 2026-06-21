@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createTRPCRouter } from "./init";
 import { addressesRouter } from "./routers/addresses";
 import { adminRouter } from "./routers/admin/index";

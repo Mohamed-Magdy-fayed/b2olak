@@ -1,3 +1,5 @@
+import "server-only";
+
 /** Sends a WhatsApp message via Twilio's REST API (no SDK needed). */
 export async function sendTwilioText(
   accountSid: string,

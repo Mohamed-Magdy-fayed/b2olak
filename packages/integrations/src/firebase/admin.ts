@@ -1,3 +1,5 @@
+import "server-only";
+
 import { type App, cert, getApps, initializeApp } from "firebase-admin/app";
 import { getStorage } from "firebase-admin/storage";
 

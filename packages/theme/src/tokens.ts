@@ -1,9 +1,15 @@
 /**
- * ba2olak design tokens — the single source of truth shared by web (mapped to
- * CSS variables in globals.css) and mobile (mapped in NativeWind's
- * tailwind.config). Gen-Z direction: electric violet + lime pop on near-black,
- * generous radii. Values are raw so both Tailwind 4 (web) and NativeWind
- * (Tailwind 3.4) can consume them.
+ * ba2olak brand tokens — reference values for the design system.
+ *
+ * Neither app consumes this file at runtime:
+ *   - Web uses OKLCH CSS variables in packages/ui/src/styles/globals.css
+ *     (shadcn/ui theme, violet primary, light-mode-first).
+ *   - Mobile defines its own NativeWind palette in apps/mobile/tailwind.config.js
+ *     (dark-luxury: charcoal canvas, gold primary, deep-emerald accent).
+ *
+ * The two palettes are **intentionally different** — see docs/13-token-parity.md.
+ * This file serves as a brand reference (naming, radius scale, spacing) and as
+ * the starting point if a future unified token pipeline is built.
  */
 
 export const palette = {

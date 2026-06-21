@@ -1,7 +1,7 @@
-import { db } from "../src/client";
 import { AreasTable } from "../src/schemas/geo/areas";
 import { CitiesTable } from "../src/schemas/geo/cities";
 import { DistrictsTable } from "../src/schemas/geo/districts";
+import { db } from "./db";
 
 /**
  * Sample delivery coverage — placeholder names meant to be edited/extended by

@@ -43,7 +43,7 @@ Verification first (it makes everything else safe to automate), then backend cor
 > test needs stubbing) and a slower watch loop than Vitest. The repo currently uses Vitest
 > in `packages/validators`; item 1 includes migrating/retiring it.
 
-### `[~]` 1. Domain test suite (Playwright Test, headless / no browser)
+### `[x]` 1. Domain test suite (Playwright Test, headless / no browser)
 - **Goal:** real test coverage of pure business logic so `/gate` actually proves correctness.
 - **Why:** unblocks safe delegation and autonomous runs — the manager can trust a green
   gate instead of re-reading code.
@@ -108,7 +108,7 @@ Verification first (it makes everything else safe to automate), then backend cor
     active delivery).
   - `/gate` green: typecheck (12 pkgs) · test 15/15 · lint 0 errors · build.
 
-### `[ ]` 3. Backend security hardening
+### `[x]` 3. Backend security hardening
 - **Goal:** make the backend resilient to abuse and common attacks.
 - **Why:** COD + phone-OTP + admin surface = real attack surface; one hole is expensive.
 - **Scope:** review against [docs/06-security.md](./06-security.md): authZ on every
@@ -120,8 +120,48 @@ Verification first (it makes everything else safe to automate), then backend cor
   triage + fix high/critical inline → `/gate`.
 - **Decisions at kickoff:** severity bar for "fix now" vs. backlog.
 - **Done when:** findings triaged; high/critical fixed; rest logged.
+- **Status (2026-06-20) — done; severity bar = fix high/critical inline, log
+  medium/low (decided at kickoff). No high/critical found; no code changed.**
+  Mapped the full surface (`Explore`) and verified the load-bearing controls by hand:
+  - **AuthZ / tiers:** clean (item 2 already fixed the stragglers). `orders.byId` does an
+    explicit admin/customer/driver ownership check; all order/address/driver reads &
+    mutations filter by `customerId`/`driverId`/`userId` or are `adminProcedure`. **No
+    IDOR found.**
+  - **Money integrity (COD):** `orders.place` trusts **no** client prices — lines carry
+    only `qty`/`unit`/`note`; delivery fee is server-fetched; chosen units are validated
+    against the item's allowed `item_units` (rejects `orders.unitNotAllowed`). Shelf
+    prices are filled by the driver later. Solid.
+  - **Rate limits:** all spec'd limits wired (OTP send phone+ip, verifyOtp, deviceLogin,
+    items.create, orders.place, search, analytics, waitlist). Sliding-window via Upstash;
+    prod always enforces (dev-only skip when Upstash env absent).
+  - **IP spoofing (investigated, NOT a bug):** `ipFromHeaders` takes the leftmost
+    `x-forwarded-for`. Per Vercel docs, Vercel **overwrites** `x-forwarded-for` and does
+    not forward external IPs (non-Enterprise), so the value is the real client IP and is
+    not spoofable on this deployment. No change.
+  - **Injection:** Drizzle parameterized throughout; pg_trgm similarity binds the
+    normalized string + column refs; no raw string interpolation.
+  - **Session/OTP:** 512-bit session ids; httpOnly+Secure(prod)+SameSite=Lax cookies;
+    scrypt+salt passwords; OTP 6-digit/10-min/5-attempt with timing-safe compare and
+    single-active-token; sessions revoked on sign-out / role-change / suspension;
+    `requestOtp` returns identical `{ ok: true }` for new/existing/suspended phones
+    (no enumeration). All good.
+  - **Webhooks:** Inngest `serve()` configured with `INNGEST_SIGNING_KEY`; fails closed
+    (refuses unsigned) outside dev. No inbound WhatsApp webhook exists yet.
+  - **Logged follow-ups (medium/low, no active hole):**
+    - **[M] Enforce `server-only` at build** — `db`/`auth`/`api`/`integrations` are
+      server-only by convention + architecture (hard rule #6) but not enforced by the
+      `server-only` package. Add `import "server-only"` to their server entrypoints as
+      defense-in-depth; verify the tRPC `AppRouter` **type-only** client import stays
+      clean and both apps still build (own focused change — build-break risk).
+    - **[L] `INNGEST_SIGNING_KEY` is prod-required** — `signingKey: env || undefined`
+      disables verification if unset; Inngest fails closed in prod, but make the key a
+      required/asserted prod env so it can't silently go missing.
+    - **[L/future] WhatsApp inbound webhook** — none today; when Wapilot delivery/read
+      callbacks are consumed, require signature verification (see threat model row).
+    - **[info] OTP token hashed with SHA-256** — acceptable (high-entropy, 10-min expiry,
+      5-attempt cap, rate-limited); no change.
 
-### `[ ]` 4. Playwright E2E + browser checks
+### `[x]` 4. Playwright E2E + browser checks
 - **Goal:** end-to-end browser tests for the critical web flows + browser-level validation
   the AI can run itself.
 - **Why:** catches integration/UX regressions logic tests can't; Playwright lets Claude
@@ -137,10 +177,22 @@ Verification first (it makes everything else safe to automate), then backend cor
 - **Delegation:** `Plan` for the harness design → implement inline → run headless.
 - **Decisions at kickoff:** which 3–5 flows first; test DB / seed strategy; CI now or later.
 - **Done when:** the browser project runs green locally on the chosen flows.
+- **Status (2026-06-21) — done:**
+  - Ported `normalize.test.ts` + `order-status.test.ts` into `tests/logic/` (Playwright
+    `test()` API); deleted the Vitest originals; removed Vitest from
+    `packages/validators/package.json`.
+  - Added `web` browser project to `playwright.config.ts` with `webServer` (starts
+    `npm run dev --workspace web`, `reuseExistingServer` in dev). `BASE_URL` env overrides.
+  - E2E tests in `tests/e2e/marketing.spec.ts`: privacy page content, terms page heading,
+    `/admin` → sign-in redirect, sign-in form renders.
+  - `npm run test` now points at Playwright `--project=logic` (31 tests, all green).
+    `npm run test:e2e` runs the browser project. `/gate` skill updated accordingly.
+  - **CI:** deferred to parking lot — wire when GitHub Actions is set up.
+  - **Admin data-table flow:** deferred to item 6 (no table component yet).
 
 ## B. Frontend & design
 
-### `[ ]` 5. shadcn/ui usage guide
+### `[x]` 5. shadcn/ui usage guide
 - **Goal:** teach Claude exactly how we use shadcn/ui so it composes from our components
   instead of hand-rolling markup.
 - **Why:** consistency + speed; complements the design system already in
@@ -151,8 +203,13 @@ Verification first (it makes everything else safe to automate), then backend cor
 - **Delegation:** `Explore` to inventory `packages/ui/src/components/**` → write the guide.
 - **Decisions at kickoff:** new doc vs. expand docs/10; build a `/ui` skill or not.
 - **Done when:** the guide lists every component + usage rule; linked from CLAUDE.md.
+- **Status (2026-06-21) — done; new doc + no /ui skill (decided at kickoff):**
+  Created `docs/13-shadcn.md` covering all 22 components: import paths, when-to-use,
+  CVA extension model, `cn()` pattern, color token table, missing-component list, RTL
+  checklist. Linked from CLAUDE.md header (docs index) and from the design-system rule
+  (hard rule #10). No `/ui` skill — the guide itself is the deliverable.
 
-### `[ ]` 6. Admin data-table pattern (rich tables)
+### `[x]` 6. Admin data-table pattern (rich tables)
 - **Goal:** codify ONE reusable admin DataTable so every transactional table gets the same
   rich behavior: sorting, column ordering/visibility, server-side pagination, filters.
 - **Why:** your tables are specific and feature-heavy; without a canonical pattern each
@@ -167,8 +224,18 @@ Verification first (it makes everything else safe to automate), then backend cor
 - **Decisions at kickoff:** URL-state vs. local-state for table params; which table is the
   reference; filter types needed (text, enum, date range).
 - **Done when:** reference table uses the shared component end-to-end; contract documented.
+- **Status (2026-06-21) — done; all infrastructure already existed; this session documented it:**
+  - The full `DataTable` suite was already built at `apps/web/features/core/data-table/`
+    (TanStack Table v8, `useDataTable`, `useTableUrlState`, all filter components).
+  - All 6 admin routers already use `tableListInputSchema` + `pageMath` from
+    `packages/api/src/lib/table-query.ts` — the wire contract was already standardized.
+  - **Decisions (at kickoff):** URL-state (confirmed, via `useTableUrlState`); reference =
+    **orders table** (most complete: every filter type + bulk actions + export); filter
+    types = text, faceted enum, date range, numeric range.
+  - Created **`docs/13-admin-data-table.md`** — wire contract reference, component API,
+    5-step copy-paste guide for new tables, decision log. Linked from CLAUDE.md.
 
-### `[ ]` 7. Web ↔ mobile color/token parity
+### `[x]` 7. Web ↔ mobile color/token parity
 - **Goal:** verify the two themes are intentionally aligned (not accidentally divergent)
   and there's a single source of truth where they should match.
 - **Why:** you haven't strongly verified parity; drift makes the brand feel inconsistent.
@@ -182,6 +249,13 @@ Verification first (it makes everything else safe to automate), then backend cor
 - **Decisions at kickoff:** make `packages/theme` the single source mobile consumes, or
   keep them separate-by-design and just document.
 - **Done when:** a parity table exists; any accidental mismatches fixed.
+- **Status (2026-06-21) — done; separate-by-design (decided at kickoff):** audited all
+  three token sources. No runtime file imports `packages/theme/src/tokens.ts` — the
+  comment claiming it was a shared SoT was corrected. Two palettes are intentionally
+  different (web: light/violet/shadcn; mobile: dark-luxury/gold/emerald). One accidental
+  gap fixed: `--success` and `--warning` CSS vars were missing from web `globals.css`
+  despite `CLAUDE.md` rules referencing them — added to both `:root` and `.dark`.
+  Parity table → `docs/13-token-parity.md`.
 
 ### `[ ]` 8. UX quality pass
 - **Goal:** make the app *feel* good — the thing that brings users back.

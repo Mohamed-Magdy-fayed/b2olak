@@ -2,12 +2,12 @@ import { eq } from "drizzle-orm";
 
 import { normalizeText } from "@workspace/validators/normalize";
 
-import { db } from "../src/client";
 import { CategoriesTable } from "../src/schemas/catalog/categories";
 import { ItemUnitsTable } from "../src/schemas/catalog/item-units";
 import { ItemsTable } from "../src/schemas/catalog/items";
 import { UnitsTable } from "../src/schemas/catalog/units";
 import { SystemSettingsTable } from "../src/schemas/system/system-settings";
+import { db } from "./db";
 import { seedCategories, seedItems } from "./catalog-data";
 
 /** Base units of measure — mirrors migration 0009. */

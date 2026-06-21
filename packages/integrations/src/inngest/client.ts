@@ -1,3 +1,5 @@
+import "server-only";
+
 import { EventSchemas, Inngest } from "inngest";
 
 type Events = {

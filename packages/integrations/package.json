@@ -12,7 +12,8 @@
     "@workspace/db": "*",
     "@workspace/validators": "*",
     "firebase-admin": "^13.0.2",
-    "inngest": "^3.32.0"
+    "inngest": "^3.32.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@types/node": "^20",
