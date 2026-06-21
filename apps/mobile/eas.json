@@ -13,14 +13,12 @@
     },
     "preview": {
       "distribution": "internal",
-      "config": "android-apk.yml",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://ba2olak-qa.gateling.com"
       }
     },
     "production": {
       "autoIncrement": true,
-      "config": "android-apk.yml",
       "android": {
         "buildType": "apk"
       },
