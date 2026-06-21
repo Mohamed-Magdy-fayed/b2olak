@@ -23,6 +23,10 @@ out/
 build
 dist
 
+# EAS custom build workflow YAMLs live inside .eas/build/ — un-ignore them
+!**/.eas/build/
+!**/.eas/build/*.yml
+
 # turbo
 .turbo
 

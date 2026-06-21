@@ -1,0 +1,10 @@
+build:
+  name: Android APK
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - run:
+        name: Restore google-services.json from EAS secret
+        command: echo "$GOOGLE_SERVICES_JSON" | base64 -d > google-services.json
+    - eas/prebuild
+    - eas/build

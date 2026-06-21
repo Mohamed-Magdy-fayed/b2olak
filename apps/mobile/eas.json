@@ -13,14 +13,14 @@
     },
     "preview": {
       "distribution": "internal",
-      "prebuildCommand": "echo \"$GOOGLE_SERVICES_JSON\" | base64 -d > google-services.json",
+      "config": "android-apk.yml",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://ba2olak-qa.gateling.com"
       }
     },
     "production": {
       "autoIncrement": true,
-      "prebuildCommand": "echo \"$GOOGLE_SERVICES_JSON\" | base64 -d > google-services.json",
+      "config": "android-apk.yml",
       "android": {
         "buildType": "apk"
       },
