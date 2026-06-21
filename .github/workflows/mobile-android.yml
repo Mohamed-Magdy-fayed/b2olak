@@ -1,0 +1,53 @@
+name: Android APK builds
+
+# Runs whenever the mobile app or any shared package changes on main.
+# Also runs on PRs targeting main so you get a build URL before merging.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/mobile/**"
+      - "packages/**"
+
+jobs:
+  build:
+    name: EAS build — ${{ matrix.profile }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false        # let both profiles finish even if one fails
+      matrix:
+        profile: [preview, production]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Install all workspace dependencies from the monorepo root.
+      # EAS picks up node_modules from here when building apps/mobile.
+      - name: Install dependencies
+        run: npm ci
+
+      # Authenticates the EAS CLI with the EXPO_TOKEN secret.
+      - name: Set up EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Cloud build on Expo's servers — no Android SDK needed here.
+      # google-services.json is written inside the EAS build environment
+      # via the prebuildCommand in eas.json using the GOOGLE_SERVICES_JSON secret.
+      - name: Build Android APK (${{ matrix.profile }})
+        working-directory: apps/mobile
+        run: eas build --non-interactive --platform android --profile ${{ matrix.profile }}
