@@ -1,4 +1,4 @@
-import { Modal, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,8 @@ export function BiometricEnableSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onSkip}>
-      <View className="flex-1 justify-end bg-black/60">
+      <Pressable className="flex-1 justify-end bg-black/60" onPress={onSkip}>
+        <Pressable onPress={(e) => e.stopPropagation()}>
         <View className="gap-5 rounded-t-3xl border-t border-border bg-background p-6 pb-10">
           {/* Gold biometric icon */}
           <View className="items-center py-2">
@@ -56,7 +57,8 @@ export function BiometricEnableSheet({
             />
           </View>
         </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }

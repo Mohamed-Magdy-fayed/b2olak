@@ -4,8 +4,16 @@ import type { ColumnDef, Row } from "@tanstack/react-table";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { Dispatch, SetStateAction } from "react";
 
+import { MoreHorizontalIcon } from "lucide-react";
+
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 import type { AppRouter } from "@workspace/api/root";
 import { useTranslation } from "@workspace/i18n/react";
 import {
@@ -64,31 +72,40 @@ function OrderRowActions({
   const canAssign = ["placed", "assigned", "shopping"].includes(row.status);
   const canCancel = !["delivered", "cancelled"].includes(row.status);
 
+  if (!canAssign && !canCancel) return null;
+
   return (
-    <div className="flex items-center gap-1">
-      {canAssign ? (
-        <Button
-          size="sm"
-          variant={row.status === "placed" ? "default" : "outline"}
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "assign" })}
-        >
-          {row.status === "placed"
-            ? String(t("admin.orders.assign"))
-            : String(t("admin.orders.reassign"))}
-        </Button>
-      ) : null}
-      {canCancel ? (
-        <Button
-          size="sm"
-          variant="destructive"
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "cancel" })}
-        >
-          {String(t("shop.cancelOrder"))}
-        </Button>
-      ) : null}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon" className="size-8">
+            <MoreHorizontalIcon className="size-4" />
+            <span className="sr-only">
+              {String(t("admin.common.actions"))}
+            </span>
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        {canAssign ? (
+          <DropdownMenuItem
+            onClick={() => setRowAction({ row, variant: "assign" })}
+          >
+            {row.status === "placed"
+              ? String(t("admin.orders.assign"))
+              : String(t("admin.orders.reassign"))}
+          </DropdownMenuItem>
+        ) : null}
+        {canCancel ? (
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => setRowAction({ row, variant: "cancel" })}
+          >
+            {String(t("shop.cancelOrder"))}
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -243,7 +260,7 @@ export function buildOrderColumns(opts: {
     },
     createEntityActionsColumn<OrderRow>({
       t,
-      size: 180,
+      size: 56,
       cell: ({ row }: { row: Row<OrderRow> }) => (
         <OrderRowActions row={row.original} setRowAction={setRowAction} />
       ),

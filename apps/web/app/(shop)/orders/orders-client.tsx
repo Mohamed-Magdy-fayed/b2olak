@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ClipboardList } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
@@ -33,7 +34,7 @@ export function OrdersClient() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="mb-6 text-2xl font-black text-foreground">
+      <h1 className="mb-6 font-display text-2xl font-black text-foreground">
         {t("shop.ordersTitle")}
       </h1>
 
@@ -44,8 +45,14 @@ export function OrdersClient() {
           ))}
         </div>
       ) : orders.length === 0 ? (
-        <div className="flex flex-col items-center gap-4 py-16">
-          <p className="text-muted-foreground">{t("shop.noOrders")}</p>
+        <div className="flex flex-col items-center gap-5 py-20 text-center">
+          <div className="flex size-20 items-center justify-center rounded-full bg-primary/10">
+            <ClipboardList className="size-9 text-primary" aria-hidden />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-lg font-bold text-foreground">{t("shop.noOrders")}</p>
+            <p className="text-sm text-muted-foreground">{t("shop.noOrdersHint")}</p>
+          </div>
           <Link href="/shop" className="text-sm font-semibold text-primary hover:underline">
             {t("shop.continueShopping")}
           </Link>
@@ -54,7 +61,7 @@ export function OrdersClient() {
         <div className="flex flex-col gap-3">
           {orders.map((order) => (
             <Link key={order.id} href={`/orders/${order.id}`}>
-              <Card className="transition-colors hover:bg-muted/50">
+              <Card className="rounded-2xl transition-colors hover:bg-accent active:scale-[0.99]">
                 <CardContent className="flex items-center justify-between px-6 py-4">
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-bold text-foreground">

@@ -27,9 +27,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
 
+import { useAppForm } from "@/components/forms/hooks";
 import {
   DataTable,
   DataTableActionBar,
@@ -71,7 +70,9 @@ type UnitFormState = {
   isActive: boolean;
 };
 
-const emptyForm: Omit<UnitFormState, "id"> = {
+type UnitFormValues = Omit<UnitFormState, "id">;
+
+const emptyForm: UnitFormValues = {
   code: "",
   nameEn: "",
   nameAr: "",
@@ -99,83 +100,124 @@ const unitGlobalFilter: FilterFn<UnitRow> = (row, _columnId, value) => {
 
 function UnitFormDialog({
   form,
-  setForm,
+  onClose,
   onSubmit,
   isSubmitting,
 }: {
   form: UnitFormState | null;
-  setForm: (f: UnitFormState | null) => void;
-  onSubmit: () => void;
+  onClose: () => void;
+  onSubmit: (values: UnitFormValues) => void;
   isSubmitting: boolean;
 }) {
   const { t } = useTranslation();
-  if (!form) return null;
 
   return (
-    <Dialog open={form !== null} onOpenChange={(open) => !open && setForm(null)}>
+    <Dialog open={form !== null} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {form.id
-              ? String(t("admin.units.editTitle"))
-              : String(t("admin.units.addTitle"))}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.units.code"))}</Label>
-            <Input
-              dir="ltr"
-              value={form.code}
-              onChange={(e) => setForm({ ...form, code: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.units.nameAr"))}</Label>
-            <Input
-              dir="rtl"
-              value={form.nameAr}
-              onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.units.nameEn"))}</Label>
-            <Input
-              dir="ltr"
-              value={form.nameEn}
-              onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.units.sortOrder"))}</Label>
-            <Input
-              type="number"
-              dir="ltr"
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm({ ...form, sortOrder: Number(e.target.value) || 0 })
-              }
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-            />
-            {String(t("admin.units.isActive"))}
-          </label>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setForm(null)}>
-            {String(t("common.cancel"))}
-          </Button>
-          <Button onClick={onSubmit} disabled={isSubmitting}>
-            {String(t("common.save"))}
-          </Button>
-        </DialogFooter>
+        {form && (
+          <UnitFormBody
+            key={form.id ?? "new"}
+            initial={form}
+            isEdit={Boolean(form.id)}
+            onClose={onClose}
+            onSubmit={onSubmit}
+            isSubmitting={isSubmitting}
+          />
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function UnitFormBody({
+  initial,
+  isEdit,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  initial: UnitFormState;
+  isEdit: boolean;
+  onClose: () => void;
+  onSubmit: (values: UnitFormValues) => void;
+  isSubmitting: boolean;
+}) {
+  const { t } = useTranslation();
+
+  const form = useAppForm({
+    defaultValues: {
+      code: initial.code,
+      nameEn: initial.nameEn,
+      nameAr: initial.nameAr,
+      sortOrder: initial.sortOrder as number | null,
+      isActive: initial.isActive,
+    },
+    onSubmit: ({ value }) =>
+      onSubmit({
+        code: value.code,
+        nameEn: value.nameEn,
+        nameAr: value.nameAr,
+        sortOrder: value.sortOrder ?? 0,
+        isActive: value.isActive,
+      }),
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>
+          {isEdit
+            ? String(t("admin.units.editTitle"))
+            : String(t("admin.units.addTitle"))}
+        </DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4 py-2">
+        <form.AppField name="code">
+          {(field) => (
+            <field.StringField
+              label={String(t("admin.units.code"))}
+              className="text-start"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="nameAr">
+          {(field) => (
+            <field.StringField label={String(t("admin.units.nameAr"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="nameEn">
+          {(field) => (
+            <field.StringField
+              label={String(t("admin.units.nameEn"))}
+              className="text-start"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="sortOrder">
+          {(field) => (
+            <field.NumberField label={String(t("admin.units.sortOrder"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="isActive">
+          {(field) => (
+            <field.BooleanField label={String(t("admin.units.isActive"))} />
+          )}
+        </form.AppField>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {String(t("common.cancel"))}
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {String(t("common.save"))}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -217,6 +259,7 @@ export function UnitsTable() {
       onSuccess: () => {
         void invalidateList();
         setForm(null);
+        toast.success("Unit created");
       },
     }),
   );
@@ -226,6 +269,7 @@ export function UnitsTable() {
       onSuccess: () => {
         void invalidateList();
         setForm(null);
+        toast.success("Unit updated");
       },
     }),
   );
@@ -246,6 +290,7 @@ export function UnitsTable() {
       onSuccess: () => {
         void invalidateList();
         setRowSelection({});
+        toast.success("Units updated");
       },
     }),
   );
@@ -255,6 +300,7 @@ export function UnitsTable() {
       onSuccess: () => {
         void invalidateList();
         setRowSelection({});
+        toast.success("Units deleted");
       },
       onError: (err) => {
         if (err.message === "admin.units.deleteInUse") {
@@ -264,17 +310,9 @@ export function UnitsTable() {
     }),
   );
 
-  function handleSubmit() {
-    if (!form) return;
-    const payload = {
-      code: form.code,
-      nameEn: form.nameEn,
-      nameAr: form.nameAr,
-      sortOrder: form.sortOrder,
-      isActive: form.isActive,
-    };
-    if (form.id) update.mutate({ id: form.id, ...payload });
-    else create.mutate(payload);
+  function handleSubmit(values: UnitFormValues) {
+    if (form?.id) update.mutate({ id: form.id, ...values });
+    else create.mutate(values);
   }
 
   // ---- URL state ----
@@ -610,7 +648,7 @@ export function UnitsTable() {
 
       <UnitFormDialog
         form={form}
-        setForm={setForm}
+        onClose={() => setForm(null)}
         onSubmit={handleSubmit}
         isSubmitting={create.isPending || update.isPending}
       />

@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from "react"
-import { Text, TextInput, View } from "react-native"
+import { useEffect, useState } from "react"
+import { Text, View } from "react-native"
 import { router, useLocalSearchParams, type Href } from "expo-router"
 import { useMutation } from "@tanstack/react-query"
 
+import { otpCodeSchema } from "@workspace/validators/auth"
+
 import { BiometricEnableSheet } from "@/components/biometric-enable-sheet"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { KeyboardAvoidingView } from "@/components/ui/keyboard-screen"
 import { Screen, ScreenBackHeader } from "@/components/ui/screen"
+import { useAppForm } from "@/components/forms"
 import { authenticate, isBiometricAvailable } from "@/lib/biometric"
 import { ensureDeviceRegistered } from "@/lib/device-auth"
 import { useTranslation } from "@/lib/i18n"
@@ -37,26 +39,17 @@ export default function VerifyScreen() {
     phone: string
     returnTo?: string
   }>()
-  const [code, setCode] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS)
   const [pendingDest, setPendingDest] = useState<Dest | null>(null)
   const [pendingUser, setPendingUser] = useState<PendingUser | null>(null)
   const [enabling, setEnabling] = useState(false)
-  const codeInputRef = useRef<TextInput>(null)
 
   useEffect(() => {
     if (cooldown <= 0) return
     const timer = setTimeout(() => setCooldown((s) => s - 1), 1000)
     return () => clearTimeout(timer)
   }, [cooldown])
-
-  // Auto-focus the code field once the screen settles so the keyboard opens
-  // immediately after the WhatsApp code is sent — no extra tap needed.
-  useEffect(() => {
-    const timer = setTimeout(() => codeInputRef.current?.focus(), 350)
-    return () => clearTimeout(timer)
-  }, [])
 
   const registerPush = useMutation(
     trpc.auth.registerPushToken.mutationOptions()
@@ -119,6 +112,14 @@ export default function VerifyScreen() {
     })
   )
 
+  const form = useAppForm({
+    defaultValues: { code: "" },
+    onSubmit: ({ value }) => {
+      setError(null)
+      verify.mutate({ phone, code: value.code })
+    },
+  })
+
   const enableBiometric = async () => {
     if (!pendingDest || !pendingUser) return
     setEnabling(true)
@@ -172,22 +173,27 @@ export default function VerifyScreen() {
 
             {/* OTP form */}
             <View className="gap-3">
-              <Text className="font-medium text-foreground">
-                {t("mobile.codeLabel")}
-              </Text>
-              <Input
-                ref={codeInputRef}
-                value={code}
-                onChangeText={(value) => {
-                  setError(null)
-                  setCode(value.replace(/[^0-9]/g, "").slice(0, 6))
+              <form.AppField
+                name="code"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    otpCodeSchema.safeParse(value).success
+                      ? undefined
+                      : "validation.otpInvalid",
                 }}
-                keyboardType="number-pad"
-                autoComplete="one-time-code"
-                maxLength={6}
-                className="text-center text-2xl tracking-[8px]"
-                style={{ textAlign: "center", writingDirection: "ltr" }}
-              />
+              >
+                {(field) => (
+                  <field.StringField
+                    label={t("mobile.codeLabel")}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoFocus
+                    ltr
+                    sanitize={(text) => text.replace(/[^0-9]/g, "").slice(0, 6)}
+                    className="text-center text-2xl tracking-[8px]"
+                  />
+                )}
+              </form.AppField>
               {error ? (
                 <Text className="text-sm text-destructive">{error}</Text>
               ) : null}
@@ -196,8 +202,7 @@ export default function VerifyScreen() {
                   verify.isPending ? t("mobile.verifying") : t("mobile.verify")
                 }
                 loading={verify.isPending}
-                disabled={code.length !== 6}
-                onPress={() => verify.mutate({ phone, code })}
+                onPress={() => void form.handleSubmit()}
               />
               <Button
                 variant="ghost"

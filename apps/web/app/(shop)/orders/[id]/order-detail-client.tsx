@@ -11,7 +11,12 @@ import { useTRPC } from "@/lib/trpc/client";
 import { OrderTimeline } from "@/features/shop/order-timeline";
 import { OrderStatusBadge } from "@/features/shop/order-status-badge";
 import {
+  StickyActionBar,
+  stickyActionBarSpacerClassName,
+} from "@/components/sticky-action-bar";
+import {
   ACTIVE_ORDER_STATUSES,
+  canCustomerEditItems,
   canTransition,
 } from "@workspace/validators/order-status";
 import type { OrderStatus } from "@workspace/validators/order-status";
@@ -30,6 +35,13 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Label } from "@workspace/ui/components/label";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 
 export function OrderDetailClient({ orderId }: { orderId: string }) {
   const { t, locale } = useTranslation();
@@ -65,6 +77,26 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
     }),
   );
 
+  const editable = order
+    ? canCustomerEditItems(order.status as OrderStatus)
+    : false;
+
+  const { data: unitOptions } = useQuery({
+    ...trpc.orders.lineUnitOptions.queryOptions({ orderId }),
+    enabled: editable,
+  });
+
+  const updateLineUnit = useMutation(
+    trpc.orders.updateLineUnit.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: orderOptions.queryKey });
+      },
+      onError: () => {
+        toast.error(t("errors.unknown"));
+      },
+    }),
+  );
+
   if (isLoading) {
     return (
       <div className="mx-auto max-w-xl px-4 py-8">
@@ -80,7 +112,11 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
   const canCancel = canTransition(status, "cancelled", "customer");
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 px-4 py-8">
+    <div
+      className={`mx-auto flex max-w-xl flex-col gap-6 px-4 pt-8 ${
+        canCancel ? stickyActionBarSpacerClassName : "pb-8"
+      }`}
+    >
       <div className="flex items-center gap-3">
         <Link
           href="/orders"
@@ -130,16 +166,47 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               line.nameSnapshotEn ??
               "—";
             const unavailable = line.status === "unavailable";
+            const lineUnits = unitOptions?.[line.id] ?? [];
+            const canEditUnit = editable && lineUnits.length > 1;
             return (
               <div
                 key={line.id}
                 className="flex items-center justify-between gap-2"
               >
-                <span
-                  className={`flex-1 text-sm ${unavailable ? "text-muted-foreground line-through" : "text-foreground"}`}
-                >
-                  {name} — {line.qty} {t(`units.${line.unit}` as never)}
-                </span>
+                {canEditUnit ? (
+                  <span className="flex flex-1 items-center gap-1.5 text-sm text-foreground">
+                    {name} — {line.qty}
+                    <Select
+                      value={line.unit}
+                      onValueChange={(v) =>
+                        v &&
+                        v !== line.unit &&
+                        updateLineUnit.mutate({
+                          orderId: order.id,
+                          orderItemId: line.id,
+                          unit: v,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-7 w-auto gap-1 px-2 py-0 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lineUnits.map((code) => (
+                          <SelectItem key={code} value={code}>
+                            {t(`units.${code}` as never)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </span>
+                ) : (
+                  <span
+                    className={`flex-1 text-sm ${unavailable ? "text-muted-foreground line-through" : "text-foreground"}`}
+                  >
+                    {name} — {line.qty} {t(`units.${line.unit}` as never)}
+                  </span>
+                )}
                 {line.status !== "pending" && (
                   <span
                     className={`text-xs font-semibold ${unavailable ? "text-destructive" : "text-emerald-600"}`}
@@ -173,6 +240,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
 
       {/* Cancel */}
       {canCancel && (
+        <StickyActionBar>
         <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
           <DialogTrigger
             render={
@@ -220,6 +288,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </StickyActionBar>
       )}
     </div>
   );

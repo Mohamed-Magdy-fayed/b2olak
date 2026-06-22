@@ -24,6 +24,17 @@ export const ACTIVE_ORDER_STATUSES: OrderStatus[] = [
   "delivering",
 ];
 
+/**
+ * Statuses where the customer still controls the order and may edit a line's
+ * unit of measure — i.e. before the driver starts shopping. Mirrors the window
+ * in which a customer may also cancel.
+ */
+export const CUSTOMER_EDITABLE_STATUSES: OrderStatus[] = ["placed", "assigned"];
+
+export function canCustomerEditItems(status: OrderStatus): boolean {
+  return CUSTOMER_EDITABLE_STATUSES.includes(status);
+}
+
 export type TransitionActor = "customer" | "driver" | "admin";
 
 type Transition = {

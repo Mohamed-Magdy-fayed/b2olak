@@ -4,8 +4,8 @@
   "main": "expo-router/entry",
   "private": true,
   "scripts": {
-    "dev": "expo start",
-    "start": "expo start",
+    "dev": "expo start --dev-client",
+    "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit"
@@ -15,10 +15,12 @@
     "@expo-google-fonts/tajawal": "^0.4.1",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@tanstack/react-form": "^1.29.0",
     "@tanstack/react-query": "^5.66.0",
     "@trpc/client": "^11.0.0",
     "@trpc/tanstack-react-query": "^11.0.0",
     "@workspace/api": "*",
+    "@workspace/forms": "*",
     "@workspace/i18n": "*",
     "@workspace/theme": "*",
     "@workspace/validators": "*",

@@ -11,6 +11,7 @@ import {
 } from "./validation-messages";
 import { FormBooleanField } from "./boolean-field";
 import { FormNumberField } from "./number-field";
+import { FormPasswordField } from "./password-field";
 import { FormPhoneField } from "./phone-field";
 import { FormSelectField } from "./select-field";
 import { FormStringField } from "./string-field";
@@ -23,6 +24,7 @@ const { useAppForm: useAppFormBase } = createFormHook({
   fieldComponents: {
     StringField: FormStringField,
     NumberField: FormNumberField,
+    PasswordField: FormPasswordField,
     PhoneField: FormPhoneField,
     SelectField: FormSelectField,
     BooleanField: FormBooleanField,

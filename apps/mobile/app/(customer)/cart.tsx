@@ -1,7 +1,9 @@
 import { FlatList, Pressable, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
+import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { itemDisplayName } from "@/components/item-row";
@@ -35,6 +37,7 @@ export default function CartScreen() {
       ) : (
         <>
           <FlatList
+            className="flex-1"
             data={lines}
             keyExtractor={(l) => l.itemId}
             showsVerticalScrollIndicator={false}
@@ -50,7 +53,13 @@ export default function CartScreen() {
                     <Text className="text-xs text-muted-foreground">
                       {cartLineUnitName(line, locale)}
                     </Text>
-                    <Pressable onPress={() => remove(line.itemId)} hitSlop={8}>
+                    <Pressable
+                      hitSlop={16}
+                      onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        remove(line.itemId);
+                      }}
+                    >
                       <Text className="text-xs text-destructive">
                         {t("shop.remove")}
                       </Text>
@@ -59,7 +68,10 @@ export default function CartScreen() {
                   <View className="flex-row items-center gap-3">
                     <Pressable
                       className="size-9 items-center justify-center rounded-full bg-muted"
-                      onPress={() => setQty(line.itemId, line.qty - 1)}
+                      onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setQty(line.itemId, line.qty - 1);
+                      }}
                     >
                       <Text className="text-lg font-bold text-foreground">−</Text>
                     </Pressable>
@@ -68,7 +80,10 @@ export default function CartScreen() {
                     </Text>
                     <Pressable
                       className="size-9 items-center justify-center rounded-full bg-primary"
-                      onPress={() => setQty(line.itemId, line.qty + 1)}
+                      onPress={() => {
+                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setQty(line.itemId, line.qty + 1);
+                      }}
                     >
                       <Text className="text-lg font-bold text-primary-foreground">
                         +
@@ -107,10 +122,7 @@ export default function CartScreen() {
             )}
             contentContainerClassName="pb-4 pt-1"
           />
-          <View
-            className="gap-3 border-t border-border pt-4"
-            style={{ paddingBottom: tabBarHeight + 12 }}
-          >
+          <BottomActionBar tabBarHeight={tabBarHeight}>
             <Text className="text-muted-foreground">
               {t("shop.itemsAtMarketPrice")}
             </Text>
@@ -136,7 +148,7 @@ export default function CartScreen() {
                 }
               }}
             />
-          </View>
+          </BottomActionBar>
         </>
       )}
     </Screen>

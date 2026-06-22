@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useStore } from "@tanstack/react-form";
 import { TRPCClientError } from "@trpc/client";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 import { useCart } from "@/features/shop/cart-store";
 import { geoName } from "@/features/shop/helpers";
 
@@ -18,15 +20,6 @@ import {
   DialogTrigger,
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
 
 function trpcErrorMessage(error: unknown, t: (k: string) => string): string {
   if (error instanceof TRPCClientError) {
@@ -45,26 +38,18 @@ export function AddItemDialog() {
   const add = useCart((s) => s.add);
 
   const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [unitId, setUnitId] = useState("");
 
   const { data: categories } = useQuery(trpc.catalog.categories.queryOptions());
   const { data: units } = useQuery(trpc.catalog.units.queryOptions());
 
-  // Default the unit picker to the first active unit once loaded.
-  if (units && units.length > 0 && !unitId) {
-    setUnitId(units[0]!.id);
-  }
-
   const createItem = useMutation(
     trpc.items.create.mutationOptions({
-      onSuccess: (data) => {
+      onSuccess: (data, variables) => {
         const msg = data.matched
           ? t("shop.addItem.foundExisting")
           : t("shop.addItem.added");
         toast.success(msg);
-        const chosen = (units ?? []).find((u) => u.id === unitId);
+        const chosen = (units ?? []).find((u) => u.id === variables.unitId);
         if (chosen) {
           add({
             itemId: data.item.id,
@@ -85,14 +70,49 @@ export function AddItemDialog() {
           queryKey: trpc.catalog.search.queryKey(),
         });
         setOpen(false);
-        setName("");
-        setCategoryId("");
+        form.reset();
       },
       onError: (err) => {
         toast.error(trpcErrorMessage(err, (k) => String(t(k as never))));
       },
     }),
   );
+
+  const form = useAppForm({
+    defaultValues: { name: "", categoryId: "", unitId: "" },
+    onSubmit: async ({ value }) => {
+      await createItem.mutateAsync({
+        name: value.name.trim(),
+        categoryId: value.categoryId,
+        unitId: value.unitId,
+      });
+    },
+  });
+
+  const name = useStore(form.baseStore, (s) => s.values.name);
+
+  const categoryOptions = useMemo(
+    () =>
+      (categories ?? []).map((c) => ({
+        value: c.id,
+        label: geoName(c, c.nameAr ?? c.nameEn ?? c.id, locale),
+      })),
+    [categories, locale],
+  );
+
+  const unitOptions = useMemo(
+    () =>
+      (units ?? []).map((u) => ({
+        value: u.id,
+        label: locale === "ar" ? (u.nameAr ?? u.nameEn ?? u.id) : (u.nameEn ?? u.id),
+      })),
+    [units, locale],
+  );
+
+  // Default the unit picker to the first active unit once loaded.
+  if (units && units.length > 0 && !form.getFieldValue("unitId")) {
+    form.setFieldValue("unitId", units[0]!.id);
+  }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -108,68 +128,61 @@ export function AddItemDialog() {
           <DialogTitle>{t("shop.addItem.title")}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="add-item-name">{name ? `"${name}"` : t("shop.addItem.title")}</Label>
-            <Input
-              id="add-item-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("shop.searchPlaceholder")}
-              autoFocus
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("shop.addItem.category")}</Label>
-            <Select value={categoryId} onValueChange={(v) => setCategoryId(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue placeholder={t("shop.addItem.category")} />
-              </SelectTrigger>
-              <SelectContent>
-                {(categories ?? []).map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {geoName(c, c.nameAr ?? c.nameEn ?? c.id, locale)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>{t("shop.addItem.unit")}</Label>
-            <Select value={unitId} onValueChange={(v) => setUnitId(v ?? "")}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(units ?? []).map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {locale === "ar" ? u.nameAr : u.nameEn}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <Button
-            onClick={() => {
-              if (!name.trim() || !categoryId || !unitId) return;
-              createItem.mutate({
-                name: name.trim(),
-                categoryId,
-                unitId,
-              });
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+          className="flex flex-col gap-4"
+        >
+          <form.AppField
+            name="name"
+            validators={{
+              onSubmit: ({ value }) =>
+                value.trim() ? undefined : "validation.required",
             }}
-            disabled={
-              createItem.isPending || !name.trim() || !categoryId || !unitId
-            }
           >
+            {(field) => (
+              <field.StringField
+                label={name ? `"${name}"` : t("shop.addItem.title")}
+                placeholder={t("shop.searchPlaceholder")}
+                autoFocus
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField
+            name="categoryId"
+            validators={{
+              onSubmit: ({ value }) =>
+                value ? undefined : "validation.required",
+            }}
+          >
+            {(field) => (
+              <field.SelectField
+                label={t("shop.addItem.category")}
+                options={categoryOptions}
+                placeholder={t("shop.addItem.category")}
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="unitId">
+            {(field) => (
+              <field.SelectField
+                label={t("shop.addItem.unit")}
+                options={unitOptions}
+                placeholder={t("shop.addItem.unit")}
+              />
+            )}
+          </form.AppField>
+
+          <Button type="submit" disabled={createItem.isPending}>
             {createItem.isPending
               ? t("shop.addItem.adding")
               : t("shop.addItem.submit")}
           </Button>
-        </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

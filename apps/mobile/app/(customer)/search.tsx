@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { FlatList, Pressable, Text, View } from "react-native"
+import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native"
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import AsyncStorage from "@react-native-async-storage/async-storage"
@@ -173,6 +173,10 @@ export default function SearchScreen() {
           className="mb-3"
         />
       </View>
+
+      {search.isFetching && query.trim().length >= 2 ? (
+        <ActivityIndicator className="mb-3" />
+      ) : null}
 
       {feedback ? (
         <Card className="border-success mx-5 mb-3">

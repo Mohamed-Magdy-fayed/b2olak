@@ -13,6 +13,12 @@ import { defineConfig, devices } from "@playwright/test";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
 
+// Only spin up the dev server when the web E2E project is actually being run.
+// Running --project=logic (pure domain tests) must not require a running web server.
+const needsWebServer =
+  !process.argv.some((a) => a === "--project" || a.startsWith("--project=")) ||
+  process.argv.some((a) => a === "web" || a === "--project=web");
+
 export default defineConfig({
   projects: [
     {
@@ -29,10 +35,12 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: "npm run dev --workspace web",
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: needsWebServer
+    ? {
+        command: "npm run dev --workspace web",
+        url: BASE_URL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      }
+    : undefined,
 });

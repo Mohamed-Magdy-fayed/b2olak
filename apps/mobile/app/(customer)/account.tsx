@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pressable, Switch, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,8 +7,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LanguageToggle } from "@/components/language-toggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
+import { useAppForm } from "@/components/forms";
 import { useSignedIn } from "@/lib/auth-gate";
 import { authenticate, isBiometricAvailable } from "@/lib/biometric";
 import {
@@ -18,6 +18,7 @@ import {
   getTrustedAccount,
   type TrustedAccount,
 } from "@/lib/device-auth";
+import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTranslation } from "@/lib/i18n";
 import {
   getActiveAccount,
@@ -28,13 +29,75 @@ import {
 } from "@/lib/session";
 import { useTRPC } from "@/lib/trpc";
 
+function NameEditForm({
+  initialName,
+  isPending,
+  onSubmit,
+  onCancel,
+}: {
+  initialName: string;
+  isPending: boolean;
+  onSubmit: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const form = useAppForm({
+    defaultValues: { name: initialName },
+    onSubmit: ({ value }) => {
+      const trimmed = value.name.trim();
+      if (trimmed.length >= 2) onSubmit(trimmed);
+    },
+  });
+
+  return (
+    <View className="gap-3">
+      <form.AppField
+        name="name"
+        validators={{
+          onSubmit: ({ value }) =>
+            value.trim().length >= 2 ? undefined : "validation.required",
+        }}
+      >
+        {(field) => (
+          <field.StringField
+            label={t("shop.namePlaceholder")}
+            placeholder={t("shop.namePlaceholder")}
+            autoFocus
+            maxLength={100}
+          />
+        )}
+      </form.AppField>
+      <View className="flex-row gap-3">
+        <Button
+          className="flex-1"
+          label={t("shop.save")}
+          loading={isPending}
+          onPress={() => void form.handleSubmit()}
+        />
+        <Button
+          className="flex-1"
+          variant="outline"
+          label={t("shop.cancel")}
+          onPress={onCancel}
+        />
+      </View>
+    </View>
+  );
+}
+
 export default function AccountScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const tabBarHeight = useTabBarHeight();
   const signedIn = useSignedIn();
   const { data } = useQuery({
     ...trpc.auth.me.queryOptions(),
+    enabled: signedIn === true,
+  });
+  const { data: devices } = useQuery({
+    ...trpc.auth.listDevices.queryOptions(),
     enabled: signedIn === true,
   });
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -42,7 +105,6 @@ export default function AccountScreen() {
   const [userId, setUserId] = useState<string | null>(null);
   const [trusted, setTrusted] = useState<TrustedAccount | null>(null);
   const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -91,11 +153,11 @@ export default function AccountScreen() {
         });
         setEditingName(false);
       },
+      onError: (err) => Alert.alert(t("common.error"), err.message),
     }),
   );
 
   const startEditName = () => {
-    setNameDraft(data?.user.name ?? "");
     setEditingName(true);
   };
 
@@ -106,6 +168,87 @@ export default function AccountScreen() {
     if (result) {
       router.replace(result.role === "driver" ? "/(driver)" : "/(customer)");
     }
+  };
+
+  const deleteAccount = useMutation(
+    trpc.auth.deleteAccount.mutationOptions({
+      onSuccess: async () => {
+        await removeActiveAccount();
+        queryClient.clear();
+        Alert.alert("", t("auth.deleteAccountSuccess"));
+        router.replace("/(customer)");
+      },
+      onError: (err) => Alert.alert(t("common.error"), err.message),
+    }),
+  );
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      t("auth.deleteAccountConfirmTitle"),
+      t("auth.deleteAccountConfirmMessage"),
+      [
+        { text: t("shop.cancel"), style: "cancel" },
+        {
+          text: t("auth.deleteAccountConfirm"),
+          style: "destructive",
+          onPress: () => deleteAccount.mutate(),
+        },
+      ],
+    );
+  };
+
+  const revokeDevice = useMutation(
+    trpc.auth.revokeDevice.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.auth.listDevices.queryKey(),
+        });
+      },
+      onError: (err) => Alert.alert(t("common.error"), err.message),
+    }),
+  );
+
+  const signOutEverywhere = useMutation(
+    trpc.auth.signOutEverywhere.mutationOptions({
+      onSettled: async () => {
+        const id = data?.user.id ?? userId;
+        if (id) await removeAccount(id);
+        else await removeActiveAccount();
+        await forgetTrustedDevice();
+        queryClient.clear();
+        router.replace("/(customer)");
+      },
+    }),
+  );
+
+  const confirmRevokeDevice = (deviceId: string) => {
+    Alert.alert(
+      t("account.devices.revoke"),
+      t("account.devices.revokeConfirm"),
+      [
+        { text: t("shop.cancel"), style: "cancel" },
+        {
+          text: t("account.devices.revoke"),
+          style: "destructive",
+          onPress: () => revokeDevice.mutate({ deviceId }),
+        },
+      ],
+    );
+  };
+
+  const confirmSignOutEverywhere = () => {
+    Alert.alert(
+      t("account.devices.signOutEverywhere"),
+      t("account.devices.signOutEverywhereConfirm"),
+      [
+        { text: t("shop.cancel"), style: "cancel" },
+        {
+          text: t("account.devices.signOutEverywhere"),
+          style: "destructive",
+          onPress: () => signOutEverywhere.mutate(),
+        },
+      ],
+    );
   };
 
   const signOut = useMutation(
@@ -124,67 +267,69 @@ export default function AccountScreen() {
 
   if (signedIn === false) {
     return (
-      <Screen className="gap-4">
-        <ScreenHeader title={t("shop.tabAccount")} right={<LanguageToggle />} />
-        <Card className="gap-2">
-          <Text className="font-display text-lg text-foreground">
-            {t("shop.guestAccountTitle")}
-          </Text>
-          <Text className="text-muted-foreground">
-            {t("shop.guestAccountSubtitle")}
-          </Text>
-          <View className="gap-3 pt-1">
-            {trusted ? (
+      <Screen padded={false}>
+        <ScreenHeader
+          title={t("shop.tabAccount")}
+          right={<LanguageToggle />}
+          className="px-5"
+        />
+        <ScrollView
+          className="flex-1 px-5"
+          contentContainerClassName="gap-4"
+          contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <Card className="gap-2">
+            <Text className="font-display text-lg text-foreground">
+              {t("shop.guestAccountTitle")}
+            </Text>
+            <Text className="text-muted-foreground">
+              {t("shop.guestAccountSubtitle")}
+            </Text>
+            <View className="gap-3 pt-1">
+              {trusted ? (
+                <Button
+                  label={t("shop.continueAs", {
+                    name: trusted.name || trusted.phone,
+                  })}
+                  onPress={() => void continueAsTrusted()}
+                />
+              ) : null}
               <Button
-                label={t("shop.continueAs", {
-                  name: trusted.name || trusted.phone,
-                })}
-                onPress={() => void continueAsTrusted()}
+                variant={trusted ? "outline" : "default"}
+                label={t("shop.signInCta")}
+                onPress={() => router.push("/(auth)/sign-in")}
               />
-            ) : null}
-            <Button
-              variant={trusted ? "outline" : "default"}
-              label={t("shop.signInCta")}
-              onPress={() => router.push("/(auth)/sign-in")}
-            />
-          </View>
-        </Card>
+            </View>
+          </Card>
+
+          <LegalLinks t={t} />
+        </ScrollView>
       </Screen>
     );
   }
 
   return (
-    <Screen className="gap-4">
-      <ScreenHeader title={t("shop.tabAccount")} right={<LanguageToggle />} />
-
-      <Card className="gap-2">
+    <Screen padded={false}>
+      <ScreenHeader
+        title={t("shop.tabAccount")}
+        right={<LanguageToggle />}
+        className="px-5"
+      />
+      <ScrollView
+        className="flex-1 px-5"
+        contentContainerClassName="gap-4"
+        contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card className="gap-2">
         {editingName ? (
-          <View className="gap-3">
-            <Input
-              value={nameDraft}
-              onChangeText={setNameDraft}
-              placeholder={t("shop.namePlaceholder")}
-              autoFocus
-              maxLength={100}
-            />
-            <View className="flex-row gap-3">
-              <Button
-                className="flex-1"
-                label={t("shop.save")}
-                loading={updateProfile.isPending}
-                disabled={nameDraft.trim().length < 2}
-                onPress={() =>
-                  updateProfile.mutate({ name: nameDraft.trim() })
-                }
-              />
-              <Button
-                className="flex-1"
-                variant="outline"
-                label={t("shop.cancel")}
-                onPress={() => setEditingName(false)}
-              />
-            </View>
-          </View>
+          <NameEditForm
+            initialName={data?.user.name ?? ""}
+            isPending={updateProfile.isPending}
+            onSubmit={(name) => updateProfile.mutate({ name })}
+            onCancel={() => setEditingName(false)}
+          />
         ) : (
           <View className="flex-row items-center justify-between gap-3">
             <View className="flex-1 gap-1">
@@ -238,12 +383,89 @@ export default function AccountScreen() {
         </Card>
       ) : null}
 
+      {devices && devices.length > 0 ? (
+        <Card className="gap-3">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="phone-portrait-outline" size={18} color="#F5F2EC" />
+            <Text className="font-semibold text-foreground">
+              {t("account.devices.title")}
+            </Text>
+          </View>
+          <View className="gap-2">
+            {devices.map((d) => (
+              <View
+                key={d.deviceId}
+                className="flex-row items-center justify-between gap-3 rounded-xl border border-border bg-elevated p-3"
+              >
+                <View className="flex-1 gap-0.5">
+                  <Text className="font-medium text-foreground">
+                    {d.label ?? t("account.devices.defaultLabel")}
+                  </Text>
+                  <Text className="text-xs text-muted-foreground">
+                    {d.lastUsedAt
+                      ? t("account.devices.lastUsed", {
+                        date: new Date(d.lastUsedAt).toLocaleDateString(locale),
+                      })
+                      : t("account.devices.added", {
+                        date: new Date(d.createdAt).toLocaleDateString(locale),
+                      })}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => confirmRevokeDevice(d.deviceId)}
+                  hitSlop={8}
+                  accessibilityLabel={t("account.devices.revoke")}
+                >
+                  <Text className="text-sm font-semibold text-destructive">
+                    {t("account.devices.revoke")}
+                  </Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        </Card>
+      ) : null}
+
       <Button
         variant="outline"
         label={t("auth.signOut")}
         loading={signOut.isPending}
         onPress={() => signOut.mutate()}
       />
+
+      <Button
+        variant="outline"
+        label={t("account.devices.signOutEverywhere")}
+        loading={signOutEverywhere.isPending}
+        onPress={confirmSignOutEverywhere}
+      />
+
+      <LegalLinks t={t} />
+
+        <Button
+          variant="destructive"
+          label={t("auth.deleteAccount")}
+          loading={deleteAccount.isPending}
+          onPress={confirmDeleteAccount}
+        />
+      </ScrollView>
     </Screen>
+  );
+}
+
+function LegalLinks({ t }: { t: ReturnType<typeof useTranslation>["t"] }) {
+  return (
+    <View className="flex-row justify-center gap-4">
+      <Pressable onPress={() => router.push("/(customer)/privacy")} hitSlop={8}>
+        <Text className="text-sm text-muted-foreground underline">
+          {t("privacy.title")}
+        </Text>
+      </Pressable>
+      <Pressable onPress={() => router.push("/(customer)/terms")} hitSlop={8}>
+        <Text className="text-sm text-muted-foreground underline">
+          {t("terms.title")}
+        </Text>
+      </Pressable>
+    </View>
   );
 }

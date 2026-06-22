@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { useTranslation } from "@/lib/i18n";
 import { cartLineFromItem, type CartUnit, useCart } from "@/lib/cart-store";
@@ -51,7 +52,10 @@ export function ItemRow({ item }: { item: CatalogItem }) {
         <View className="flex-row items-center gap-3 rounded-2xl bg-elevated px-2 py-1">
           <Pressable
             className="size-9 items-center justify-center rounded-full bg-card active:opacity-70"
-            onPress={() => setQty(item.id, line.qty - 1)}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setQty(item.id, line.qty - 1);
+            }}
           >
             <Ionicons name="remove" size={18} color="#9B968C" />
           </Pressable>
@@ -60,7 +64,10 @@ export function ItemRow({ item }: { item: CatalogItem }) {
           </Text>
           <Pressable
             className="size-9 items-center justify-center rounded-full bg-primary active:opacity-70"
-            onPress={() => setQty(item.id, line.qty + 1)}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setQty(item.id, line.qty + 1);
+            }}
           >
             <Ionicons name="add" size={18} color="#0E0E10" />
           </Pressable>
@@ -69,7 +76,10 @@ export function ItemRow({ item }: { item: CatalogItem }) {
         <Pressable
           className={`rounded-2xl px-5 py-2.5 active:opacity-70 ${disabled ? "bg-elevated" : "bg-primary"}`}
           disabled={disabled}
-          onPress={() => add(cartLineFromItem(item))}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            add(cartLineFromItem(item));
+          }}
         >
           <Text className={`text-sm font-semibold ${disabled ? "text-muted-foreground" : "text-primary-foreground"}`}>
             {t("shop.addToCart")}

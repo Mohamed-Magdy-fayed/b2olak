@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -13,9 +12,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
+import { egyptianPhoneSchema, otpCodeSchema } from "@workspace/validators/auth";
 
+import { useAppForm } from "@/components/forms/hooks";
 import {
   requestOtpAction,
   signInWithGoogleAction,
@@ -50,24 +49,18 @@ export function CustomerSignIn({
   oauthError: string | null;
 }) {
   const { t } = useTranslation();
-  const [reqState, requestAction, requestPending] = useActionState(
-    requestOtpAction,
-    undefined,
-  );
-  const [verState, verifyAction, verifyPending] = useActionState(
-    verifyOtpAction,
-    undefined,
-  );
+  const [requestPending, startRequest] = useTransition();
+  const [verifyPending, startVerify] = useTransition();
 
   const [step, setStep] = useState<"phone" | "code">("phone");
+  const [confirmedPhone, setConfirmedPhone] = useState("");
   const [resendIn, setResendIn] = useState(0);
-
-  useEffect(() => {
-    if (reqState?.phase === "code") {
-      setStep("code");
-      setResendIn(RESEND_SECONDS);
-    }
-  }, [reqState]);
+  const [error, setError] = useState<string | null>(
+    oauthError
+      ? (OAUTH_ERROR_KEYS[oauthError as keyof typeof OAUTH_ERROR_KEYS] ??
+          "auth.oauthFailed")
+      : null,
+  );
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -75,15 +68,41 @@ export function CustomerSignIn({
     return () => clearTimeout(timer);
   }, [resendIn]);
 
-  const phone = reqState?.phase === "code" ? reqState.phone : "";
-  const error =
-    step === "code"
-      ? (verState?.error ?? reqState?.error)
-      : (reqState?.error ??
-        (oauthError
-          ? OAUTH_ERROR_KEYS[oauthError as keyof typeof OAUTH_ERROR_KEYS] ??
-            "auth.oauthFailed"
-          : undefined));
+  const form = useAppForm({
+    defaultValues: { phone: "", code: "" },
+    onSubmit: ({ value }) => {
+      // Verify step — phone is the one confirmed by the request step.
+      setError(null);
+      startVerify(async () => {
+        const fd = new FormData();
+        fd.set("phone", confirmedPhone);
+        fd.set("code", value.code);
+        if (next) fd.set("next", next);
+        const result = await verifyOtpAction(undefined, fd);
+        if (result?.error) setError(result.error);
+      });
+    },
+  });
+
+  async function sendCode() {
+    await form.validateField("phone", "submit");
+    if (!form.getFieldMeta("phone")?.isValid) return;
+    const phoneVal = form.getFieldValue("phone");
+    setError(null);
+    startRequest(async () => {
+      const fd = new FormData();
+      fd.set("phone", phoneVal);
+      const result = await requestOtpAction(undefined, fd);
+      if (result?.phase === "code") {
+        setConfirmedPhone(result.phone);
+        setStep("code");
+        setResendIn(RESEND_SECONDS);
+        setTimeout(() => document.getElementById("code")?.focus(), 100);
+      } else if (result?.error) {
+        setError(result.error);
+      }
+    });
+  }
 
   return (
     <Card className="w-full max-w-sm">
@@ -94,7 +113,7 @@ export function CustomerSignIn({
         <CardDescription>
           {step === "phone"
             ? t("auth.customerSignInSubtitle")
-            : t("mobile.codeSentTo", { phone })}
+            : t("mobile.codeSentTo", { phone: confirmedPhone })}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -109,67 +128,87 @@ export function CustomerSignIn({
         </div>
 
         {step === "phone" ? (
-          <form action={requestAction} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="phone">{t("mobile.phoneLabel")}</Label>
-              <Input
-                id="phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                dir="ltr"
-                placeholder={t("mobile.phonePlaceholder")}
-                required
-              />
-            </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void sendCode();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <form.AppField
+              name="phone"
+              validators={{
+                onSubmit: ({ value }) =>
+                  egyptianPhoneSchema.safeParse(value).success
+                    ? undefined
+                    : "validation.phoneInvalid",
+              }}
+            >
+              {(field) => (
+                <field.PhoneField
+                  label={t("mobile.phoneLabel")}
+                  placeholder={t("mobile.phonePlaceholder")}
+                  autoFocus
+                />
+              )}
+            </form.AppField>
             <Button type="submit" disabled={requestPending}>
               {requestPending ? t("mobile.sending") : t("mobile.sendCode")}
             </Button>
           </form>
         ) : (
           <div className="flex flex-col gap-4">
-            <form action={verifyAction} className="flex flex-col gap-4">
-              <input type="hidden" name="phone" value={phone} />
-              {next ? <input type="hidden" name="next" value={next} /> : null}
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="code">{t("mobile.codeLabel")}</Label>
-                <Input
-                  id="code"
-                  name="code"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength={6}
-                  dir="ltr"
-                  className="text-center text-lg tracking-[0.5em]"
-                  required
-                />
-              </div>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void form.handleSubmit();
+              }}
+              className="flex flex-col gap-4"
+            >
+              <form.AppField
+                name="code"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    otpCodeSchema.safeParse(value).success
+                      ? undefined
+                      : "validation.otpInvalid",
+                }}
+              >
+                {(field) => (
+                  <field.StringField
+                    label={t("mobile.codeLabel")}
+                    inputMode="numeric"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    dir="ltr"
+                    className="text-center text-lg tracking-[0.5em]"
+                  />
+                )}
+              </form.AppField>
               <Button type="submit" disabled={verifyPending}>
                 {verifyPending ? t("mobile.verifying") : t("mobile.verify")}
               </Button>
             </form>
             <div className="flex items-center justify-between gap-2">
-              <form action={requestAction}>
-                <input type="hidden" name="phone" value={phone} />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="sm"
-                  disabled={resendIn > 0 || requestPending}
-                >
-                  {resendIn > 0
-                    ? t("mobile.resendIn", { seconds: resendIn })
-                    : t("mobile.resend")}
-                </Button>
-              </form>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => setStep("phone")}
+                disabled={resendIn > 0 || requestPending}
+                onClick={() => void sendCode()}
+              >
+                {resendIn > 0
+                  ? t("mobile.resendIn", { seconds: resendIn })
+                  : t("mobile.resend")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStep("phone");
+                  setError(null);
+                }}
               >
                 {t("auth.changeNumber")}
               </Button>
@@ -198,12 +237,6 @@ export function CustomerSignIn({
             {t("auth.continueWithGoogle")}
           </Button>
         </form>
-
-        <p className="text-muted-foreground text-center text-sm">
-          <Link href="/sign-in/admin" className="hover:text-foreground underline">
-            {t("auth.staffSignIn")}
-          </Link>
-        </p>
       </CardContent>
     </Card>
   );

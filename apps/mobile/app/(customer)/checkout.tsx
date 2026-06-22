@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Pressable, Text, View } from "react-native"
+import { Alert, Pressable, Text, View } from "react-native"
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 import { router } from "expo-router"
 import { useMutation, useQuery } from "@tanstack/react-query"
@@ -100,6 +100,7 @@ export default function CheckoutScreen() {
     trpc.orders.place.mutationOptions({
       onSuccess: (data) => {
         clear()
+        Alert.alert(t("shop.orderPlaced"), t("shop.orderPlacedMessage"))
         router.replace(`/(customer)/orders/${data.orderId}`)
       },
       onError: (err) => {

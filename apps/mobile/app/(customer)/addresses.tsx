@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import {
   AddressFormModal,
   type EditableAddress,
 } from "@/components/address-form-modal";
+import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
@@ -91,6 +92,7 @@ export default function AddressesScreen() {
     trpc.addresses.delete.mutationOptions({
       onSuccess: () =>
         void queryClient.invalidateQueries({ queryKey: listOptions.queryKey }),
+      onError: (err) => Alert.alert(t("common.error"), err.message),
     }),
   );
 
@@ -101,7 +103,7 @@ export default function AddressesScreen() {
         <ScrollView
           className="flex-1 px-5"
           contentContainerClassName="gap-3"
-          contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+          contentContainerStyle={{ paddingBottom: 16 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -117,18 +119,16 @@ export default function AddressesScreen() {
                   ) : null}
                 </View>
                 <View className="flex-row gap-4">
-                  <Text
-                    className="font-semibold text-primary"
-                    onPress={() => setEditing(address)}
-                  >
-                    {t("admin.common.edit")}
-                  </Text>
-                  <Text
-                    className="font-semibold text-destructive"
-                    onPress={() => remove.mutate({ id: address.id })}
-                  >
-                    {t("address.delete")}
-                  </Text>
+                  <Pressable hitSlop={16} onPress={() => setEditing(address)}>
+                    <Text className="font-semibold text-primary">
+                      {t("admin.common.edit")}
+                    </Text>
+                  </Pressable>
+                  <Pressable hitSlop={16} onPress={() => remove.mutate({ id: address.id })}>
+                    <Text className="font-semibold text-destructive">
+                      {t("address.delete")}
+                    </Text>
+                  </Pressable>
                 </View>
               </View>
               <Text className="text-sm text-muted-foreground">
@@ -142,8 +142,11 @@ export default function AddressesScreen() {
               {t("address.none")}
             </Text>
           ) : null}
-          <Button label={t("address.add")} onPress={() => setEditing("new")} />
         </ScrollView>
+
+        <BottomActionBar className="px-5" tabBarHeight={tabBarHeight}>
+          <Button label={t("address.add")} onPress={() => setEditing("new")} />
+        </BottomActionBar>
       </Screen>
 
       <AddressFormModal

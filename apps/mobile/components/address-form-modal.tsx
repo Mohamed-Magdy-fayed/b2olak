@@ -1,22 +1,18 @@
-import { useEffect, useState } from "react"
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native"
+import { useEffect, useMemo, useState } from "react"
+import { Modal, Pressable, Text, View } from "react-native"
 import {
   KeyboardAwareScrollView,
   KeyboardProvider,
 } from "react-native-keyboard-controller"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useStore } from "@tanstack/react-form"
 import { Ionicons } from "@expo/vector-icons"
 
+import { egyptianPhoneSchema } from "@workspace/validators/auth"
+
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen"
+import { useAppForm } from "@/components/forms"
 import { useTranslation } from "@/lib/i18n"
 import { useTRPC } from "@/lib/trpc"
 
@@ -97,132 +93,11 @@ function geoDisplayName(row: GeoRow, locale: string): string {
   )
 }
 
-// ─── GeoPickerModal ───────────────────────────────────────────────────────────
-
-type GeoPickerModalProps = {
-  visible: boolean
-  title: string
-  items: GeoRow[]
-  selectedId: string
-  locale: string
-  onSelect: (id: string) => void
-  onClose: () => void
-}
-
-function GeoPickerModal({
-  visible,
-  title,
-  items,
-  selectedId,
-  locale,
-  onSelect,
-  onClose,
-}: GeoPickerModalProps) {
-  return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable className="flex-1 bg-black/60" onPress={onClose} />
-      <View className="max-h-[60%] rounded-t-2xl bg-card px-5 pt-4 pb-8">
-        <View className="mb-1 items-center">
-          <View className="mb-3 h-1 w-10 rounded-full bg-border" />
-        </View>
-        <Text className="mb-3 text-center text-base font-bold text-foreground">
-          {title}
-        </Text>
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {items.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => {
-                onSelect(item.id)
-                onClose()
-              }}
-              className={`flex-row items-center justify-between border-b border-border py-3.5 ${
-                selectedId === item.id ? "bg-primary/10" : ""
-              }`}
-            >
-              <Text
-                className={`flex-1 text-base ${
-                  selectedId === item.id
-                    ? "font-bold text-primary"
-                    : "text-foreground"
-                }`}
-              >
-                {geoDisplayName(item, locale)}
-              </Text>
-              {selectedId === item.id ? (
-                <Ionicons name="checkmark" size={18} color="#C9A227" />
-              ) : null}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
-    </Modal>
-  )
-}
-
-// ─── GeoSelect ────────────────────────────────────────────────────────────────
-
-type GeoSelectProps = {
-  label: string
-  placeholder: string
-  items: GeoRow[] | undefined
-  selectedId: string
-  locale: string
-  disabled?: boolean
-  onSelect: (id: string) => void
-}
-
-function GeoSelect({
-  label,
-  placeholder,
-  items,
-  selectedId,
-  locale,
-  disabled,
-  onSelect,
-}: GeoSelectProps) {
-  const [open, setOpen] = useState(false)
-  const selected = items?.find((r) => r.id === selectedId)
-
-  return (
-    <View className="gap-1.5">
-      <Text className="text-sm font-medium text-foreground">{label}</Text>
-      <Pressable
-        onPress={() => !disabled && setOpen(true)}
-        className={`bg-elevated h-12 w-full flex-row items-center rounded-2xl border border-input px-4 ${
-          disabled ? "opacity-40" : ""
-        }`}
-      >
-        <Text
-          className={`flex-1 text-base ${
-            selected ? "text-foreground" : "text-muted-foreground"
-          }`}
-        >
-          {selected ? geoDisplayName(selected, locale) : placeholder}
-        </Text>
-        <Ionicons name="chevron-down" size={16} color="#9B968C" />
-      </Pressable>
-      {items ? (
-        <GeoPickerModal
-          visible={open}
-          title={label}
-          items={items}
-          selectedId={selectedId}
-          locale={locale}
-          onSelect={onSelect}
-          onClose={() => setOpen(false)}
-        />
-      ) : null}
-    </View>
-  )
+function geoOptions(rows: GeoRow[] | undefined, locale: string) {
+  return (rows ?? []).map((row) => ({
+    value: row.id,
+    label: geoDisplayName(row, locale),
+  }))
 }
 
 // ─── AddressFormModal ─────────────────────────────────────────────────────────
@@ -250,31 +125,7 @@ export function AddressFormModal({
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
-  const [form, setForm] = useState<FormState>(emptyForm)
   const [error, setError] = useState<string | null>(null)
-
-  // Reset the form whenever the sheet is (re)opened for a new target.
-  useEffect(() => {
-    if (visible) {
-      setForm(address ? formFromAddress(address) : emptyForm)
-      setError(null)
-    }
-  }, [visible, address])
-
-  // Geo queries — city always loaded, district/area enabled by selection.
-  const { data: cities } = useQuery(trpc.geo.cities.queryOptions())
-  const { data: districts } = useQuery(
-    trpc.geo.districts.queryOptions(
-      { cityId: form.cityId },
-      { enabled: !!form.cityId }
-    )
-  )
-  const { data: areas } = useQuery(
-    trpc.geo.areas.queryOptions(
-      { districtId: form.districtId },
-      { enabled: !!form.districtId }
-    )
-  )
 
   const listKey = trpc.addresses.list.queryOptions().queryKey
   const invalidate = () => queryClient.invalidateQueries({ queryKey: listKey })
@@ -305,37 +156,54 @@ export function AddressFormModal({
     })
   )
 
-  function submit() {
-    setError(null)
+  const form = useAppForm({
+    defaultValues: emptyForm,
+    onSubmit: ({ value }) => {
+      setError(null)
+      const payload = {
+        label: value.label.trim() || undefined,
+        cityId: value.cityId,
+        districtId: value.districtId,
+        areaId: value.areaId,
+        building: value.building.trim(),
+        floor: value.floor.trim() || undefined,
+        apartment: value.apartment.trim() || undefined,
+        landmark: value.landmark.trim() || undefined,
+        contactPhone: value.contactPhone.trim(),
+        isDefault: value.isDefault,
+      }
+      if (address) update.mutate({ id: address.id, ...payload })
+      else create.mutate(payload)
+    },
+  })
 
-    if (!form.cityId || !form.districtId || !form.areaId) {
-      setError(t("address.invalidGeoSelection"))
-      return
+  // Reset the form whenever the sheet is (re)opened for a new target.
+  useEffect(() => {
+    if (visible) {
+      form.reset(address ? formFromAddress(address) : emptyForm)
+      setError(null)
     }
-    if (!form.building.trim()) {
-      setError(t("address.building"))
-      return
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, address])
 
-    const payload = {
-      label: form.label.trim() || undefined,
-      cityId: form.cityId,
-      districtId: form.districtId,
-      areaId: form.areaId,
-      building: form.building.trim(),
-      floor: form.floor.trim() || undefined,
-      apartment: form.apartment.trim() || undefined,
-      landmark: form.landmark.trim() || undefined,
-      contactPhone: form.contactPhone.trim(),
-      isDefault: form.isDefault,
-    }
+  const cityId = useStore(form.baseStore, (s) => s.values.cityId)
+  const districtId = useStore(form.baseStore, (s) => s.values.districtId)
 
-    if (address) {
-      update.mutate({ id: address.id, ...payload })
-    } else {
-      create.mutate(payload)
-    }
-  }
+  // Geo queries — city always loaded, district/area enabled by selection.
+  const { data: cities } = useQuery(trpc.geo.cities.queryOptions())
+  const { data: districts } = useQuery(
+    trpc.geo.districts.queryOptions({ cityId }, { enabled: !!cityId })
+  )
+  const { data: areas } = useQuery(
+    trpc.geo.areas.queryOptions({ districtId }, { enabled: !!districtId })
+  )
+
+  const cityOptions = useMemo(() => geoOptions(cities, locale), [cities, locale])
+  const districtOptions = useMemo(
+    () => geoOptions(districts, locale),
+    [districts, locale]
+  )
+  const areaOptions = useMemo(() => geoOptions(areas, locale), [areas, locale])
 
   return (
     <Modal
@@ -367,123 +235,118 @@ export function AddressFormModal({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Label (optional) */}
-            <View className="gap-1.5">
-              <Text className="text-sm font-medium text-foreground">
-                {t("address.label")}
-              </Text>
-              <Input
-                value={form.label}
-                onChangeText={(value) => setForm({ ...form, label: value })}
-              />
-            </View>
+            <form.AppField name="label">
+              {(field) => <field.StringField label={t("address.label")} />}
+            </form.AppField>
 
             {/* City picker */}
-            <GeoSelect
-              label={t("address.city")}
-              placeholder={t("address.selectCity")}
-              items={cities}
-              selectedId={form.cityId}
-              locale={locale}
-              onSelect={(cityId) =>
-                setForm({ ...form, cityId, districtId: "", areaId: "" })
-              }
-            />
+            <form.AppField
+              name="cityId"
+              listeners={{
+                onChange: () => {
+                  form.setFieldValue("districtId", "")
+                  form.setFieldValue("areaId", "")
+                },
+              }}
+              validators={{
+                onSubmit: ({ value }) =>
+                  value ? undefined : "validation.required",
+              }}
+            >
+              {(field) => (
+                <field.SelectField
+                  label={t("address.city")}
+                  placeholder={t("address.selectCity")}
+                  options={cityOptions}
+                />
+              )}
+            </form.AppField>
 
             {/* District picker — enabled only after city is chosen */}
-            <GeoSelect
-              label={t("address.district")}
-              placeholder={t("address.selectDistrict")}
-              items={districts}
-              selectedId={form.districtId}
-              locale={locale}
-              disabled={!form.cityId}
-              onSelect={(districtId) =>
-                setForm({ ...form, districtId, areaId: "" })
-              }
-            />
+            <form.AppField
+              name="districtId"
+              listeners={{
+                onChange: () => form.setFieldValue("areaId", ""),
+              }}
+              validators={{
+                onSubmit: ({ value }) =>
+                  value ? undefined : "validation.required",
+              }}
+            >
+              {(field) => (
+                <field.SelectField
+                  label={t("address.district")}
+                  placeholder={t("address.selectDistrict")}
+                  options={districtOptions}
+                  disabled={!cityId}
+                />
+              )}
+            </form.AppField>
 
             {/* Area picker — enabled only after district is chosen */}
-            <GeoSelect
-              label={t("address.area")}
-              placeholder={t("address.selectArea")}
-              items={areas}
-              selectedId={form.areaId}
-              locale={locale}
-              disabled={!form.districtId}
-              onSelect={(areaId) => setForm({ ...form, areaId })}
-            />
+            <form.AppField
+              name="areaId"
+              validators={{
+                onSubmit: ({ value }) =>
+                  value ? undefined : "validation.required",
+              }}
+            >
+              {(field) => (
+                <field.SelectField
+                  label={t("address.area")}
+                  placeholder={t("address.selectArea")}
+                  options={areaOptions}
+                  disabled={!districtId}
+                />
+              )}
+            </form.AppField>
 
             {/* Building — required */}
-            <View className="gap-1.5">
-              <Text className="text-sm font-medium text-foreground">
-                {t("address.building")}
-                <Text className="text-destructive"> *</Text>
-              </Text>
-              <Input
-                value={form.building}
-                onChangeText={(value) => setForm({ ...form, building: value })}
-              />
-            </View>
+            <form.AppField
+              name="building"
+              validators={{
+                onSubmit: ({ value }) =>
+                  value.trim() ? undefined : "validation.required",
+              }}
+            >
+              {(field) => (
+                <field.StringField label={`${t("address.building")} *`} />
+              )}
+            </form.AppField>
 
-            {/* Optional text fields */}
-            {(
-              [
-                ["floor", t("address.floor")],
-                ["apartment", t("address.apartment")],
-                ["landmark", t("address.landmark")],
-              ] as const
-            ).map(([key, label]) => (
-              <View key={key} className="gap-1.5">
-                <Text className="text-sm font-medium text-foreground">
-                  {label}
-                </Text>
-                <Input
-                  value={form[key]}
-                  onChangeText={(value) => setForm({ ...form, [key]: value })}
-                />
-              </View>
-            ))}
+            <form.AppField name="floor">
+              {(field) => <field.StringField label={t("address.floor")} />}
+            </form.AppField>
+            <form.AppField name="apartment">
+              {(field) => (
+                <field.StringField label={t("address.apartment")} />
+              )}
+            </form.AppField>
+            <form.AppField name="landmark">
+              {(field) => <field.StringField label={t("address.landmark")} />}
+            </form.AppField>
 
             {/* Contact phone — LTR override intentionally preserved */}
-            <View className="gap-1.5">
-              <Text className="text-sm font-medium text-foreground">
-                {t("address.contactPhone")}
-              </Text>
-              <Input
-                value={form.contactPhone}
-                onChangeText={(value) =>
-                  setForm({ ...form, contactPhone: value })
-                }
-                keyboardType="phone-pad"
-                style={{
-                  textAlign: "left",
-                  writingDirection: "ltr",
-                  direction: "ltr",
-                }}
-              />
-            </View>
+            <form.AppField
+              name="contactPhone"
+              validators={{
+                onSubmit: ({ value }) =>
+                  egyptianPhoneSchema.safeParse(value).success
+                    ? undefined
+                    : "validation.phoneInvalid",
+              }}
+            >
+              {(field) => (
+                <field.PhoneField label={t("address.contactPhone")} />
+              )}
+            </form.AppField>
 
             {/* isDefault toggle */}
-            <Pressable
-              className="bg-elevated flex-row items-center gap-3 rounded-2xl border border-border p-4"
-              onPress={() => setForm({ ...form, isDefault: !form.isDefault })}
-            >
-              <View
-                className={`size-5 items-center justify-center rounded-md border-2 ${
-                  form.isDefault
-                    ? "border-primary bg-primary/20"
-                    : "border-border"
-                }`}
-              >
-                {form.isDefault ? (
-                  <Ionicons name="checkmark" size={14} color="#C9A227" />
-                ) : null}
-              </View>
-              <Text className="flex-1 text-foreground">
-                {t("address.isDefault")}
-              </Text>
-            </Pressable>
+            <form.AppField name="isDefault">
+              {(field) => (
+                <field.BooleanField label={t("address.isDefault")} />
+              )}
+            </form.AppField>
 
             {error ? (
               <View className="flex-row items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3">
@@ -502,7 +365,7 @@ export function AddressFormModal({
             <Button
               label={t("address.save")}
               loading={create.isPending || update.isPending}
-              onPress={submit}
+              onPress={() => void form.handleSubmit()}
             />
             <Button
               variant="ghost"

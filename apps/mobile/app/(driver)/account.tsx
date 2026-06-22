@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ScrollView, Switch, Text, View } from "react-native";
+import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -73,6 +73,9 @@ export default function DriverAccount() {
       // Logging out of the captain app drops into the customer storefront as a
       // guest (not a login wall). Remove by user id so a stale active token can
       // never leave the driver account stored and bounce us back into /(driver).
+      onError: (err: { message: string }) => {
+        Alert.alert(t("common.error"), err.message);
+      },
       onSettled: async () => {
         if (data?.user.id) await removeAccount(data.user.id);
         else await removeActiveAccount();
@@ -143,6 +146,25 @@ export default function DriverAccount() {
           loading={signOut.isPending}
           onPress={() => signOut.mutate()}
         />
+
+        <View className="flex-row justify-center gap-4 pt-2">
+          <Pressable
+            onPress={() => router.push("/(customer)/privacy")}
+            hitSlop={8}
+          >
+            <Text className="text-sm text-muted-foreground underline">
+              {t("privacy.title")}
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push("/(customer)/terms")}
+            hitSlop={8}
+          >
+            <Text className="text-sm text-muted-foreground underline">
+              {t("terms.title")}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </Screen>
   );

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
@@ -13,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CategoryCard } from "@/components/category-card";
 import { ItemHScroll } from "@/components/item-h-scroll";
 import { LanguageToggle } from "@/components/language-toggle";
+import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTabBarHeight } from "@/lib/use-tab-bar-height";
@@ -25,14 +28,21 @@ export default function CustomerHome() {
   const signedIn = useSignedIn();
   const tabBarHeight = useTabBarHeight();
 
-  const { data: categories, isLoading: categoriesLoading } = useQuery(
+  const { data: categories, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useQuery(
     trpc.catalog.categories.queryOptions(),
   );
-  const { data: popularItems } = useQuery(
+  const { data: popularItems, isLoading: popularLoading, error: popularError, refetch: refetchPopular } = useQuery(
     trpc.catalog.popularItems.queryOptions(),
   );
   // "Buy again" is personalised and auth-only — skip it entirely for guests.
-  const { data: reorderItems } = useQuery({
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([refetchCategories(), refetchPopular()]);
+    setRefreshing(false);
+  };
+
+  const { data: reorderItems, isLoading: reorderLoading } = useQuery({
     ...trpc.catalog.reorderItems.queryOptions(),
     enabled: signedIn === true,
   });
@@ -43,6 +53,14 @@ export default function CustomerHome() {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor="#C9A227"
+            colors={["#C9A227"]}
+          />
+        }
       >
         {/* Header: brand wordmark + language toggle */}
         <View className="mb-5 flex-row items-center justify-between">
@@ -68,11 +86,24 @@ export default function CustomerHome() {
           </Text>
         </Pressable>
 
-        {/* Buy again — hidden when empty */}
-        <ItemHScroll title={t("shop.buyAgain")} items={reorderItems ?? []} />
+        {/* Buy again — hidden when empty or not yet loaded */}
+        {reorderLoading ? (
+          <ActivityIndicator className="mb-6" />
+        ) : (
+          <ItemHScroll title={t("shop.buyAgain")} items={reorderItems ?? []} />
+        )}
 
-        {/* Popular now — hidden when empty */}
-        <ItemHScroll title={t("shop.popularNow")} items={popularItems ?? []} />
+        {/* Popular now */}
+        {popularLoading ? (
+          <ActivityIndicator className="mb-6" />
+        ) : popularError ? (
+          <View className="mb-6 items-center gap-2">
+            <Text className="text-muted-foreground">{t("common.error")}</Text>
+            <Button label={t("common.retry")} variant="outline" onPress={() => void refetchPopular()} />
+          </View>
+        ) : (
+          <ItemHScroll title={t("shop.popularNow")} items={popularItems ?? []} />
+        )}
 
         {/* Categories grid */}
         <Text className="mb-3 font-display text-xl text-foreground">
@@ -81,6 +112,11 @@ export default function CustomerHome() {
 
         {categoriesLoading ? (
           <ActivityIndicator className="py-12" color="#C9A227" />
+        ) : categoriesError ? (
+          <View className="items-center gap-2 py-8">
+            <Text className="text-muted-foreground">{t("common.error")}</Text>
+            <Button label={t("common.retry")} variant="outline" onPress={() => void refetchCategories()} />
+          </View>
         ) : (
           <FlatList
             data={categories ?? []}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useStore } from "@tanstack/react-form";
 import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n/react";
@@ -14,277 +14,256 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@workspace/ui/components/field";
-import { Input } from "@workspace/ui/components/input";
-import { PhoneInput } from "@workspace/ui/components/phone-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+import { Field, FieldLabel } from "@workspace/ui/components/field";
 
 import { EntityPageHeader } from "@/features/core/data-table";
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 
 type Provider = "wapilot" | "twilio" | "console";
 
-export default function AdminSettingsPage() {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
+// ── General settings ────────────────────────────────────────────────────────
+function GeneralSettingsForm({
+  initial,
+  onSaved,
+}: {
+  initial: { deliveryFeeEgp: number; supportWhatsappNumber: string };
+  onSaved: () => void;
+}) {
   const { t } = useTranslation();
-
-  // ── General settings ──────────────────────────────────────────────────────
-  const getOptions = trpc.admin.settings.get.queryOptions();
-  const { data } = useQuery(getOptions);
-
-  const [deliveryFee, setDeliveryFee] = useState("");
-  const [supportWhatsapp, setSupportWhatsapp] = useState("");
-
-  useEffect(() => {
-    if (data) {
-      setDeliveryFee(String(data.deliveryFeeEgp));
-      setSupportWhatsapp(data.supportWhatsappNumber);
-    }
-  }, [data]);
+  const trpc = useTRPC();
 
   const update = useMutation(
     trpc.admin.settings.update.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: getOptions.queryKey });
+        onSaved();
         toast.success(String(t("admin.settings.saved")));
       },
     }),
   );
 
-  // ── Store links ───────────────────────────────────────────────────────────
-  const storeLinksOptions = trpc.admin.settings.getStoreLinks.queryOptions();
-  const { data: storeLinksData } = useQuery(storeLinksOptions);
+  const form = useAppForm({
+    defaultValues: {
+      deliveryFeeEgp: initial.deliveryFeeEgp as number | null,
+      supportWhatsappNumber: initial.supportWhatsappNumber,
+    },
+    onSubmit: async ({ value }) => {
+      await update.mutateAsync({
+        deliveryFeeEgp: value.deliveryFeeEgp ?? 0,
+        supportWhatsappNumber: value.supportWhatsappNumber,
+      });
+    },
+  });
 
-  const [playStoreUrl, setPlayStoreUrl] = useState("");
-  const [appStoreUrl, setAppStoreUrl] = useState("");
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{String(t("admin.settings.title"))}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <form.AppField name="deliveryFeeEgp">
+            {(field) => (
+              <field.NumberField
+                label={String(t("admin.settings.deliveryFee"))}
+                description={String(t("admin.settings.deliveryFeeHint"))}
+              />
+            )}
+          </form.AppField>
 
-  useEffect(() => {
-    if (storeLinksData) {
-      setPlayStoreUrl(storeLinksData.playStoreUrl ?? "");
-      setAppStoreUrl(storeLinksData.appStoreUrl ?? "");
-    }
-  }, [storeLinksData]);
+          <form.AppField name="supportWhatsappNumber">
+            {(field) => (
+              <field.PhoneField
+                label={String(t("admin.settings.supportWhatsapp"))}
+              />
+            )}
+          </form.AppField>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" disabled={update.isPending}>
+              {String(t("common.save"))}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── App store links ─────────────────────────────────────────────────────────
+function StoreLinksForm({
+  initial,
+  onSaved,
+}: {
+  initial: { playStoreUrl: string; appStoreUrl: string };
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const trpc = useTRPC();
 
   const updateStoreLinks = useMutation(
     trpc.admin.settings.updateStoreLinks.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: storeLinksOptions.queryKey,
-        });
+        onSaved();
         toast.success(String(t("admin.settings.saved")));
       },
     }),
   );
 
-  // ── WhatsApp integration ───────────────────────────────────────────────────
-  const waOptions = trpc.admin.settings.getWhatsapp.queryOptions();
-  const { data: waData } = useQuery(waOptions);
+  const form = useAppForm({
+    defaultValues: {
+      playStoreUrl: initial.playStoreUrl,
+      appStoreUrl: initial.appStoreUrl,
+    },
+    onSubmit: async ({ value }) => {
+      await updateStoreLinks.mutateAsync(value);
+    },
+  });
 
-  const [provider, setProvider] = useState<Provider>("console");
-  const [wapilotInstanceId, setWapilotInstanceId] = useState("");
-  const [wapilotToken, setWapilotToken] = useState("");
-  const [twilioAccountSid, setTwilioAccountSid] = useState("");
-  const [twilioAuthToken, setTwilioAuthToken] = useState("");
-  const [twilioFromNumber, setTwilioFromNumber] = useState("");
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{String(t("admin.settings.storeLinks"))}</CardTitle>
+        <CardDescription>
+          {String(t("admin.settings.storeLinksHint"))}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <form.AppField name="playStoreUrl">
+            {(field) => (
+              <field.StringField
+                label={String(t("admin.settings.playStoreUrl"))}
+                inputType="url"
+                className="text-start"
+                placeholder="https://play.google.com/store/apps/details?id=…"
+              />
+            )}
+          </form.AppField>
 
-  useEffect(() => {
-    if (waData?.provider) {
-      setProvider(waData.provider);
-    }
-    // Credential inputs always start empty ("leave blank to keep current value")
-  }, [waData]);
+          <form.AppField name="appStoreUrl">
+            {(field) => (
+              <field.StringField
+                label={String(t("admin.settings.appStoreUrl"))}
+                inputType="url"
+                className="text-start"
+                placeholder="https://apps.apple.com/app/…"
+              />
+            )}
+          </form.AppField>
+
+          <div className="flex justify-end pt-2">
+            <Button type="submit" disabled={updateStoreLinks.isPending}>
+              {String(t("common.save"))}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── WhatsApp integration ─────────────────────────────────────────────────────
+function WhatsappForm({
+  initialProvider,
+  wapilotConfigured,
+  twilioConfigured,
+  onSaved,
+}: {
+  initialProvider: Provider;
+  wapilotConfigured: boolean;
+  twilioConfigured: boolean;
+  onSaved: () => void;
+}) {
+  const { t } = useTranslation();
+  const trpc = useTRPC();
 
   const updateWhatsapp = useMutation(
     trpc.admin.settings.updateWhatsapp.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({ queryKey: waOptions.queryKey });
+        onSaved();
         toast.success(String(t("admin.settings.whatsappSaved")));
       },
     }),
   );
 
-  function handleWhatsappSave() {
-    updateWhatsapp.mutate({
-      provider,
-      wapilot:
-        provider === "wapilot" && (wapilotInstanceId || wapilotToken)
-          ? {
-              instanceId: wapilotInstanceId,
-              token: wapilotToken,
-            }
-          : undefined,
-      twilio:
-        provider === "twilio" &&
-        (twilioAccountSid || twilioAuthToken || twilioFromNumber)
-          ? {
-              accountSid: twilioAccountSid,
-              authToken: twilioAuthToken,
-              fromNumber: twilioFromNumber,
-            }
-          : undefined,
-    });
-  }
+  const form = useAppForm({
+    defaultValues: {
+      provider: initialProvider,
+      wapilotInstanceId: "",
+      wapilotToken: "",
+      twilioAccountSid: "",
+      twilioAuthToken: "",
+      twilioFromNumber: "",
+    },
+    onSubmit: async ({ value }) => {
+      await updateWhatsapp.mutateAsync({
+        provider: value.provider,
+        wapilot:
+          value.provider === "wapilot" &&
+          (value.wapilotInstanceId || value.wapilotToken)
+            ? {
+                instanceId: value.wapilotInstanceId,
+                token: value.wapilotToken,
+              }
+            : undefined,
+        twilio:
+          value.provider === "twilio" &&
+          (value.twilioAccountSid ||
+            value.twilioAuthToken ||
+            value.twilioFromNumber)
+            ? {
+                accountSid: value.twilioAccountSid,
+                authToken: value.twilioAuthToken,
+                fromNumber: value.twilioFromNumber,
+              }
+            : undefined,
+      });
+    },
+  });
 
-  const wapilotConfigured = waData?.credentials.wapilot.configured ?? false;
-  const twilioConfigured = waData?.credentials.twilio.configured ?? false;
+  const provider = useStore(form.baseStore, (s) => s.values.provider);
+
+  const providerOptions = [
+    { value: "console", label: String(t("admin.settings.providerConsole")) },
+    { value: "wapilot", label: String(t("admin.settings.providerWapilot")) },
+    { value: "twilio", label: String(t("admin.settings.providerTwilio")) },
+  ];
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
-      <EntityPageHeader
-        title={String(t("admin.settings.title"))}
-        lead={String(t("admin.settings.lead"))}
-      />
-
-      {/* ── General settings ─────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{String(t("admin.settings.title"))}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Field>
-            <FieldLabel htmlFor="fee">
-              {String(t("admin.settings.deliveryFee"))}
-            </FieldLabel>
-            <Input
-              id="fee"
-              type="number"
-              dir="ltr"
-              min={0}
-              value={deliveryFee}
-              onChange={(e) => setDeliveryFee(e.target.value)}
-            />
-            <FieldDescription>
-              {String(t("admin.settings.deliveryFeeHint"))}
-            </FieldDescription>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="support-whatsapp">
-              {String(t("admin.settings.supportWhatsapp"))}
-            </FieldLabel>
-            <PhoneInput
-              id="support-whatsapp"
-              value={supportWhatsapp}
-              onChange={(v) => setSupportWhatsapp(v)}
-            />
-          </Field>
-
-          <div className="flex justify-end pt-2">
-            <Button
-              disabled={update.isPending}
-              onClick={() =>
-                update.mutate({
-                  deliveryFeeEgp: Number(deliveryFee) || 0,
-                  supportWhatsappNumber: supportWhatsapp,
-                })
-              }
-            >
-              {String(t("common.save"))}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── App store links ───────────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{String(t("admin.settings.storeLinks"))}</CardTitle>
-          <CardDescription>
-            {String(t("admin.settings.storeLinksHint"))}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Field>
-            <FieldLabel htmlFor="play-store-url">
-              {String(t("admin.settings.playStoreUrl"))}
-            </FieldLabel>
-            <Input
-              id="play-store-url"
-              type="url"
-              dir="ltr"
-              value={playStoreUrl}
-              onChange={(e) => setPlayStoreUrl(e.target.value)}
-              placeholder="https://play.google.com/store/apps/details?id=…"
-            />
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="app-store-url">
-              {String(t("admin.settings.appStoreUrl"))}
-            </FieldLabel>
-            <Input
-              id="app-store-url"
-              type="url"
-              dir="ltr"
-              value={appStoreUrl}
-              onChange={(e) => setAppStoreUrl(e.target.value)}
-              placeholder="https://apps.apple.com/app/…"
-            />
-          </Field>
-
-          <div className="flex justify-end pt-2">
-            <Button
-              disabled={updateStoreLinks.isPending}
-              onClick={() =>
-                updateStoreLinks.mutate({ playStoreUrl, appStoreUrl })
-              }
-            >
-              {String(t("common.save"))}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── WhatsApp integration ──────────────────────────────────────────── */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {String(t("admin.settings.whatsappIntegration"))}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Provider select */}
-          <Field>
-            <FieldLabel htmlFor="wa-provider">
-              {String(t("admin.settings.whatsappProviderLabel"))}
-            </FieldLabel>
-            <FieldDescription>
-              {String(t("admin.settings.whatsappProviderHint"))}
-            </FieldDescription>
-            <Select
-              value={provider}
-              onValueChange={(v) => {
-                if (!v) return;
-                setProvider(v as Provider);
-              }}
-            >
-              <SelectTrigger id="wa-provider" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="console">
-                  {String(t("admin.settings.providerConsole"))}
-                </SelectItem>
-                <SelectItem value="wapilot">
-                  {String(t("admin.settings.providerWapilot"))}
-                </SelectItem>
-                <SelectItem value="twilio">
-                  {String(t("admin.settings.providerTwilio"))}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
+    <Card>
+      <CardHeader>
+        <CardTitle>{String(t("admin.settings.whatsappIntegration"))}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+          className="space-y-4"
+        >
+          <form.AppField name="provider">
+            {(field) => (
+              <field.SelectField
+                label={String(t("admin.settings.whatsappProviderLabel"))}
+                description={String(t("admin.settings.whatsappProviderHint"))}
+                options={providerOptions}
+              />
+            )}
+          </form.AppField>
 
           {/* Credential status badges */}
           <Field>
@@ -314,90 +293,128 @@ export default function AdminSettingsPage() {
           {/* Wapilot credential inputs */}
           {provider === "wapilot" && (
             <div className="space-y-4">
-              <FieldDescription>
-                {String(t("admin.settings.credentialUpdateHint"))}
-              </FieldDescription>
-              <Field>
-                <FieldLabel htmlFor="wapilot-id">
-                  {String(t("admin.settings.wapilotInstanceId"))}
-                </FieldLabel>
-                <Input
-                  id="wapilot-id"
-                  dir="ltr"
-                  value={wapilotInstanceId}
-                  onChange={(e) => setWapilotInstanceId(e.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="wapilot-token">
-                  {String(t("admin.settings.wapilotToken"))}
-                </FieldLabel>
-                <Input
-                  id="wapilot-token"
-                  dir="ltr"
-                  type="password"
-                  value={wapilotToken}
-                  onChange={(e) => setWapilotToken(e.target.value)}
-                />
-              </Field>
+              <form.AppField name="wapilotInstanceId">
+                {(field) => (
+                  <field.StringField
+                    label={String(t("admin.settings.wapilotInstanceId"))}
+                    description={String(t("admin.settings.credentialUpdateHint"))}
+                    className="text-start"
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="wapilotToken">
+                {(field) => (
+                  <field.PasswordField
+                    label={String(t("admin.settings.wapilotToken"))}
+                  />
+                )}
+              </form.AppField>
             </div>
           )}
 
           {/* Twilio credential inputs */}
           {provider === "twilio" && (
             <div className="space-y-4">
-              <FieldDescription>
-                {String(t("admin.settings.credentialUpdateHint"))}
-              </FieldDescription>
-              <Field>
-                <FieldLabel htmlFor="twilio-sid">
-                  {String(t("admin.settings.twilioAccountSid"))}
-                </FieldLabel>
-                <Input
-                  id="twilio-sid"
-                  dir="ltr"
-                  placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                  value={twilioAccountSid}
-                  onChange={(e) => setTwilioAccountSid(e.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="twilio-auth">
-                  {String(t("admin.settings.twilioAuthToken"))}
-                </FieldLabel>
-                <Input
-                  id="twilio-auth"
-                  dir="ltr"
-                  type="password"
-                  value={twilioAuthToken}
-                  onChange={(e) => setTwilioAuthToken(e.target.value)}
-                />
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="twilio-from">
-                  {String(t("admin.settings.twilioFromNumber"))}
-                </FieldLabel>
-                <Input
-                  id="twilio-from"
-                  dir="ltr"
-                  placeholder="+14155238886"
-                  value={twilioFromNumber}
-                  onChange={(e) => setTwilioFromNumber(e.target.value)}
-                />
-              </Field>
+              <form.AppField name="twilioAccountSid">
+                {(field) => (
+                  <field.StringField
+                    label={String(t("admin.settings.twilioAccountSid"))}
+                    description={String(t("admin.settings.credentialUpdateHint"))}
+                    className="text-start"
+                    placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="twilioAuthToken">
+                {(field) => (
+                  <field.PasswordField
+                    label={String(t("admin.settings.twilioAuthToken"))}
+                  />
+                )}
+              </form.AppField>
+              <form.AppField name="twilioFromNumber">
+                {(field) => (
+                  <field.StringField
+                    label={String(t("admin.settings.twilioFromNumber"))}
+                    className="text-start"
+                    placeholder="+14155238886"
+                  />
+                )}
+              </form.AppField>
             </div>
           )}
 
           <div className="flex justify-end pt-2">
-            <Button
-              disabled={updateWhatsapp.isPending}
-              onClick={handleWhatsappSave}
-            >
+            <Button type="submit" disabled={updateWhatsapp.isPending}>
               {String(t("common.save"))}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function AdminSettingsPage() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
+
+  const getOptions = trpc.admin.settings.get.queryOptions();
+  const { data } = useQuery(getOptions);
+
+  const storeLinksOptions = trpc.admin.settings.getStoreLinks.queryOptions();
+  const { data: storeLinksData } = useQuery(storeLinksOptions);
+
+  const waOptions = trpc.admin.settings.getWhatsapp.queryOptions();
+  const { data: waData } = useQuery(waOptions);
+
+  return (
+    <div className="mx-auto w-full max-w-3xl space-y-6">
+      <EntityPageHeader
+        title={String(t("admin.settings.title"))}
+        lead={String(t("admin.settings.lead"))}
+      />
+
+      {data && (
+        <GeneralSettingsForm
+          key={`${data.deliveryFeeEgp}-${data.supportWhatsappNumber}`}
+          initial={{
+            deliveryFeeEgp: data.deliveryFeeEgp,
+            supportWhatsappNumber: data.supportWhatsappNumber,
+          }}
+          onSaved={() =>
+            void queryClient.invalidateQueries({ queryKey: getOptions.queryKey })
+          }
+        />
+      )}
+
+      {storeLinksData && (
+        <StoreLinksForm
+          key={`${storeLinksData.playStoreUrl}-${storeLinksData.appStoreUrl}`}
+          initial={{
+            playStoreUrl: storeLinksData.playStoreUrl ?? "",
+            appStoreUrl: storeLinksData.appStoreUrl ?? "",
+          }}
+          onSaved={() =>
+            void queryClient.invalidateQueries({
+              queryKey: storeLinksOptions.queryKey,
+            })
+          }
+        />
+      )}
+
+      {waData && (
+        <WhatsappForm
+          key={waData.provider ?? "console"}
+          initialProvider={waData.provider ?? "console"}
+          wapilotConfigured={waData.credentials.wapilot.configured ?? false}
+          twilioConfigured={waData.credentials.twilio.configured ?? false}
+          onSaved={() =>
+            void queryClient.invalidateQueries({ queryKey: waOptions.queryKey })
+          }
+        />
+      )}
     </div>
   );
 }

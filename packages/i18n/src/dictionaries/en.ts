@@ -9,11 +9,17 @@ const en = {
     appName: "ba2olak",
     language: "Language",
     loading: "Loading…",
+    error: "Something went wrong.",
     retry: "Retry",
     cancel: "Cancel",
     confirm: "Confirm",
     save: "Save",
     scrollToTop: "Scroll to top",
+    close: "Close",
+    menu: "Menu",
+    more: "More",
+    showPassword: "Show password",
+    hidePassword: "Hide password",
   },
   home: {
     tagline: "You want it. We buy it. We deliver it.",
@@ -100,6 +106,12 @@ const en = {
       customer: "Customer",
       captain: "Captain",
     },
+    deleteAccount: "Delete account",
+    deleteAccountConfirmTitle: "Delete your account?",
+    deleteAccountConfirmMessage:
+      "Your personal data will be anonymized. Order history is kept for accounting. This cannot be undone.",
+    deleteAccountConfirm: "Yes, delete my account",
+    deleteAccountSuccess: "Your account has been deleted.",
   },
   validation: {
     phoneInvalid: "Enter a valid Egyptian mobile number.",
@@ -254,11 +266,13 @@ const en = {
     signedInAs: "Signed in: {phone}",
   },
   shop: {
+    mobileNavLabel: "Shop navigation",
     tabHome: "Home",
     tabSearch: "Search",
     tabCart: "Cart",
     tabOrders: "Orders",
     tabAccount: "Account",
+    tabOrderNow: "Order Now",
     categories: "Categories",
     searchPlaceholder: "Search for anything… sugar, rice, شامبو",
     noResults: "Nothing found.",
@@ -268,6 +282,7 @@ const en = {
     qty: "Qty",
     marketPriceNote: "You pay market price for items + delivery fee. Cash on delivery.",
     cartEmpty: "Your cart is empty.",
+    cartEmptyHint: "Add items from the shop to get started.",
     cartTitle: "Your cart",
     deliveryFee: "Delivery fee",
     itemsAtMarketPrice: "Items: at market price",
@@ -278,11 +293,14 @@ const en = {
     chooseAddress: "Choose an address",
     placeOrder: "Place order — cash on delivery",
     placing: "Placing order…",
+    orderPlaced: "Order placed!",
+    orderPlacedMessage: "We'll WhatsApp you as your order moves.",
     orderPlacedTitle: "Order #{number} placed! 🎉",
     orderPlacedBody: "We'll WhatsApp you as it moves. Track it live below.",
     trackOrder: "Track my order",
     ordersTitle: "My orders",
-    noOrders: "No orders yet — your first one is a tap away.",
+    noOrders: "No orders yet.",
+    noOrdersHint: "Your first order is a tap away.",
     guestAccountTitle: "Create an account",
     guestAccountSubtitle:
       "Sign in to save addresses, track orders, and reorder in a tap.",
@@ -352,6 +370,19 @@ const en = {
     phoneLinked: "Number verified",
     security: "Security",
     securityHint: "Passkeys for faster, safer sign-in",
+    devices: {
+      title: "Trusted devices",
+      hint: "Devices that can sign in without a code, plus your active sessions.",
+      defaultLabel: "This device",
+      lastUsed: "Last used {date}",
+      added: "Added {date}",
+      none: "No trusted devices yet.",
+      revoke: "Revoke",
+      revokeConfirm: "This device will need a fresh code to sign in again.",
+      signOutEverywhere: "Sign out everywhere",
+      signOutEverywhereConfirm:
+        "You'll be signed out on every device, including this one.",
+    },
   },
   address: {
     title: "My addresses",
@@ -414,6 +445,8 @@ const en = {
     tabOrders: "Orders",
     tabHistory: "History",
     tabAccount: "Account",
+    orderDelivered: "Order Delivered!",
+    orderDeliveredMessage: "Great job! The order has been delivered successfully.",
   },
   landing: {
     nav: {
@@ -466,6 +499,7 @@ const en = {
     },
   },
   admin: {
+    mobileNavLabel: "Admin navigation",
     title: "Dashboard",
     nav: {
       dashboard: "Dashboard",
@@ -478,6 +512,11 @@ const en = {
       geo: "Coverage areas",
       settings: "Settings",
       users: "Customers",
+      group: {
+        operations: "Operations",
+        catalog: "Catalog",
+        settings: "Settings",
+      },
     },
     kpi: {
       customers: "Customers",
@@ -676,6 +715,40 @@ const en = {
       approved: "Approved.",
       merged: "Merged.",
     },
+  },
+  privacy: {
+    title: "Privacy policy",
+    lastUpdated: "Last updated: June 2026.",
+    s1Title: "What we collect",
+    s1Body:
+      "Your phone number and name (for account creation and WhatsApp verification), the delivery addresses you add, and your order history. We hold no payment data — payment is cash on delivery.",
+    s2Title: "How we use it",
+    s2Body:
+      "Fulfilling and delivering your orders, contacting you on WhatsApp about your orders, and improving the service. Your data is never sold to third parties.",
+    s3Title: "Who sees it",
+    s3Body:
+      "The rider assigned to your order sees only that order's delivery address and contact number; our operations team manages orders.",
+    s4Title: "Account deletion",
+    s4Body:
+      "Delete your account from the Account screen in the app. Personal data is anonymized; order records are retained for accounting.",
+    s5Title: "Contact",
+    s5Body: "For privacy questions, reach us on WhatsApp from inside the app.",
+  },
+  terms: {
+    title: "Terms of service",
+    lastUpdated: "Last updated: June 2026.",
+    s1Title: "The service",
+    s1Body:
+      "ba2olak is a delivery service: you order items in the app, a rider buys them from the market at market price, and you pay the items total plus the delivery fee in cash on delivery.",
+    s2Title: "Pricing",
+    s2Body:
+      "Item prices are the actual market purchase prices, shown to you live in the app while shopping. The delivery fee is flat and shown before you confirm the order.",
+    s3Title: "Cancellation",
+    s3Body:
+      "You can cancel free of charge before shopping starts. After that, cancellation is handled by customer support only.",
+    s4Title: "Fair use",
+    s4Body:
+      "Abuse (fake orders, offensive item names, repeated refusal to receive) may lead to account suspension.",
   },
 } as const satisfies LanguageMessages;
 

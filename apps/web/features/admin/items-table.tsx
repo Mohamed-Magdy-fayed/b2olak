@@ -23,15 +23,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
 import {
   Tooltip,
   TooltipContent,
@@ -61,13 +52,13 @@ import type {
   ImportReviewRow,
   ParsedImportFile,
 } from "@/features/core/import-review";
-import { ImageUpload } from "@/features/admin/image-upload";
 import { useTRPC } from "@/lib/trpc/client";
 
 import {
   buildItemColumns,
-  UnitsPicker,
+  ItemFormBody,
   type ItemFormState,
+  type ItemFormValues,
   type ItemRow,
   type UnitOption,
 } from "./items-columns";
@@ -104,7 +95,7 @@ function AddItemDialog({
   const { t } = useTranslation();
   const trpc = useTRPC();
   const [open, setOpen] = useState(false);
-  const emptyForm = (): Omit<ItemFormState, "id"> => ({
+  const emptyForm = (): ItemFormValues => ({
     categoryId: categories[0]?.id ?? "",
     nameEn: "",
     nameAr: "",
@@ -112,113 +103,36 @@ function AddItemDialog({
     defaultUnitId: units[0]?.id ?? "",
     imageUrl: null,
   });
-  const [form, setForm] = useState<Omit<ItemFormState, "id">>(emptyForm);
 
   const create = useMutation(
     trpc.admin.catalog.items.create.mutationOptions({
       onSuccess: () => {
         onCreated();
         setOpen(false);
-        setForm(emptyForm());
       },
     }),
   );
 
   return (
     <>
-      <Button
-        size="sm"
-        type="button"
-        onClick={() => {
-          setForm(emptyForm());
-          setOpen(true);
-        }}
-      >
+      <Button size="sm" type="button" onClick={() => setOpen(true)}>
         {String(t("admin.common.add"))}
       </Button>
 
       <Dialog open={open} onOpenChange={(o) => !o && setOpen(false)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{String(t("admin.items.addTitle"))}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.items.nameAr"))}</Label>
-              <Input
-                dir="rtl"
-                value={form.nameAr}
-                onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.items.nameEn"))}</Label>
-              <Input
-                dir="ltr"
-                value={form.nameEn}
-                onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.items.category"))}</Label>
-              <Select
-                value={form.categoryId}
-                onValueChange={(v) => {
-                  if (v) setForm({ ...form, categoryId: v });
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {locale === "ar" ? c.nameAr : c.nameEn}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <UnitsPicker
+          {open && (
+            <ItemFormBody
+              title={String(t("admin.items.addTitle"))}
+              initial={emptyForm()}
+              categories={categories}
               units={units}
-              unitIds={form.unitIds}
-              defaultUnitId={form.defaultUnitId}
-              onChange={(unitIds, defaultUnitId) =>
-                setForm({ ...form, unitIds, defaultUnitId })
-              }
               locale={locale}
-              t={t}
+              onClose={() => setOpen(false)}
+              onSubmit={(values) => create.mutate(values)}
+              isSubmitting={create.isPending}
             />
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.common.image"))}</Label>
-              <ImageUpload
-                value={form.imageUrl}
-                folder="items"
-                onChange={(url) => setForm({ ...form, imageUrl: url })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              {String(t("common.cancel"))}
-            </Button>
-            <Button
-              onClick={() => {
-                if (!form.categoryId || form.unitIds.length === 0) return;
-                create.mutate({
-                  categoryId: form.categoryId,
-                  nameEn: form.nameEn,
-                  nameAr: form.nameAr,
-                  unitIds: form.unitIds,
-                  defaultUnitId: form.defaultUnitId,
-                  imageUrl: form.imageUrl,
-                });
-              }}
-              disabled={create.isPending || form.unitIds.length === 0}
-            >
-              {String(t("common.save"))}
-            </Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -377,19 +291,10 @@ export function ItemsTable() {
         unitOptions,
         editForm,
         setEditForm,
-        onFormSubmit: () => {
-          if (!editForm?.id || editForm.unitIds.length === 0) return;
-          update.mutate({
-            id: editForm.id,
-            categoryId: editForm.categoryId,
-            nameEn: editForm.nameEn,
-            nameAr: editForm.nameAr,
-            unitIds: editForm.unitIds,
-            defaultUnitId: editForm.defaultUnitId,
-            imageUrl: editForm.imageUrl,
-          });
+        onFormSubmit: (values: ItemFormValues) => {
+          if (!editForm?.id || values.unitIds.length === 0) return;
+          update.mutate({ id: editForm.id, ...values });
         },
-        onFormChange: setEditForm,
         isSubmitting: update.isPending,
         onDelete: (id) => remove.mutate({ id }),
       }),

@@ -257,7 +257,7 @@ Verification first (it makes everything else safe to automate), then backend cor
   despite `CLAUDE.md` rules referencing them — added to both `:root` and `.dark`.
   Parity table → `docs/13-token-parity.md`.
 
-### `[ ]` 8. UX quality pass
+### `[x]` 8. UX quality pass
 - **Goal:** make the app *feel* good — the thing that brings users back.
 - **Why:** retention is the product goal; polish is a feature.
 - **Scope:** audit loading/empty/error/success states, optimistic updates, haptics
@@ -265,13 +265,18 @@ Verification first (it makes everything else safe to automate), then backend cor
   experience. Produce a prioritized punch-list, then fix the top items.
 - **Delegation:** `ui-auditor` + `Explore` for the inventory → prioritized list → fix top
   N inline → verify with Playwright/preview screenshots.
-- **Decisions at kickoff:** customer app vs. driver app vs. admin first; how many to fix
-  this round.
+- **Decisions at kickoff:** all 3 surfaces in parallel; all P1+P2 findings fixed.
 - **Done when:** punch-list exists; top-priority items fixed and verified.
+- **Status (2026-06-21) — done; all surfaces, all P1+P2 fixed:**
+  - Audited all 3 surfaces in parallel (customer mobile, driver mobile, admin web).
+  - **Customer mobile (20 findings, all P1+P2 fixed):** loading states on orders/category/detail/search/home; error states with retry on all queries; onError for cancel/remove/updateProfile; success alert on order placement; haptics on cart +/− and item-row; hitSlop fixes on cart Remove and address Edit/Delete.
+  - **Driver mobile (12 findings, all P1+P2 fixed):** loading states on DriverHome/OrderDetail/History; delivery confirmation alert + haptic; RTL-aware chevron on order rows; haptics on markDelivered + updateLine; error + retry on history; onError for signOut; optimistic status updates for startShopping/doneShopping/startDelivery; price input minWidth.
+  - **Admin web (8 findings, all P1+P2 fixed):** raw `<h1>` → `<H1>` typography; success toasts on all mutations in categories/units/geo-manager (16 mutations); bulk-delete onError toasts; `text-emerald-600` → `text-success`; KPI skeleton cards; raw checkbox labels → shadcn `<Checkbox>` + `<Label>`.
+  - Gate: typecheck ✅ lint ✅ test 31/31 ✅ build ✅.
 
 ## C. Launch & compliance
 
-### `[ ]` 9. Store submission readiness (Google Play + App Store)
+### `[x]` 9. Store submission readiness (Google Play + App Store)
 - **Goal:** make sure Claude knows — and the repo satisfies — what's required to ship to
   the stores.
 - **Why:** missing a Data Safety form or account-deletion flow blocks release late.
@@ -286,6 +291,7 @@ Verification first (it makes everything else safe to automate), then backend cor
 - **Decisions at kickoff:** Play first or both; who owns store-console steps (manual, not
   Claude).
 - **Done when:** readiness doc with a green/red checklist; code gaps logged as follow-ups.
+- **Status (2026-06-21) — done; Play first + both (decided at kickoff):** audited app config, permissions, account deletion, privacy policy, analytics, and build config against current store policies. Created `docs/14-store-readiness.md` with green/red checklist. Two critical blockers found (no in-app account deletion + no `deleteAccount` API endpoint — required by both stores). Additional gaps: AAB vs APK build type, splash screen config, in-app privacy/terms links. All manual console steps (Data Safety form, App Privacy labels, store listings) documented.
 
 ---
 

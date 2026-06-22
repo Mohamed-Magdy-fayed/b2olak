@@ -4,8 +4,16 @@ import type { ColumnDef, Row } from "@tanstack/react-table";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { Dispatch, SetStateAction } from "react";
 
+import { MoreHorizontalIcon } from "lucide-react";
+
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 import type { AppRouter } from "@workspace/api/root";
 import { useTranslation } from "@workspace/i18n/react";
 import {
@@ -57,36 +65,41 @@ function DriverRowActions({
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center gap-1">
-      {row.status === "pending" ? (
-        <Button
-          size="sm"
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "approve" })}
-        >
-          {String(t("admin.drivers.approve"))}
-        </Button>
-      ) : null}
-      {row.status !== "suspended" ? (
-        <Button
-          size="sm"
-          variant="destructive"
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "suspend" })}
-        >
-          {String(t("admin.drivers.suspend"))}
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "reactivate" })}
-        >
-          {String(t("admin.drivers.reactivate"))}
-        </Button>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon" className="size-8">
+            <MoreHorizontalIcon className="size-4" />
+            <span className="sr-only">
+              {String(t("admin.common.actions"))}
+            </span>
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        {row.status === "pending" ? (
+          <DropdownMenuItem
+            onClick={() => setRowAction({ row, variant: "approve" })}
+          >
+            {String(t("admin.drivers.approve"))}
+          </DropdownMenuItem>
+        ) : null}
+        {row.status !== "suspended" ? (
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => setRowAction({ row, variant: "suspend" })}
+          >
+            {String(t("admin.drivers.suspend"))}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            onClick={() => setRowAction({ row, variant: "reactivate" })}
+          >
+            {String(t("admin.drivers.reactivate"))}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -260,7 +273,7 @@ export function buildDriverColumns(opts: {
     },
     createEntityActionsColumn<DriverRow>({
       t,
-      size: 160,
+      size: 56,
       cell: ({ row }: { row: Row<DriverRow> }) => (
         <DriverRowActions row={row.original} setRowAction={setRowAction} />
       ),

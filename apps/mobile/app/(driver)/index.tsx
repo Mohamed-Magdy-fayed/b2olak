@@ -1,4 +1,5 @@
-import { FlatList, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,17 +16,24 @@ export default function DriverHome() {
   const tabBarHeight = useTabBarHeight();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   const { data: me } = useQuery(trpc.auth.me.queryOptions());
   const approved = me?.driverProfile?.status === "approved";
 
   const ordersOptions = trpc.driver.myOrders.queryOptions();
-  const { data } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     ...ordersOptions,
     enabled: approved,
     refetchInterval: 10_000,
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   const setAvailability = useMutation(
     trpc.driver.setAvailability.mutationOptions({
@@ -62,6 +70,14 @@ export default function DriverHome() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor="#C9A227"
+            colors={["#C9A227"]}
+          />
+        }
       >
         <ScreenHeader
           title={t("mobile.welcomeTitle")}
@@ -95,8 +111,12 @@ export default function DriverHome() {
           {t("driver.activeOrders")}
         </Text>
 
+        {isLoading ? (
+          <ActivityIndicator className="mt-8" />
+        ) : null}
+
         <FlatList
-          data={data?.active ?? []}
+          data={isLoading ? [] : (data?.active ?? [])}
           keyExtractor={(o) => o.id}
           scrollEnabled={false}
           renderItem={({ item: order }) => (
@@ -116,17 +136,19 @@ export default function DriverHome() {
                   {t("driver.orderFor", { area: order.area })} •{" "}
                   {t("driver.itemsCount", { count: String(order.items.length) })}
                 </Text>
-                <Ionicons name="chevron-forward" size={16} color="#9B968C" />
+                <Ionicons name={locale === "ar" ? "chevron-back" : "chevron-forward"} size={16} color="#9B968C" />
               </View>
             </Pressable>
           )}
           ListEmptyComponent={
-            <View className="items-center gap-3 py-16">
-              <Ionicons name="bag-outline" size={40} color="#9B968C" />
-              <Text className="text-center text-muted-foreground">
-                {t("driver.noActive")}
-              </Text>
-            </View>
+            !isLoading ? (
+              <View className="items-center gap-3 py-16">
+                <Ionicons name="bag-outline" size={40} color="#9B968C" />
+                <Text className="text-center text-muted-foreground">
+                  {t("driver.noActive")}
+                </Text>
+              </View>
+            ) : null
           }
         />
       </ScrollView>

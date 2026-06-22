@@ -1,4 +1,4 @@
-import { Geist_Mono, Inter } from "next/font/google";
+import { El_Messiri, Geist_Mono, Tajawal } from "next/font/google";
 import { Toaster } from "sonner";
 
 import "@workspace/ui/globals.css";
@@ -11,7 +11,19 @@ import { getLocale } from "@/lib/i18n";
 import { TRPCReactProvider } from "@/lib/trpc/client";
 import { dirFor } from "@workspace/i18n/dictionaries";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const tajawal = Tajawal({
+  subsets: ["arabic", "latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-sans",
+  display: "swap",
+});
+
+const elMessiri = El_Messiri({
+  subsets: ["arabic"],
+  weight: ["700"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
@@ -21,6 +33,10 @@ const fontMono = Geist_Mono({
 export const metadata = {
   title: "ba2olak — بقولك",
   description: "You want it. We buy it. We deliver it.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default async function RootLayout({
@@ -38,8 +54,9 @@ export default async function RootLayout({
       className={cn(
         "antialiased",
         fontMono.variable,
+        tajawal.variable,
+        elMessiri.variable,
         "font-sans",
-        inter.variable,
       )}
     >
       <body>

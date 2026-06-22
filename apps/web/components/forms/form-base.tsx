@@ -22,6 +22,8 @@ export type FormFieldProps = {
   description?: string;
   autoFocus?: boolean;
   disabled?: boolean;
+  /** Render the label for screen readers only (visually hidden). */
+  srOnlyLabel?: boolean;
 };
 
 type FormBaseProps = FormFieldProps & {
@@ -35,6 +37,7 @@ export function FormBase({
   description,
   controlFirst,
   disabled,
+  srOnlyLabel,
 }: FormBaseProps) {
   const field = useFieldContext();
   const { t, locale } = useTranslation();
@@ -52,7 +55,9 @@ export function FormBase({
 
   const labelElement = (
     <>
-      <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
+      <FieldLabel htmlFor={field.name} className={srOnlyLabel ? "sr-only" : undefined}>
+        {label}
+      </FieldLabel>
       {description && <FieldDescription>{description}</FieldDescription>}
     </>
   );

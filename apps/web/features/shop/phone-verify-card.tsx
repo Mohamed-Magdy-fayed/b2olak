@@ -6,12 +6,12 @@ import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
+import { egyptianPhoneSchema, otpCodeSchema } from "@workspace/validators/auth";
 
 const RESEND_SECONDS = 60;
 
@@ -30,8 +30,6 @@ export function PhoneVerifyCard() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [resendCountdown, setResendCountdown] = useState(0);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -81,6 +79,19 @@ export function PhoneVerifyCard() {
     }),
   );
 
+  const form = useAppForm({
+    defaultValues: { phone: "", code: "" },
+    onSubmit: ({ value }) => {
+      confirm.mutate({ phone: value.phone, code: value.code });
+    },
+  });
+
+  async function sendCode() {
+    await form.validateField("phone", "submit");
+    if (!form.getFieldMeta("phone")?.isValid) return;
+    request.mutate({ phone: form.getFieldValue("phone") });
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -89,60 +100,77 @@ export function PhoneVerifyCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         {step === "phone" ? (
-          <>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="verify-phone">{t("mobile.phoneLabel")}</Label>
-              <Input
-                id="verify-phone"
-                type="tel"
-                dir="ltr"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder={t("mobile.phonePlaceholder")}
-              />
-            </div>
-            <Button
-              onClick={() => request.mutate({ phone })}
-              disabled={request.isPending || !phone.trim()}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void sendCode();
+            }}
+            className="flex flex-col gap-4"
+          >
+            <form.AppField
+              name="phone"
+              validators={{
+                onSubmit: ({ value }) =>
+                  egyptianPhoneSchema.safeParse(value).success
+                    ? undefined
+                    : "validation.phoneInvalid",
+              }}
             >
+              {(field) => (
+                <field.PhoneField
+                  label={t("mobile.phoneLabel")}
+                  placeholder={t("mobile.phonePlaceholder")}
+                />
+              )}
+            </form.AppField>
+            <Button type="submit" disabled={request.isPending}>
               {request.isPending ? t("mobile.sending") : t("account.linkPhoneCta")}
             </Button>
-          </>
+          </form>
         ) : (
-          <>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void form.handleSubmit();
+            }}
+            className="flex flex-col gap-4"
+          >
             <p className="text-sm text-muted-foreground">
-              {t("mobile.codeSentTo", { phone })}
+              {t("mobile.codeSentTo", { phone: form.getFieldValue("phone") })}
             </p>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="verify-code">{t("mobile.codeLabel")}</Label>
-              <Input
-                id="verify-code"
-                type="text"
-                dir="ltr"
-                inputMode="numeric"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-              />
-            </div>
-            <Button
-              onClick={() => confirm.mutate({ phone, code })}
-              disabled={confirm.isPending || code.length !== 6}
+            <form.AppField
+              name="code"
+              validators={{
+                onSubmit: ({ value }) =>
+                  otpCodeSchema.safeParse(value).success
+                    ? undefined
+                    : "validation.otpInvalid",
+              }}
             >
+              {(field) => (
+                <field.StringField
+                  label={t("mobile.codeLabel")}
+                  inputMode="numeric"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                  dir="ltr"
+                />
+              )}
+            </form.AppField>
+            <Button type="submit" disabled={confirm.isPending}>
               {confirm.isPending ? t("mobile.verifying") : t("mobile.verify")}
             </Button>
             <Button
+              type="button"
               variant="ghost"
-              onClick={() => {
-                request.mutate({ phone });
-              }}
+              onClick={() => void sendCode()}
               disabled={resendCountdown > 0 || request.isPending}
             >
               {resendCountdown > 0
                 ? t("mobile.resendIn", { seconds: String(resendCountdown) })
                 : t("mobile.resend")}
             </Button>
-          </>
+          </form>
         )}
       </CardContent>
     </Card>

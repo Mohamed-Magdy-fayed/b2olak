@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 import { cartLineFromItem, type CartUnit, useCart } from "@/lib/cart-store";
 import { useTranslation } from "@/lib/i18n";
@@ -33,7 +34,10 @@ function CompactAddButton({ item }: { item: Item }) {
       <View className="mt-2 flex-row items-center justify-center gap-2 rounded-xl bg-elevated px-2 py-1">
         <Pressable
           className="size-7 items-center justify-center rounded-full bg-card active:opacity-70"
-          onPress={() => setQty(item.id, line.qty - 1)}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setQty(item.id, line.qty - 1);
+          }}
         >
           <Ionicons name="remove" size={14} color="#9B968C" />
         </Pressable>
@@ -42,7 +46,10 @@ function CompactAddButton({ item }: { item: Item }) {
         </Text>
         <Pressable
           className="size-7 items-center justify-center rounded-full bg-primary active:opacity-70"
-          onPress={() => setQty(item.id, line.qty + 1)}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setQty(item.id, line.qty + 1);
+          }}
         >
           <Ionicons name="add" size={14} color="#0E0E10" />
         </Pressable>
@@ -54,7 +61,10 @@ function CompactAddButton({ item }: { item: Item }) {
     <Pressable
       className={`mt-2 rounded-xl px-3 py-2 active:opacity-70 ${disabled ? "bg-elevated" : "bg-primary"}`}
       disabled={disabled}
-      onPress={() => add(cartLineFromItem(item))}
+      onPress={() => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        add(cartLineFromItem(item));
+      }}
     >
       <Text className={`text-center text-xs font-semibold ${disabled ? "text-muted-foreground" : "text-primary-foreground"}`}>
         {t("shop.addToCart")}

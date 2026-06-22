@@ -5,6 +5,7 @@ import * as crypto from "node:crypto";
 import { createOtp, verifyOtp } from "@workspace/auth/otp";
 import {
   createSession,
+  deleteAllSessionsForUser,
   deleteSession,
   type SessionUser,
   updateSessionUser,
@@ -20,6 +21,7 @@ import {
 } from "@workspace/auth/webauthn";
 import { UserDevicesTable } from "@workspace/db/schemas/auth/user-devices";
 import { UserPasskeysTable } from "@workspace/db/schemas/auth/user-passkeys";
+import { UserTokensTable } from "@workspace/db/schemas/auth/user-tokens";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
 import { inngest } from "@workspace/integrations/inngest/client";
 import { getWhatsAppConfig } from "@workspace/integrations/whatsapp/config";
@@ -578,6 +580,18 @@ export const authRouter = createTRPCRouter({
     }),
 
   /**
+   * List the calling user's trusted devices for the auth manager. The secret
+   * hash is never exposed — only display metadata.
+   */
+  listDevices: protectedProcedure.query(async ({ ctx }) => {
+    return ctx.db.query.UserDevicesTable.findMany({
+      where: eq(UserDevicesTable.userId, ctx.session.user.id),
+      columns: { deviceId: true, label: true, createdAt: true, lastUsedAt: true },
+      orderBy: (t, { desc }) => [desc(t.lastUsedAt), desc(t.createdAt)],
+    });
+  }),
+
+  /**
    * Revoke a trusted device. Only the owning user can revoke their own devices.
    */
   revokeDevice: protectedProcedure
@@ -594,4 +608,59 @@ export const authRouter = createTRPCRouter({
 
       return { ok: true as const };
     }),
+
+  /**
+   * Sign out of every session for the calling user (this device included).
+   * Trusted devices and passkeys are kept — only live sessions are revoked.
+   */
+  signOutEverywhere: protectedProcedure.mutation(async ({ ctx }) => {
+    await deleteAllSessionsForUser(ctx.session.user.id);
+    return { ok: true as const };
+  }),
+
+  /**
+   * Permanently anonymize the calling user's account.
+   * - PII (name, phone, email, image, push token) is cleared.
+   * - All sessions, OTP tokens, trusted devices, and passkeys are revoked.
+   * - Order rows are retained for accounting (per privacy policy).
+   * Required by Google Play and App Store for apps with account creation.
+   */
+  deleteAccount: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    await deleteAllSessionsForUser(userId);
+
+    await ctx.db
+      .delete(UserDevicesTable)
+      .where(eq(UserDevicesTable.userId, userId));
+
+    await ctx.db
+      .update(UserPasskeysTable)
+      .set({ deletedAt: new Date() })
+      .where(
+        and(
+          eq(UserPasskeysTable.userId, userId),
+          isNull(UserPasskeysTable.deletedAt),
+        ),
+      );
+
+    await ctx.db
+      .delete(UserTokensTable)
+      .where(eq(UserTokensTable.userId, userId));
+
+    await ctx.db
+      .update(UsersTable)
+      .set({
+        name: null,
+        phone: null,
+        email: null,
+        imageUrl: null,
+        pushToken: null,
+        deletedAt: new Date(),
+        updatedBy: userId,
+      })
+      .where(eq(UsersTable.id, userId));
+
+    return { ok: true as const };
+  }),
 });

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -10,6 +10,10 @@ import { useTranslation } from "@workspace/i18n/react";
 import { useTRPC } from "@/lib/trpc/client";
 import { addressLabel, addressSummary } from "@/features/shop/helpers";
 import { AddressForm } from "@/features/shop/address-form";
+import {
+  StickyActionBar,
+  stickyActionBarSpacerClassName,
+} from "@/components/sticky-action-bar";
 
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -61,7 +65,7 @@ export function AddressesClient() {
   );
 
   return (
-    <div className="mx-auto max-w-xl px-4 py-8">
+    <div className={`mx-auto max-w-xl px-4 pt-8 ${stickyActionBarSpacerClassName}`}>
       <div className="mb-6 flex items-center gap-3">
         <Link
           href="/account"
@@ -85,7 +89,12 @@ export function AddressesClient() {
           ))}
         </div>
       ) : (addresses ?? []).length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">{t("address.none")}</p>
+        <div className="flex flex-col items-center gap-4 py-16 text-center">
+          <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+            <MapPin className="size-7 text-primary" aria-hidden />
+          </div>
+          <p className="text-sm text-muted-foreground">{t("address.none")}</p>
+        </div>
       ) : (
         <div className="flex flex-col gap-3">
           {(addresses ?? []).map((address) => (
@@ -134,9 +143,11 @@ export function AddressesClient() {
         </div>
       )}
 
-      <Button className="mt-4 w-full" onClick={() => setAddOpen(true)}>
-        + {t("address.add")}
-      </Button>
+      <StickyActionBar>
+        <Button className="w-full" onClick={() => setAddOpen(true)}>
+          + {t("address.add")}
+        </Button>
+      </StickyActionBar>
 
       {/* Add dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>

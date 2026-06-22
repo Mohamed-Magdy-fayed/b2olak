@@ -6,11 +6,13 @@ const nextConfig: NextConfig = {
     "@workspace/api",
     "@workspace/auth",
     "@workspace/db",
+    "@workspace/forms",
     "@workspace/i18n",
     "@workspace/integrations",
     "@workspace/theme",
     "@workspace/validators",
   ],
+  images:{remotePatterns: [{hostname: "images.unsplash.com"}]}
 };
 
 export default nextConfig;

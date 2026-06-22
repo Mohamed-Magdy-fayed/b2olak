@@ -1,8 +1,16 @@
-import { Alert, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
@@ -26,7 +34,7 @@ export default function OrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
-  const { data: order } = useQuery({
+  const { data: order, isLoading } = useQuery({
     ...orderOptions,
     enabled: !!id,
     refetchInterval: (query) =>
@@ -43,11 +51,32 @@ export default function OrderDetailScreen() {
           queryKey: trpc.orders.mine.queryKey(),
         });
       },
+      onError: (err) => Alert.alert(t("common.error"), err.message),
     }),
   );
 
-  if (!order) {
-    return <View className="flex-1 bg-background" />;
+  // Customers may swap a line's unit only before the driver starts shopping.
+  const editable = order?.status === "placed" || order?.status === "assigned";
+  const { data: unitOptions } = useQuery({
+    ...trpc.orders.lineUnitOptions.queryOptions({ orderId: id! }),
+    enabled: !!id && editable,
+  });
+
+  const updateLineUnit = useMutation(
+    trpc.orders.updateLineUnit.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: orderOptions.queryKey });
+      },
+      onError: (err) => Alert.alert(t("common.error"), err.message),
+    }),
+  );
+
+  if (isLoading || !order) {
+    return (
+      <View className="flex-1 items-center justify-center bg-background">
+        <ActivityIndicator className="mt-16" />
+      </View>
+    );
   }
 
   const reachedStatuses = new Set(
@@ -148,26 +177,66 @@ export default function OrderDetailScreen() {
             line.nameSnapshotEn ??
             "—";
           const unavailable = line.status === "unavailable";
+          const lineUnits = unitOptions?.[line.id] ?? [];
+          const canEditUnit = editable && lineUnits.length > 1;
           return (
-            <View key={line.id} className="flex-row items-center justify-between">
-              <Text
-                className={`flex-1 ${
-                  unavailable
-                    ? "text-muted-foreground line-through"
-                    : "text-foreground"
-                }`}
-              >
-                {name} — {line.qty} {line.unit}
-              </Text>
-              {line.status !== "pending" ? (
+            <View key={line.id} className="gap-2">
+              <View className="flex-row items-center justify-between">
                 <Text
-                  className={`text-xs font-semibold ${
-                    unavailable ? "text-destructive" : "text-success"
+                  className={`flex-1 ${
+                    unavailable
+                      ? "text-muted-foreground line-through"
+                      : "text-foreground"
                   }`}
                 >
-                  {t(`shop.lineStatus.${line.status}`)}
-                  {line.actualLineTotal ? ` • ${line.actualLineTotal} EGP` : ""}
+                  {name} — {line.qty}
+                  {canEditUnit ? "" : ` ${line.unit}`}
                 </Text>
+                {line.status !== "pending" ? (
+                  <Text
+                    className={`text-xs font-semibold ${
+                      unavailable ? "text-destructive" : "text-success"
+                    }`}
+                  >
+                    {t(`shop.lineStatus.${line.status}`)}
+                    {line.actualLineTotal ? ` • ${line.actualLineTotal} EGP` : ""}
+                  </Text>
+                ) : null}
+              </View>
+              {canEditUnit ? (
+                <View className="flex-row flex-wrap gap-1.5">
+                  {lineUnits.map((code) => {
+                    const selected = code === line.unit;
+                    return (
+                      <Pressable
+                        key={code}
+                        onPress={() =>
+                          !selected &&
+                          updateLineUnit.mutate({
+                            orderId: order.id,
+                            orderItemId: line.id,
+                            unit: code,
+                          })
+                        }
+                        className={`rounded-full border px-3 py-1 ${
+                          selected
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-elevated"
+                        }`}
+                      >
+                        <Text
+                          className={`text-xs ${
+                            selected
+                              ? "font-semibold text-primary"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {t(`units.${code}` as never)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               ) : null}
             </View>
           );
@@ -190,24 +259,27 @@ export default function OrderDetailScreen() {
         </View>
       </Card>
 
-      {canCancel ? (
-        <Button
-          variant="destructive"
-          label={t("shop.cancelOrder")}
-          loading={cancel.isPending}
-          onPress={() =>
-            Alert.alert(t("shop.cancelOrder"), t("shop.cancelConfirm"), [
-              { text: t("common.cancel"), style: "cancel" },
-              {
-                text: t("common.confirm"),
-                style: "destructive",
-                onPress: () => cancel.mutate({ orderId: order.id }),
-              },
-            ])
-          }
-        />
-      ) : null}
       </ScrollView>
+
+      {canCancel ? (
+        <BottomActionBar className="px-5">
+          <Button
+            variant="destructive"
+            label={t("shop.cancelOrder")}
+            loading={cancel.isPending}
+            onPress={() =>
+              Alert.alert(t("shop.cancelOrder"), t("shop.cancelConfirm"), [
+                { text: t("common.cancel"), style: "cancel" },
+                {
+                  text: t("common.confirm"),
+                  style: "destructive",
+                  onPress: () => cancel.mutate({ orderId: order.id }),
+                },
+              ])
+            }
+          />
+        </BottomActionBar>
+      ) : null}
     </Screen>
   );
 }

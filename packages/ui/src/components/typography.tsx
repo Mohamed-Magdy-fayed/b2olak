@@ -14,7 +14,7 @@ export function H1({
   return (
     <h1
       className={cn(
-        "scroll-m-20 text-balance font-extrabold tracking-tight text-3xl md:text-4xl lg:text-5xl xl:text-6xl",
+        "scroll-m-20 text-balance font-display font-black tracking-tight text-3xl md:text-4xl lg:text-5xl xl:text-6xl",
         className,
       )}
       {...props}
@@ -34,7 +34,7 @@ export function H2({
       className={cn(
         // `border-b pb-2` is the doc/article style; app section headings can
         // drop it with `className="border-0 pb-0"`.
-        "scroll-m-20 border-b pb-2 font-bold tracking-tight first:mt-0 text-2xl md:text-3xl lg:text-4xl",
+        "scroll-m-20 font-display font-black tracking-tight first:mt-0 text-2xl md:text-3xl lg:text-4xl",
         className,
       )}
       {...props}

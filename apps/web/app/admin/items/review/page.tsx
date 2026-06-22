@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "@workspace/i18n/react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { H1 } from "@workspace/ui/components/typography";
 import {
   Card,
   CardContent,
@@ -36,7 +37,7 @@ export default function AdminReviewPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-bold">{t("admin.review.title")}</h1>
+      <H1>{t("admin.review.title")}</H1>
 
       {queue?.length === 0 ? (
         <p className="text-muted-foreground py-12 text-center">

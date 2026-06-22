@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-import { canTransition, isTerminal } from "@workspace/validators/order-status";
+import {
+  canCustomerEditItems,
+  canTransition,
+  isTerminal,
+} from "@workspace/validators/order-status";
 
 test.describe("order status machine", () => {
   test("allows the driver happy path", () => {
@@ -33,6 +37,15 @@ test.describe("order status machine", () => {
   test("drivers cannot skip states", () => {
     expect(canTransition("assigned", "purchased", "driver")).toBe(false);
     expect(canTransition("shopping", "delivered", "driver")).toBe(false);
+  });
+
+  test("customers may edit item units only before shopping starts", () => {
+    expect(canCustomerEditItems("placed")).toBe(true);
+    expect(canCustomerEditItems("assigned")).toBe(true);
+    expect(canCustomerEditItems("shopping")).toBe(false);
+    expect(canCustomerEditItems("purchased")).toBe(false);
+    expect(canCustomerEditItems("delivered")).toBe(false);
+    expect(canCustomerEditItems("cancelled")).toBe(false);
   });
 
   test("terminal states are delivered and cancelled", () => {

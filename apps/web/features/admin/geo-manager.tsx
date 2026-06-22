@@ -23,6 +23,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { Badge } from "@workspace/ui/components/badge";
@@ -41,8 +42,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
 import {
   Tooltip,
   TooltipContent,
@@ -73,6 +72,7 @@ import {
   type ParsedImportFile,
 } from "@/features/core/import-review";
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 
 // ── GeoTreeRow type ────────────────────────────────────────────────────────────
 
@@ -234,7 +234,7 @@ function buildGeoImportColumns(
             {row.reasons.join("; ")}
           </span>
         ) : (
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">
+          <span className="text-xs text-success">
             {String(t("dataTable.importResultReady"))}
           </span>
         ),
@@ -246,86 +246,120 @@ function buildGeoImportColumns(
 
 function GeoFormDialog({
   form,
-  setForm,
+  onClose,
   onSubmit,
   isSubmitting,
 }: {
   form: GeoFormState | null;
-  setForm: (f: GeoFormState | null) => void;
+  onClose: () => void;
+  onSubmit: (f: GeoFormState) => void;
+  isSubmitting: boolean;
+}) {
+  return (
+    <Dialog open={form !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        {form && (
+          <GeoFormBody
+            key={form.id ?? `${form.level}-${form.parentId ?? "root"}`}
+            initial={form}
+            onClose={onClose}
+            onSubmit={onSubmit}
+            isSubmitting={isSubmitting}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GeoFormBody({
+  initial,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  initial: GeoFormState;
+  onClose: () => void;
   onSubmit: (f: GeoFormState) => void;
   isSubmitting: boolean;
 }) {
   const { t } = useTranslation();
-  if (!form) return null;
 
   const editTitle =
-    form.level === "city"
+    initial.level === "city"
       ? String(t("admin.geo.editCity"))
-      : form.level === "district"
+      : initial.level === "district"
         ? String(t("admin.geo.editDistrict"))
         : String(t("admin.geo.editArea"));
 
   const addTitle =
-    form.level === "city"
+    initial.level === "city"
       ? String(t("admin.geo.addCity"))
-      : form.level === "district"
+      : initial.level === "district"
         ? String(t("admin.geo.addDistrict"))
         : String(t("admin.geo.addArea"));
 
+  const form = useAppForm({
+    defaultValues: {
+      nameEn: initial.nameEn,
+      nameAr: initial.nameAr,
+      sortOrder: initial.sortOrder as number | null,
+      isActive: initial.isActive,
+    },
+    onSubmit: ({ value }) =>
+      onSubmit({
+        ...initial,
+        nameEn: value.nameEn,
+        nameAr: value.nameAr,
+        sortOrder: value.sortOrder ?? 0,
+        isActive: value.isActive,
+      }),
+  });
+
   return (
-    <Dialog open={form !== null} onOpenChange={(open) => !open && setForm(null)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{form.id ? editTitle : addTitle}</DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.geo.nameAr"))}</Label>
-            <Input
-              dir="rtl"
-              value={form.nameAr}
-              onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>{initial.id ? editTitle : addTitle}</DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4 py-2">
+        <form.AppField name="nameAr">
+          {(field) => (
+            <field.StringField label={String(t("admin.geo.nameAr"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="nameEn">
+          {(field) => (
+            <field.StringField
+              label={String(t("admin.geo.nameEn"))}
+              className="text-start"
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.geo.nameEn"))}</Label>
-            <Input
-              dir="ltr"
-              value={form.nameEn}
-              onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.geo.sortOrder"))}</Label>
-            <Input
-              type="number"
-              dir="ltr"
-              min={0}
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm({ ...form, sortOrder: Number(e.target.value) || 0 })
-              }
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-            />
-            {String(t("admin.geo.isActive"))}
-          </label>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setForm(null)}>
-            {String(t("common.cancel"))}
-          </Button>
-          <Button onClick={() => onSubmit(form)} disabled={isSubmitting}>
-            {String(t("common.save"))}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          )}
+        </form.AppField>
+        <form.AppField name="sortOrder">
+          {(field) => (
+            <field.NumberField label={String(t("admin.geo.sortOrder"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="isActive">
+          {(field) => (
+            <field.BooleanField label={String(t("admin.geo.isActive"))} />
+          )}
+        </form.AppField>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {String(t("common.cancel"))}
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {String(t("common.save"))}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -403,27 +437,28 @@ export function GeoManager() {
 
   const citiesCreate = useMutation(
     trpc.admin.geo.cities.create.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("City created"); },
     }),
   );
   const citiesUpdate = useMutation(
     trpc.admin.geo.cities.update.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("City updated"); },
     }),
   );
   const citiesDelete = useMutation(
     trpc.admin.geo.cities.delete.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("City deleted"); },
     }),
   );
   const citiesBulkSetActive = useMutation(
     trpc.admin.geo.cities.bulkSetActive.mutationOptions({
-      onSuccess: () => { void invalidateTree(); setRowSelection({}); },
+      onSuccess: () => { void invalidateTree(); setRowSelection({}); toast.success("Cities updated"); },
     }),
   );
   const citiesBulkDelete = useMutation(
     trpc.admin.geo.cities.bulkDelete.mutationOptions({
-      onSuccess: () => { void invalidateTree(); setRowSelection({}); },
+      onSuccess: () => { void invalidateTree(); setRowSelection({}); toast.success("Cities deleted"); },
+      onError: (err) => toast.error(err.message),
     }),
   );
   const citiesImportRows = useMutation(
@@ -434,27 +469,28 @@ export function GeoManager() {
 
   const districtsCreate = useMutation(
     trpc.admin.geo.districts.create.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("District created"); },
     }),
   );
   const districtsUpdate = useMutation(
     trpc.admin.geo.districts.update.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("District updated"); },
     }),
   );
   const districtsDelete = useMutation(
     trpc.admin.geo.districts.delete.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("District deleted"); },
     }),
   );
   const districtsBulkSetActive = useMutation(
     trpc.admin.geo.districts.bulkSetActive.mutationOptions({
-      onSuccess: () => { void invalidateTree(); setRowSelection({}); },
+      onSuccess: () => { void invalidateTree(); setRowSelection({}); toast.success("Districts updated"); },
     }),
   );
   const districtsBulkDelete = useMutation(
     trpc.admin.geo.districts.bulkDelete.mutationOptions({
-      onSuccess: () => { void invalidateTree(); setRowSelection({}); },
+      onSuccess: () => { void invalidateTree(); setRowSelection({}); toast.success("Districts deleted"); },
+      onError: (err) => toast.error(err.message),
     }),
   );
   const districtsImportRows = useMutation(
@@ -465,27 +501,28 @@ export function GeoManager() {
 
   const areasCreate = useMutation(
     trpc.admin.geo.areas.create.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("Area created"); },
     }),
   );
   const areasUpdate = useMutation(
     trpc.admin.geo.areas.update.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("Area updated"); },
     }),
   );
   const areasDelete = useMutation(
     trpc.admin.geo.areas.delete.mutationOptions({
-      onSuccess: () => void invalidateTree(),
+      onSuccess: () => { void invalidateTree(); toast.success("Area deleted"); },
     }),
   );
   const areasBulkSetActive = useMutation(
     trpc.admin.geo.areas.bulkSetActive.mutationOptions({
-      onSuccess: () => { void invalidateTree(); setRowSelection({}); },
+      onSuccess: () => { void invalidateTree(); setRowSelection({}); toast.success("Areas updated"); },
     }),
   );
   const areasBulkDelete = useMutation(
     trpc.admin.geo.areas.bulkDelete.mutationOptions({
-      onSuccess: () => { void invalidateTree(); setRowSelection({}); },
+      onSuccess: () => { void invalidateTree(); setRowSelection({}); toast.success("Areas deleted"); },
+      onError: (err) => toast.error(err.message),
     }),
   );
   const areasImportRows = useMutation(
@@ -1127,7 +1164,7 @@ export function GeoManager() {
       {/* Add/Edit form dialog */}
       <GeoFormDialog
         form={form}
-        setForm={setForm}
+        onClose={() => setForm(null)}
         onSubmit={handleFormSubmit}
         isSubmitting={isFormSubmitting}
       />

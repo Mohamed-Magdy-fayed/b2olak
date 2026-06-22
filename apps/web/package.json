@@ -22,6 +22,7 @@
     "@workspace/api": "*",
     "@workspace/auth": "*",
     "@workspace/db": "*",
+    "@workspace/forms": "*",
     "@workspace/i18n": "*",
     "@workspace/integrations": "*",
     "@workspace/theme": "*",

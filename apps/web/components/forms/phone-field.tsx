@@ -13,10 +13,12 @@ export function FormPhoneField({
   placeholder = "01001234567",
   autoFocus,
   disabled,
+  className,
   ...props
 }: FormFieldProps & {
   placeholder?: string;
   disabled?: boolean;
+  className?: string;
 }) {
   const field = useFieldContext<string>();
   const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
@@ -27,6 +29,7 @@ export function FormPhoneField({
         aria-invalid={isInvalid}
         autoComplete="tel"
         autoFocus={autoFocus}
+        className={className}
         dir="ltr"
         disabled={disabled}
         id={field.name}

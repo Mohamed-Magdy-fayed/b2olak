@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useState, useTransition } from "react";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
@@ -12,17 +12,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
+import { signInPasswordSchema } from "@workspace/validators/auth";
 
+import { useAppForm } from "@/components/forms/hooks";
 import { signInAdminAction } from "./actions";
 
 export function SignInForm() {
   const { t } = useTranslation();
-  const [state, formAction, isPending] = useActionState(
-    signInAdminAction,
-    undefined,
-  );
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  const form = useAppForm({
+    defaultValues: { email: "", password: "" },
+    validators: { onSubmit: signInPasswordSchema },
+    onSubmit: ({ value }) => {
+      setError(null);
+      startTransition(async () => {
+        const fd = new FormData();
+        fd.set("email", value.email);
+        fd.set("password", value.password);
+        const result = await signInAdminAction(undefined, fd);
+        if (result?.error) setError(result.error);
+      });
+    },
+  });
 
   return (
     <Card className="w-full max-w-sm">
@@ -31,37 +44,34 @@ export function SignInForm() {
         <CardDescription>{t("auth.signInSubtitle")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form action={formAction} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email">{t("auth.email")}</Label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              dir="ltr"
-              required
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">{t("auth.password")}</Label>
-            <Input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              dir="ltr"
-              required
-            />
-          </div>
-          {state?.error ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void form.handleSubmit();
+          }}
+          className="flex flex-col gap-4"
+        >
+          <form.AppField name="email">
+            {(field) => (
+              <field.StringField
+                label={t("auth.email")}
+                inputType="email"
+                dir="ltr"
+                autoComplete="email"
+              />
+            )}
+          </form.AppField>
+          <form.AppField name="password">
+            {(field) => (
+              <field.PasswordField
+                label={t("auth.password")}
+                autoComplete="current-password"
+              />
+            )}
+          </form.AppField>
+          {error ? (
             <Alert variant="destructive">
-              <AlertDescription>
-                {
-                  // error values are i18n keys returned by the server action
-                  t(state.error as never)
-                }
-              </AlertDescription>
+              <AlertDescription>{t(error as never)}</AlertDescription>
             </Alert>
           ) : null}
           <Button type="submit" disabled={isPending}>

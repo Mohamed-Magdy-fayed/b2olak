@@ -19,16 +19,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
-import { PhoneInput } from "@workspace/ui/components/phone-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
 import {
   Tooltip,
   TooltipContent,
@@ -56,6 +46,7 @@ import {
   useTableUrlState,
 } from "@/features/core/data-table";
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 import { buildDriverColumns, type DriverRow } from "./drivers-columns";
 
 type RouterOutput = inferRouterOutputs<AppRouter>;
@@ -82,6 +73,102 @@ const vehicleKeyMap: Record<Vehicle, VehicleKey> = {
   car: "vehicleCar",
   on_foot: "vehicleOnFoot",
 };
+
+type DriverFormValues = {
+  name: string;
+  phone: string;
+  vehicleType: Vehicle;
+  vehiclePlate?: string;
+};
+
+function AddDriverForm({
+  error,
+  isPending,
+  onClearError,
+  onClose,
+  onSubmit,
+}: {
+  error: string | null;
+  isPending: boolean;
+  onClearError: () => void;
+  onClose: () => void;
+  onSubmit: (values: DriverFormValues) => void;
+}) {
+  const { t } = useTranslation();
+
+  const vehicleOptions = VEHICLES.map((v) => ({
+    value: v,
+    label: String(t(`admin.drivers.${vehicleKeyMap[v]}`)),
+  }));
+
+  const form = useAppForm({
+    defaultValues: {
+      name: "",
+      phone: "",
+      vehicleType: "motorcycle" as Vehicle,
+      vehiclePlate: "",
+    },
+    onSubmit: ({ value }) => {
+      if (value.name.trim().length < 2 || value.phone.trim().length < 10) return;
+      onSubmit({
+        name: value.name.trim(),
+        phone: value.phone.trim(),
+        vehicleType: value.vehicleType,
+        vehiclePlate: value.vehiclePlate.trim() || undefined,
+      });
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>{String(t("admin.drivers.addTitle"))}</DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4 py-2">
+        <form.AppField name="name">
+          {(field) => (
+            <field.StringField label={String(t("admin.drivers.name"))} />
+          )}
+        </form.AppField>
+        <form.AppField
+          name="phone"
+          listeners={{ onChange: onClearError }}
+        >
+          {(field) => (
+            <field.PhoneField label={String(t("admin.drivers.phone"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="vehicleType">
+          {(field) => (
+            <field.SelectField
+              label={String(t("admin.drivers.vehicle"))}
+              options={vehicleOptions}
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="vehiclePlate">
+          {(field) => (
+            <field.StringField label={String(t("admin.drivers.plate"))} />
+          )}
+        </form.AppField>
+        {error ? <p className="text-destructive text-sm">{error}</p> : null}
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {String(t("common.cancel"))}
+        </Button>
+        <Button type="submit" disabled={isPending}>
+          {String(t("common.save"))}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
 
 // ─── Standalone export button ─────────────────────────────────────────────────
 
@@ -196,10 +283,6 @@ export function DriversTable() {
 
   // Add-driver dialog state
   const [adding, setAdding] = useState(false);
-  const [driverName, setDriverName] = useState("");
-  const [driverPhone, setDriverPhone] = useState("");
-  const [driverVehicle, setDriverVehicle] = useState<Vehicle>("motorcycle");
-  const [driverPlate, setDriverPlate] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
 
   const listInput = useMemo(
@@ -299,9 +382,6 @@ export function DriversTable() {
       onSuccess: () => {
         void invalidate();
         setAdding(false);
-        setDriverName("");
-        setDriverPhone("");
-        setDriverPlate("");
         setAddError(null);
       },
       onError: (err) => {
@@ -478,87 +558,18 @@ export function DriversTable() {
         }}
       >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{String(t("admin.drivers.addTitle"))}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.drivers.name"))}</Label>
-              <Input
-                value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.drivers.phone"))}</Label>
-              <PhoneInput
-                id="driver-phone"
-                value={driverPhone}
-                onChange={(v) => {
-                  setAddError(null);
-                  setDriverPhone(v);
-                }}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.drivers.vehicle"))}</Label>
-              <Select
-                value={driverVehicle}
-                onValueChange={(v) => {
-                  if (v) setDriverVehicle(v as Vehicle);
-                }}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {VEHICLES.map((v) => (
-                    <SelectItem key={v} value={v}>
-                      {String(t(`admin.drivers.${vehicleKeyMap[v]}`))}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>{String(t("admin.drivers.plate"))}</Label>
-              <Input
-                value={driverPlate}
-                onChange={(e) => setDriverPlate(e.target.value)}
-              />
-            </div>
-            {addError ? (
-              <p className="text-destructive text-sm">{addError}</p>
-            ) : null}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
+          {adding && (
+            <AddDriverForm
+              error={addError}
+              isPending={create.isPending}
+              onClearError={() => setAddError(null)}
+              onClose={() => {
                 setAdding(false);
                 setAddError(null);
               }}
-            >
-              {String(t("common.cancel"))}
-            </Button>
-            <Button
-              disabled={
-                driverName.trim().length < 2 ||
-                driverPhone.trim().length < 10 ||
-                create.isPending
-              }
-              onClick={() =>
-                create.mutate({
-                  name: driverName.trim(),
-                  phone: driverPhone.trim(),
-                  vehicleType: driverVehicle,
-                  vehiclePlate: driverPlate.trim() || undefined,
-                })
-              }
-            >
-              {String(t("common.save"))}
-            </Button>
-          </DialogFooter>
+              onSubmit={(values) => create.mutate(values)}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>

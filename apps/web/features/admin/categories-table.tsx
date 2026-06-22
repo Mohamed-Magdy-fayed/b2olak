@@ -26,13 +26,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
+import { Field, FieldLabel } from "@workspace/ui/components/field";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
+
+import { useAppForm } from "@/components/forms/hooks";
 
 import {
   DataTable,
@@ -91,7 +92,9 @@ type CategoryImportRow = ImportReviewRow & {
   sortOrder: number;
 };
 
-const emptyForm: Omit<CategoryFormState, "id"> = {
+type CategoryFormValues = Omit<CategoryFormState, "id">;
+
+const emptyForm: CategoryFormValues = {
   nameEn: "",
   nameAr: "",
   slug: "",
@@ -120,91 +123,140 @@ const categoryGlobalFilter: FilterFn<CategoryRow> = (row, _columnId, value) => {
 
 function CategoryFormDialog({
   form,
-  setForm,
+  onClose,
   onSubmit,
   isSubmitting,
 }: {
   form: CategoryFormState | null;
-  setForm: (f: CategoryFormState | null) => void;
-  onSubmit: () => void;
+  onClose: () => void;
+  onSubmit: (values: CategoryFormValues) => void;
+  isSubmitting: boolean;
+}) {
+  return (
+    <Dialog open={form !== null} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        {form && (
+          <CategoryFormBody
+            key={form.id ?? "new"}
+            initial={form}
+            isEdit={Boolean(form.id)}
+            onClose={onClose}
+            onSubmit={onSubmit}
+            isSubmitting={isSubmitting}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function CategoryFormBody({
+  initial,
+  isEdit,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  initial: CategoryFormState;
+  isEdit: boolean;
+  onClose: () => void;
+  onSubmit: (values: CategoryFormValues) => void;
   isSubmitting: boolean;
 }) {
   const { t } = useTranslation();
-  if (!form) return null;
+
+  const form = useAppForm({
+    defaultValues: {
+      nameEn: initial.nameEn,
+      nameAr: initial.nameAr,
+      slug: initial.slug,
+      imageUrl: initial.imageUrl,
+      sortOrder: initial.sortOrder as number | null,
+      isActive: initial.isActive,
+    },
+    onSubmit: ({ value }) =>
+      onSubmit({
+        nameEn: value.nameEn,
+        nameAr: value.nameAr,
+        slug: value.slug,
+        imageUrl: value.imageUrl,
+        sortOrder: value.sortOrder ?? 0,
+        isActive: value.isActive,
+      }),
+  });
 
   return (
-    <Dialog open={form !== null} onOpenChange={(open) => !open && setForm(null)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {form.id
-              ? String(t("admin.categories.editTitle"))
-              : String(t("admin.categories.addTitle"))}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.categories.nameAr"))}</Label>
-            <Input
-              dir="rtl"
-              value={form.nameAr}
-              onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>
+          {isEdit
+            ? String(t("admin.categories.editTitle"))
+            : String(t("admin.categories.addTitle"))}
+        </DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4 py-2">
+        <form.AppField name="nameAr">
+          {(field) => (
+            <field.StringField label={String(t("admin.categories.nameAr"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="nameEn">
+          {(field) => (
+            <field.StringField
+              label={String(t("admin.categories.nameEn"))}
+              className="text-start"
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.categories.nameEn"))}</Label>
-            <Input
-              dir="ltr"
-              value={form.nameEn}
-              onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
+          )}
+        </form.AppField>
+        <form.AppField name="slug">
+          {(field) => (
+            <field.StringField
+              label={String(t("admin.categories.slug"))}
+              className="text-start"
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.categories.slug"))}</Label>
-            <Input
-              dir="ltr"
-              value={form.slug}
-              onChange={(e) => setForm({ ...form, slug: e.target.value })}
+          )}
+        </form.AppField>
+        <form.AppField name="sortOrder">
+          {(field) => (
+            <field.NumberField
+              label={String(t("admin.categories.sortOrder"))}
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.categories.sortOrder"))}</Label>
-            <Input
-              type="number"
-              dir="ltr"
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm({ ...form, sortOrder: Number(e.target.value) || 0 })
-              }
+          )}
+        </form.AppField>
+        <form.AppField name="imageUrl">
+          {(field) => (
+            <Field>
+              <FieldLabel>{String(t("admin.common.image"))}</FieldLabel>
+              <ImageUpload
+                value={field.state.value}
+                folder="categories"
+                onChange={(url) => field.handleChange(url)}
+              />
+            </Field>
+          )}
+        </form.AppField>
+        <form.AppField name="isActive">
+          {(field) => (
+            <field.BooleanField
+              label={String(t("admin.categories.isActive"))}
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{String(t("admin.common.image"))}</Label>
-            <ImageUpload
-              value={form.imageUrl}
-              folder="categories"
-              onChange={(url) => setForm({ ...form, imageUrl: url })}
-            />
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-            />
-            {String(t("admin.categories.isActive"))}
-          </label>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setForm(null)}>
-            {String(t("common.cancel"))}
-          </Button>
-          <Button onClick={onSubmit} disabled={isSubmitting}>
-            {String(t("common.save"))}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          )}
+        </form.AppField>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {String(t("common.cancel"))}
+        </Button>
+        <Button type="submit" disabled={isSubmitting}>
+          {String(t("common.save"))}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 
@@ -247,6 +299,7 @@ export function CategoriesTable() {
       onSuccess: () => {
         void invalidateList();
         setForm(null);
+        toast.success("Category created");
       },
     }),
   );
@@ -256,6 +309,7 @@ export function CategoriesTable() {
       onSuccess: () => {
         void invalidateList();
         setForm(null);
+        toast.success("Category updated");
       },
     }),
   );
@@ -271,6 +325,7 @@ export function CategoriesTable() {
       onSuccess: () => {
         void invalidateList();
         setRowSelection({});
+        toast.success("Categories updated");
       },
     }),
   );
@@ -280,6 +335,7 @@ export function CategoriesTable() {
       onSuccess: () => {
         void invalidateList();
         setRowSelection({});
+        toast.success("Categories deleted");
       },
     }),
   );
@@ -288,18 +344,9 @@ export function CategoriesTable() {
     trpc.admin.catalog.categories.importRows.mutationOptions(),
   );
 
-  function handleSubmit() {
-    if (!form) return;
-    const payload = {
-      nameEn: form.nameEn,
-      nameAr: form.nameAr,
-      slug: form.slug,
-      imageUrl: form.imageUrl,
-      sortOrder: form.sortOrder,
-      isActive: form.isActive,
-    };
-    if (form.id) update.mutate({ id: form.id, ...payload });
-    else create.mutate(payload);
+  function handleSubmit(values: CategoryFormValues) {
+    if (form?.id) update.mutate({ id: form.id, ...values });
+    else create.mutate(values);
   }
 
   // ---- URL state ----
@@ -821,7 +868,7 @@ export function CategoriesTable() {
 
       <CategoryFormDialog
         form={form}
-        setForm={setForm}
+        onClose={() => setForm(null)}
         onSubmit={handleSubmit}
         isSubmitting={create.isPending || update.isPending}
       />

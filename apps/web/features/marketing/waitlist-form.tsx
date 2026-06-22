@@ -5,16 +5,14 @@ import { useMutation } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { Button } from "@workspace/ui/components/button";
-import { Input } from "@workspace/ui/components/input";
 import { egyptianPhoneSchema } from "@workspace/validators/auth";
 
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 
 export function WaitlistForm() {
   const { t } = useTranslation();
   const trpc = useTRPC();
-  const [phone, setPhone] = useState("");
-  const [phoneError, setPhoneError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
 
   const join = useMutation(
@@ -22,6 +20,14 @@ export function WaitlistForm() {
       onSuccess: () => setDone(true),
     }),
   );
+
+  const form = useAppForm({
+    defaultValues: { phone: "" },
+    onSubmit: ({ value }) => {
+      const result = egyptianPhoneSchema.safeParse(value.phone);
+      if (result.success) join.mutate({ phone: result.data });
+    },
+  });
 
   if (done) {
     return (
@@ -31,38 +37,32 @@ export function WaitlistForm() {
     );
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setPhoneError(null);
-    const result = egyptianPhoneSchema.safeParse(phone);
-    if (!result.success) {
-      setPhoneError(t("validation.phoneInvalid"));
-      return;
-    }
-    join.mutate({ phone: result.data });
-  }
-
   return (
     <form
-      onSubmit={handleSubmit}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
       className="flex w-full max-w-sm flex-col gap-2"
     >
-      <Input
-        type="tel"
-        dir="ltr"
-        value={phone}
-        onChange={(e) => {
-          setPhoneError(null);
-          setPhone(e.target.value);
+      <form.AppField
+        name="phone"
+        validators={{
+          onSubmit: ({ value }) =>
+            egyptianPhoneSchema.safeParse(value).success
+              ? undefined
+              : "validation.phoneInvalid",
         }}
-        aria-label={t("landing.download.waitlistLabel")}
-        placeholder={t("mobile.phonePlaceholder")}
-        className="bg-background text-foreground"
-        aria-invalid={phoneError ? true : undefined}
-      />
-      {phoneError ? (
-        <p className="text-primary-foreground/80 text-sm">{phoneError}</p>
-      ) : null}
+      >
+        {(field) => (
+          <field.PhoneField
+            label={t("landing.download.waitlistLabel")}
+            srOnlyLabel
+            placeholder={t("mobile.phonePlaceholder")}
+            className="bg-background text-foreground placeholder:text-foreground/50"
+          />
+        )}
+      </form.AppField>
       <Button
         type="submit"
         size="xl"

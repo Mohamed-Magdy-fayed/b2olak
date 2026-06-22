@@ -1,16 +1,20 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Linking,
   Pressable,
   ScrollView,
   Text,
   View,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,7 +36,7 @@ export default function DriverOrderScreen() {
   const [cashCollected, setCashCollected] = useState("");
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
-  const { data: order } = useQuery({ ...orderOptions, enabled: !!id });
+  const { data: order, isLoading } = useQuery({ ...orderOptions, enabled: !!id });
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: orderOptions.queryKey });
@@ -58,7 +62,22 @@ export default function DriverOrderScreen() {
   };
 
   const startShopping = useMutation(
-    trpc.driver.startShopping.mutationOptions(mutationOpts),
+    trpc.driver.startShopping.mutationOptions({
+      ...mutationOpts,
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: orderOptions.queryKey });
+        const previous = queryClient.getQueryData(orderOptions.queryKey);
+        queryClient.setQueryData(orderOptions.queryKey, (old) =>
+          old ? { ...old, status: "shopping" as const } : old,
+        );
+        return { previous };
+      },
+      onError: (_err, _vars, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(orderOptions.queryKey, context.previous);
+        }
+      },
+    }),
   );
   // Per-line edits update the cache optimistically so the row flips instantly;
   // the server call (and its recomputed totals) reconciles in the background.
@@ -92,6 +111,11 @@ export default function DriverOrderScreen() {
         });
         return { previous };
       },
+      onSuccess: () => {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setError(null);
+        invalidate();
+      },
       onError: (err, _vars, context) => {
         if (context?.previous) {
           queryClient.setQueryData(orderOptions.queryKey, context.previous);
@@ -112,21 +136,63 @@ export default function DriverOrderScreen() {
     }),
   );
   const doneShopping = useMutation(
-    trpc.driver.doneShopping.mutationOptions(mutationOpts),
+    trpc.driver.doneShopping.mutationOptions({
+      ...mutationOpts,
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: orderOptions.queryKey });
+        const previous = queryClient.getQueryData(orderOptions.queryKey);
+        queryClient.setQueryData(orderOptions.queryKey, (old) =>
+          old ? { ...old, status: "purchased" as const } : old,
+        );
+        return { previous };
+      },
+      onError: (_err, _vars, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(orderOptions.queryKey, context.previous);
+        }
+      },
+    }),
   );
   const startDelivery = useMutation(
-    trpc.driver.startDelivery.mutationOptions(mutationOpts),
+    trpc.driver.startDelivery.mutationOptions({
+      ...mutationOpts,
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: orderOptions.queryKey });
+        const previous = queryClient.getQueryData(orderOptions.queryKey);
+        queryClient.setQueryData(orderOptions.queryKey, (old) =>
+          old ? { ...old, status: "delivering" as const } : old,
+        );
+        return { previous };
+      },
+      onError: (_err, _vars, context) => {
+        if (context?.previous) {
+          queryClient.setQueryData(orderOptions.queryKey, context.previous);
+        }
+      },
+    }),
   );
   const markDelivered = useMutation(
     trpc.driver.markDelivered.mutationOptions({
       ...mutationOpts,
       onSuccess: () => {
         invalidate();
-        router.back();
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(t("driver.orderDelivered"), t("driver.orderDeliveredMessage"), [
+          { text: t("common.confirm"), onPress: () => router.back() },
+        ]);
       },
     }),
   );
 
+  if (isLoading) {
+    return (
+      <Screen>
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator />
+        </View>
+      </Screen>
+    );
+  }
   if (!order) return <Screen />;
 
   const lineName = (line: (typeof order.items)[number]) =>
@@ -151,6 +217,14 @@ export default function DriverOrderScreen() {
   ]
     .filter(Boolean)
     .join("، ");
+
+  // The single status CTA is pinned to the bottom — except while collecting
+  // cash, where the inline card (with its amount input) drives the flow.
+  const showActionBar =
+    order.status === "assigned" ||
+    order.status === "shopping" ||
+    order.status === "purchased" ||
+    (order.status === "delivering" && !collecting);
 
   return (
     <Screen>
@@ -271,7 +345,7 @@ export default function DriverOrderScreen() {
                       onChangeText={(value) =>
                         setPrices((p) => ({ ...p, [line.id]: value }))
                       }
-                      style={{ textAlign: "left", writingDirection: "ltr" }}
+                      style={{ textAlign: "left", writingDirection: "ltr", minWidth: 80 }}
                     />
                     <Pressable
                       className="size-12 items-center justify-center rounded-full bg-success active:opacity-80"
@@ -347,34 +421,6 @@ export default function DriverOrderScreen() {
           </View>
         ) : null}
 
-        {order.status === "assigned" ? (
-          <Button
-            label={t("driver.startShopping")}
-            loading={startShopping.isPending}
-            onPress={() => startShopping.mutate({ orderId: order.id })}
-          />
-        ) : null}
-        {order.status === "shopping" ? (
-          <Button
-            label={t("driver.doneShopping")}
-            loading={doneShopping.isPending}
-            onPress={() => doneShopping.mutate({ orderId: order.id })}
-          />
-        ) : null}
-        {order.status === "purchased" ? (
-          <Button
-            label={t("driver.startDelivery")}
-            loading={startDelivery.isPending}
-            onPress={() => startDelivery.mutate({ orderId: order.id })}
-          />
-        ) : null}
-        {order.status === "delivering" && !collecting ? (
-          <Button
-            label={t("driver.markDelivered")}
-            loading={markDelivered.isPending}
-            onPress={() => setCollecting(true)}
-          />
-        ) : null}
         {order.status === "delivering" && collecting ? (
           <Card className="gap-3">
             <Text className="font-semibold text-foreground">
@@ -407,6 +453,39 @@ export default function DriverOrderScreen() {
           </Card>
         ) : null}
       </ScrollView>
+
+      {showActionBar ? (
+        <BottomActionBar className="-mx-5 px-5">
+          {order.status === "assigned" ? (
+            <Button
+              label={t("driver.startShopping")}
+              loading={startShopping.isPending}
+              onPress={() => startShopping.mutate({ orderId: order.id })}
+            />
+          ) : null}
+          {order.status === "shopping" ? (
+            <Button
+              label={t("driver.doneShopping")}
+              loading={doneShopping.isPending}
+              onPress={() => doneShopping.mutate({ orderId: order.id })}
+            />
+          ) : null}
+          {order.status === "purchased" ? (
+            <Button
+              label={t("driver.startDelivery")}
+              loading={startDelivery.isPending}
+              onPress={() => startDelivery.mutate({ orderId: order.id })}
+            />
+          ) : null}
+          {order.status === "delivering" && !collecting ? (
+            <Button
+              label={t("driver.markDelivered")}
+              loading={markDelivered.isPending}
+              onPress={() => setCollecting(true)}
+            />
+          ) : null}
+        </BottomActionBar>
+      ) : null}
     </Screen>
   );
 }

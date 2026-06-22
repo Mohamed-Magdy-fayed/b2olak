@@ -11,7 +11,10 @@ import { inngest } from "@workspace/integrations/inngest/client";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrderStatusEventsTable } from "@workspace/db/schemas/orders/order-status-events";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
-import { canTransition } from "@workspace/validators/order-status";
+import {
+  canCustomerEditItems,
+  canTransition,
+} from "@workspace/validators/order-status";
 import { cancelOrderSchema, placeOrderSchema } from "@workspace/validators/orders";
 
 import {
@@ -233,6 +236,104 @@ export const ordersRouter = createTRPCRouter({
       // The assigned driver's name + phone ride along so the customer can
       // reach them during an active delivery.
       return order;
+    }),
+
+  /**
+   * Allowed unit codes per line for an order the customer may still edit.
+   * Returns `{}` once the order has left the editable window, so the UI hides
+   * the unit picker. Codes map to i18n keys (`units.<code>`).
+   */
+  lineUnitOptions: customerProcedure
+    .input(z.object({ orderId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const order = await ctx.db.query.OrdersTable.findFirst({
+        where: and(
+          eq(OrdersTable.id, input.orderId),
+          eq(OrdersTable.customerId, ctx.session.user.id),
+          isNull(OrdersTable.deletedAt),
+        ),
+        with: { items: { columns: { id: true, itemId: true } } },
+      });
+      if (!order) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!canCustomerEditItems(order.status)) return {};
+
+      const itemIds = [...new Set(order.items.map((line) => line.itemId))];
+      const links = await ctx.db.query.ItemUnitsTable.findMany({
+        where: inArray(ItemUnitsTable.itemId, itemIds),
+        with: { unit: { columns: { code: true } } },
+        orderBy: (t, { asc }) => [asc(t.sortOrder)],
+      });
+      const codesByItem = new Map<string, string[]>();
+      for (const link of links) {
+        const list = codesByItem.get(link.itemId) ?? [];
+        list.push(link.unit.code);
+        codesByItem.set(link.itemId, list);
+      }
+
+      const result: Record<string, string[]> = {};
+      for (const line of order.items) {
+        result[line.id] = codesByItem.get(line.itemId) ?? [];
+      }
+      return result;
+    }),
+
+  /**
+   * Change a line's unit of measure while the order is still customer-editable
+   * (before the driver starts shopping). The new unit must be an allowed unit
+   * for that line's item; `unit` is the unit `code` snapshot.
+   */
+  updateLineUnit: customerProcedure
+    .input(
+      z.object({
+        orderId: z.uuid(),
+        orderItemId: z.uuid(),
+        unit: z.string().min(1).max(32),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const order = await ctx.db.query.OrdersTable.findFirst({
+        where: and(
+          eq(OrdersTable.id, input.orderId),
+          eq(OrdersTable.customerId, ctx.session.user.id),
+          isNull(OrdersTable.deletedAt),
+        ),
+      });
+      if (!order) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!canCustomerEditItems(order.status)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "orders.itemsLocked",
+        });
+      }
+
+      const line = await ctx.db.query.OrderItemsTable.findFirst({
+        where: and(
+          eq(OrderItemsTable.id, input.orderItemId),
+          eq(OrderItemsTable.orderId, order.id),
+        ),
+        columns: { id: true, itemId: true },
+      });
+      if (!line) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // The chosen unit must be linked to this line's item.
+      const links = await ctx.db.query.ItemUnitsTable.findMany({
+        where: eq(ItemUnitsTable.itemId, line.itemId),
+        with: { unit: { columns: { code: true } } },
+      });
+      const allowed = links.some((link) => link.unit.code === input.unit);
+      if (!allowed) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "orders.unitNotAllowed",
+        });
+      }
+
+      await ctx.db
+        .update(OrderItemsTable)
+        .set({ unit: input.unit, updatedBy: ctx.session.user.id })
+        .where(eq(OrderItemsTable.id, line.id));
+
+      return { ok: true as const };
     }),
 
   cancel: customerProcedure

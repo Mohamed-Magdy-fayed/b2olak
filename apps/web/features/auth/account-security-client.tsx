@@ -7,6 +7,7 @@ import { browserSupportsWebAuthn } from "@simplewebauthn/browser";
 
 import { useTranslation } from "@workspace/i18n/react";
 import { useTRPC } from "@/lib/trpc/client";
+import { useAppForm } from "@/components/forms/hooks";
 
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -24,8 +25,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
-import { Input } from "@workspace/ui/components/input";
-import { Label } from "@workspace/ui/components/label";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 
 import { PasskeyEnrollButton } from "./passkey-enroll-button";
@@ -63,11 +62,11 @@ export function AccountSecurityClient() {
   );
 
   const [renameDialogId, setRenameDialogId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [renameInitialLabel, setRenameInitialLabel] = useState("");
   const [deleteDialogId, setDeleteDialogId] = useState<string | null>(null);
 
   function openRename(id: string, currentLabel: string | null) {
-    setRenameValue(currentLabel ?? "");
+    setRenameInitialLabel(currentLabel ?? "");
     setRenameDialogId(id);
   }
 
@@ -160,46 +159,16 @@ export function AccountSecurityClient() {
         onOpenChange={(open) => !open && setRenameDialogId(null)}
       >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("auth.passkey.renameTitle" as never)}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 py-2">
-            <Label htmlFor="passkey-label">
-              {t("auth.passkey.defaultLabel" as never)}
-            </Label>
-            <Input
-              id="passkey-label"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              placeholder={t("auth.passkey.labelPlaceholder" as never)}
-              maxLength={64}
+          {renameDialogId && (
+            <RenamePasskeyForm
+              initialLabel={renameInitialLabel}
+              isPending={renamePasskey.isPending}
+              onCancel={() => setRenameDialogId(null)}
+              onSubmit={(label) =>
+                renamePasskey.mutate({ id: renameDialogId, label })
+              }
             />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setRenameDialogId(null)}
-            >
-              {t("common.cancel" as never)}
-            </Button>
-            <Button
-              type="button"
-              disabled={renamePasskey.isPending || !renameValue.trim()}
-              onClick={() => {
-                if (renameDialogId) {
-                  renamePasskey.mutate({
-                    id: renameDialogId,
-                    label: renameValue.trim(),
-                  });
-                }
-              }}
-            >
-              {renamePasskey.isPending
-                ? t("common.loading" as never)
-                : t("common.save" as never)}
-            </Button>
-          </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -241,5 +210,66 @@ export function AccountSecurityClient() {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function RenamePasskeyForm({
+  initialLabel,
+  isPending,
+  onSubmit,
+  onCancel,
+}: {
+  initialLabel: string;
+  isPending: boolean;
+  onSubmit: (label: string) => void;
+  onCancel: () => void;
+}) {
+  const { t } = useTranslation();
+
+  const form = useAppForm({
+    defaultValues: { label: initialLabel },
+    onSubmit: ({ value }) => {
+      const trimmed = value.label.trim();
+      if (trimmed) onSubmit(trimmed);
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>{t("auth.passkey.renameTitle" as never)}</DialogTitle>
+      </DialogHeader>
+      <div className="py-2">
+        <form.AppField
+          name="label"
+          validators={{
+            onChange: ({ value }) =>
+              !value.trim() ? "validation.required" : undefined,
+          }}
+          children={(field) => (
+            <field.StringField
+              label={t("auth.passkey.defaultLabel" as never)}
+              placeholder={t("auth.passkey.labelPlaceholder" as never)}
+              autoFocus
+            />
+          )}
+        />
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          {t("common.cancel" as never)}
+        </Button>
+        <Button type="submit" disabled={isPending}>
+          {isPending
+            ? t("common.loading" as never)
+            : t("common.save" as never)}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }

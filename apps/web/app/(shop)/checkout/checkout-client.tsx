@@ -12,6 +12,10 @@ import { cartLineUnitName, useCart } from "@/features/shop/cart-store";
 import { itemDisplayName, addressLabel, addressSummary } from "@/features/shop/helpers";
 import { PhoneVerifyCard } from "@/features/shop/phone-verify-card";
 import { AddressForm } from "@/features/shop/address-form";
+import {
+  StickyActionBar,
+  stickyActionBarSpacerClassName,
+} from "@/components/sticky-action-bar";
 
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
@@ -92,7 +96,9 @@ export function CheckoutClient() {
   const phoneVerified = !!user?.phone;
 
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 px-4 py-8">
+    <div
+      className={`mx-auto flex max-w-xl flex-col gap-6 px-4 pt-8 ${stickyActionBarSpacerClassName}`}
+    >
       <h1 className="text-2xl font-black text-foreground">{t("shop.checkout")}</h1>
 
       {/* Item summary */}
@@ -209,25 +215,28 @@ export function CheckoutClient() {
           <PhoneVerifyCard />
         </div>
       ) : (
-        <Button
-          size="lg"
-          onClick={() => {
-            if (!selected || lines.length === 0) return;
-            place.mutate({
-              addressId: selected,
-              note: note.trim() || undefined,
-              items: lines.map((line) => ({
-                itemId: line.itemId,
-                qty: line.qty,
-                unitId: line.unitId,
-                note: line.note,
-              })),
-            });
-          }}
-          disabled={place.isPending || !selected || lines.length === 0}
-        >
-          {place.isPending ? t("shop.placing") : t("shop.placeOrder")}
-        </Button>
+        <StickyActionBar>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              if (!selected || lines.length === 0) return;
+              place.mutate({
+                addressId: selected,
+                note: note.trim() || undefined,
+                items: lines.map((line) => ({
+                  itemId: line.itemId,
+                  qty: line.qty,
+                  unitId: line.unitId,
+                  note: line.note,
+                })),
+              });
+            }}
+            disabled={place.isPending || !selected || lines.length === 0}
+          >
+            {place.isPending ? t("shop.placing") : t("shop.placeOrder")}
+          </Button>
+        </StickyActionBar>
       )}
     </div>
   );

@@ -1,4 +1,5 @@
-import { FlatList, ScrollView, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
@@ -13,7 +14,14 @@ export default function DriverHistory() {
   const tabBarHeight = useTabBarHeight();
   const trpc = useTRPC();
   const { t } = useTranslation();
-  const { data } = useQuery(trpc.driver.myOrders.queryOptions());
+  const { data, isLoading, isError, refetch } = useQuery(trpc.driver.myOrders.queryOptions());
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   return (
     <Screen padded={false}>
@@ -21,8 +29,36 @@ export default function DriverHistory() {
         className="flex-1 px-5"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor="#C9A227"
+            colors={["#C9A227"]}
+          />
+        }
       >
         <ScreenHeader title={t("driver.history")} />
+
+        {isLoading ? (
+          <ActivityIndicator className="mt-8" />
+        ) : isError ? (
+          <View className="items-center gap-4 py-16">
+            <Ionicons name="alert-circle-outline" size={40} color="#F0584F" />
+            <Text className="text-center text-destructive">
+              {t("common.error")}
+            </Text>
+            <Pressable
+              className="rounded-2xl bg-primary px-6 py-3 active:opacity-80"
+              onPress={() => void refetch()}
+            >
+              <Text className="font-semibold text-primary-foreground">
+                {t("common.retry")}
+              </Text>
+            </Pressable>
+          </View>
+        ) : (
+          <>
 
         {/* today's recap */}
         <Card className="mb-4 gap-3">
@@ -86,6 +122,8 @@ export default function DriverHistory() {
             </View>
           }
         />
+          </>
+        )}
       </ScrollView>
     </Screen>
   );

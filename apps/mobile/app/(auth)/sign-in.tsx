@@ -4,11 +4,13 @@ import { router, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { useMutation } from "@tanstack/react-query"
 
+import { egyptianPhoneSchema } from "@workspace/validators/auth"
+
 import { LanguageToggle } from "@/components/language-toggle"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { KeyboardAvoidingView } from "@/components/ui/keyboard-screen"
 import { Screen } from "@/components/ui/screen"
+import { useAppForm } from "@/components/forms"
 import { useTranslation } from "@/lib/i18n"
 import { useTRPC } from "@/lib/trpc"
 
@@ -16,20 +18,17 @@ export default function SignInScreen() {
   const trpc = useTRPC()
   const { t } = useTranslation()
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>()
-  const [phone, setPhone] = useState("")
   const [error, setError] = useState<string | null>(null)
 
   const requestOtp = useMutation(
     trpc.auth.requestOtp.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
         router.push({
           pathname: "/(auth)/verify",
-          params: { phone, ...(returnTo ? { returnTo } : {}) },
+          params: { phone: variables.phone, ...(returnTo ? { returnTo } : {}) },
         })
       },
       onError: (err) => {
-        console.log(err)
-
         setError(
           err.message === "errors.tooManyRequests"
             ? t("errors.tooManyRequests")
@@ -38,6 +37,14 @@ export default function SignInScreen() {
       },
     })
   )
+
+  const form = useAppForm({
+    defaultValues: { phone: "" },
+    onSubmit: ({ value }) => {
+      setError(null)
+      requestOtp.mutate({ phone: value.phone })
+    },
+  })
 
   return (
     <KeyboardAvoidingView behavior="padding" className="flex-1">
@@ -68,24 +75,23 @@ export default function SignInScreen() {
 
           {/* Phone form */}
           <View className="gap-3">
-            <Text className="font-medium text-foreground">
-              {t("mobile.phoneLabel")}
-            </Text>
-            <Input
-              value={phone}
-              onChangeText={(value) => {
-                setError(null)
-                setPhone(value)
+            <form.AppField
+              name="phone"
+              validators={{
+                onSubmit: ({ value }) =>
+                  egyptianPhoneSchema.safeParse(value).success
+                    ? undefined
+                    : "validation.phoneInvalid",
               }}
-              placeholder={t("mobile.phonePlaceholder")}
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              style={{
-                textAlign: "left",
-                writingDirection: "ltr",
-                direction: "ltr",
-              }}
-            />
+            >
+              {(field) => (
+                <field.PhoneField
+                  label={t("mobile.phoneLabel")}
+                  placeholder={t("mobile.phonePlaceholder")}
+                  autoFocus
+                />
+              )}
+            </form.AppField>
             {error ? (
               <Text className="text-sm text-destructive">{error}</Text>
             ) : null}
@@ -96,8 +102,7 @@ export default function SignInScreen() {
                   : t("mobile.sendCode")
               }
               loading={requestOtp.isPending}
-              disabled={phone.trim().length < 10}
-              onPress={() => requestOtp.mutate({ phone })}
+              onPress={() => void form.handleSubmit()}
             />
           </View>
         </View>

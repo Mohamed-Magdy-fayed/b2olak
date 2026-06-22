@@ -9,7 +9,8 @@ Full detail lives in **[docs/](docs/00-product-overview.md)** — read these bef
 [file structure](docs/08-file-structure.md) · [design system](docs/10-design-system.md) ·
 [shadcn/ui catalog](docs/13-shadcn.md) ·
 [admin data-table pattern](docs/13-admin-data-table.md) ·
-[AI workflow & delegation](docs/11-ai-workflow.md).
+[AI workflow & delegation](docs/11-ai-workflow.md) ·
+[store readiness](docs/14-store-readiness.md).
 
 > This file is the operating manual. It overrides the global `~/.claude/CLAUDE.md` where
 > they conflict. Don't restate the docs here — link them.

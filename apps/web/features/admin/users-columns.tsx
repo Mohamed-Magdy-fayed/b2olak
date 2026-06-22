@@ -3,8 +3,16 @@
 import type { ColumnDef, Row } from "@tanstack/react-table";
 import type { Dispatch, SetStateAction } from "react";
 
+import { MoreHorizontalIcon } from "lucide-react";
+
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 import { useTranslation } from "@workspace/i18n/react";
 import {
   createEntityActionsColumn,
@@ -46,27 +54,34 @@ function UserRowActions({
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center gap-1">
-      {row.status !== "suspended" ? (
-        <Button
-          size="sm"
-          variant="destructive"
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "suspend" })}
-        >
-          {String(t("admin.users.suspend"))}
-        </Button>
-      ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-7 px-2 text-xs"
-          onClick={() => setRowAction({ row, variant: "reactivate" })}
-        >
-          {String(t("admin.users.reactivate"))}
-        </Button>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon" className="size-8">
+            <MoreHorizontalIcon className="size-4" />
+            <span className="sr-only">
+              {String(t("admin.common.actions"))}
+            </span>
+          </Button>
+        }
+      />
+      <DropdownMenuContent align="end">
+        {row.status !== "suspended" ? (
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => setRowAction({ row, variant: "suspend" })}
+          >
+            {String(t("admin.users.suspend"))}
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            onClick={() => setRowAction({ row, variant: "reactivate" })}
+          >
+            {String(t("admin.users.reactivate"))}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -238,7 +253,7 @@ export function buildUserColumns(opts: {
     },
     createEntityActionsColumn<UserRow>({
       t,
-      size: 120,
+      size: 56,
       cell: ({ row }: { row: Row<UserRow> }) => (
         <UserRowActions row={row.original} setRowAction={setRowAction} />
       ),

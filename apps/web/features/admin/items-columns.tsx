@@ -19,18 +19,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import { Input } from "@workspace/ui/components/input";
+import { Field, FieldLabel } from "@workspace/ui/components/field";
 import { Label } from "@workspace/ui/components/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
-import type { useTranslation } from "@workspace/i18n/react";
+import { useTranslation } from "@workspace/i18n/react";
 
 import { ImageUpload } from "@/features/admin/image-upload";
+import { useAppForm } from "@/components/forms/hooks";
 import {
   DataTableColumnHeader,
   createEntityActionsColumn,
@@ -163,6 +157,134 @@ export function UnitsPicker({
   );
 }
 
+export type ItemFormValues = Omit<ItemFormState, "id">;
+
+/**
+ * Shared add/edit item form, built on the design-system `useAppForm`.
+ * Used by both the create dialog (items-table) and the row edit dialog.
+ */
+export function ItemFormBody({
+  title,
+  initial,
+  categories,
+  units,
+  locale,
+  onClose,
+  onSubmit,
+  isSubmitting,
+}: {
+  title: string;
+  initial: ItemFormValues;
+  categories: { id: string; nameEn: string; nameAr: string }[];
+  units: UnitOption[];
+  locale: string;
+  onClose: () => void;
+  onSubmit: (values: ItemFormValues) => void;
+  isSubmitting: boolean;
+}) {
+  const { t } = useTranslation();
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.id,
+    label: locale === "ar" ? c.nameAr : c.nameEn,
+  }));
+
+  const form = useAppForm({
+    defaultValues: {
+      categoryId: initial.categoryId,
+      nameEn: initial.nameEn,
+      nameAr: initial.nameAr,
+      unitIds: initial.unitIds,
+      defaultUnitId: initial.defaultUnitId,
+      imageUrl: initial.imageUrl,
+    },
+    onSubmit: ({ value }) => {
+      if (!value.categoryId || value.unitIds.length === 0) return;
+      onSubmit(value);
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>{title}</DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4 py-2">
+        <form.AppField name="nameAr">
+          {(field) => (
+            <field.StringField label={String(t("admin.items.nameAr"))} />
+          )}
+        </form.AppField>
+        <form.AppField name="nameEn">
+          {(field) => (
+            <field.StringField
+              label={String(t("admin.items.nameEn"))}
+              className="text-start"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="categoryId">
+          {(field) => (
+            <field.SelectField
+              label={String(t("admin.items.category"))}
+              options={categoryOptions}
+            />
+          )}
+        </form.AppField>
+        <form.Subscribe
+          selector={(s) => ({
+            unitIds: s.values.unitIds,
+            defaultUnitId: s.values.defaultUnitId,
+          })}
+        >
+          {({ unitIds, defaultUnitId }) => (
+            <UnitsPicker
+              units={units}
+              unitIds={unitIds}
+              defaultUnitId={defaultUnitId}
+              onChange={(nextUnitIds, nextDefaultUnitId) => {
+                form.setFieldValue("unitIds", nextUnitIds);
+                form.setFieldValue("defaultUnitId", nextDefaultUnitId);
+              }}
+              locale={locale}
+              t={t}
+            />
+          )}
+        </form.Subscribe>
+        <form.AppField name="imageUrl">
+          {(field) => (
+            <Field>
+              <FieldLabel>{String(t("admin.common.image"))}</FieldLabel>
+              <ImageUpload
+                value={field.state.value}
+                folder="items"
+                onChange={(url) => field.handleChange(url)}
+              />
+            </Field>
+          )}
+        </form.AppField>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {String(t("common.cancel"))}
+        </Button>
+        <form.Subscribe selector={(s) => s.values.unitIds.length > 0}>
+          {(hasUnits) => (
+            <Button type="submit" disabled={isSubmitting || !hasUnits}>
+              {String(t("common.save"))}
+            </Button>
+          )}
+        </form.Subscribe>
+      </DialogFooter>
+    </form>
+  );
+}
+
 type BuildColumnsArgs = {
   t: Translate;
   locale: string;
@@ -172,8 +294,7 @@ type BuildColumnsArgs = {
   unitOptions: { label: string; value: string }[];
   editForm: ItemFormState | null;
   setEditForm: (form: ItemFormState | null) => void;
-  onFormSubmit: () => void;
-  onFormChange: (form: ItemFormState) => void;
+  onFormSubmit: (values: ItemFormValues) => void;
   isSubmitting: boolean;
   onDelete: (id: string) => void;
 };
@@ -187,7 +308,6 @@ function ItemRowActions({
   editForm,
   setEditForm,
   onFormSubmit,
-  onFormChange,
   isSubmitting,
   onDelete,
 }: { row: Row<ItemRow> } & Omit<
@@ -248,84 +368,19 @@ function ItemRowActions({
         onOpenChange={(open) => !open && setEditForm(null)}
       >
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{String(t("admin.items.editTitle"))}</DialogTitle>
-          </DialogHeader>
           {editForm && isThisFormOpen ? (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label>{String(t("admin.items.nameAr"))}</Label>
-                <Input
-                  dir="rtl"
-                  value={editForm.nameAr}
-                  onChange={(e) =>
-                    onFormChange({ ...editForm, nameAr: e.target.value })
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label>{String(t("admin.items.nameEn"))}</Label>
-                <Input
-                  dir="ltr"
-                  value={editForm.nameEn}
-                  onChange={(e) =>
-                    onFormChange({ ...editForm, nameEn: e.target.value })
-                  }
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label>{String(t("admin.items.category"))}</Label>
-                <Select
-                  value={editForm.categoryId}
-                  onValueChange={(v) => {
-                    if (v) onFormChange({ ...editForm, categoryId: v });
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {locale === "ar" ? c.nameAr : c.nameEn}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <UnitsPicker
-                units={units}
-                unitIds={editForm.unitIds}
-                defaultUnitId={editForm.defaultUnitId}
-                onChange={(unitIds, defaultUnitId) =>
-                  onFormChange({ ...editForm, unitIds, defaultUnitId })
-                }
-                locale={locale}
-                t={t}
-              />
-              <div className="flex flex-col gap-2">
-                <Label>{String(t("admin.common.image"))}</Label>
-                <ImageUpload
-                  value={editForm.imageUrl}
-                  folder="items"
-                  onChange={(url) =>
-                    onFormChange({ ...editForm, imageUrl: url })
-                  }
-                />
-              </div>
-            </div>
+            <ItemFormBody
+              key={editForm.id}
+              title={String(t("admin.items.editTitle"))}
+              initial={editForm}
+              categories={categories}
+              units={units}
+              locale={locale}
+              onClose={() => setEditForm(null)}
+              onSubmit={onFormSubmit}
+              isSubmitting={isSubmitting}
+            />
           ) : null}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditForm(null)}>
-              {String(t("common.cancel"))}
-            </Button>
-            <Button
-              onClick={onFormSubmit}
-              disabled={isSubmitting || !editForm?.unitIds.length}
-            >
-              {String(t("common.save"))}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
@@ -343,7 +398,6 @@ export function buildItemColumns(args: BuildColumnsArgs): ColumnDef<ItemRow>[] {
     editForm,
     setEditForm,
     onFormSubmit,
-    onFormChange,
     isSubmitting,
     onDelete,
   } = args;
@@ -566,7 +620,6 @@ export function buildItemColumns(args: BuildColumnsArgs): ColumnDef<ItemRow>[] {
           editForm={editForm}
           setEditForm={setEditForm}
           onFormSubmit={onFormSubmit}
-          onFormChange={onFormChange}
           isSubmitting={isSubmitting}
           onDelete={onDelete}
         />

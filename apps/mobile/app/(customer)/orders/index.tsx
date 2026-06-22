@@ -1,4 +1,5 @@
-import { FlatList, Pressable, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
@@ -18,11 +19,18 @@ export default function OrdersScreen() {
   const signedIn = useSignedIn();
   const tabBarHeight = useTabBarHeight();
 
-  const { data } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     ...trpc.orders.mine.queryOptions({ cursor: 0 }),
     refetchInterval: 15_000,
     enabled: signedIn === true,
   });
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   if (signedIn === false) {
     return (
@@ -41,6 +49,23 @@ export default function OrdersScreen() {
     );
   }
 
+  if (error) {
+    return (
+      <Screen className="items-center justify-center gap-4">
+        <Text className="text-center text-foreground">{t("common.error")}</Text>
+        <Button label={t("common.retry")} onPress={() => void refetch()} />
+      </Screen>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Screen className="items-center justify-center">
+        <ActivityIndicator className="mt-8" />
+      </Screen>
+    );
+  }
+
   const orders = [...(data?.orders ?? [])].sort((a, b) => {
     const aActive = ACTIVE.includes(a.status) ? 0 : 1;
     const bActive = ACTIVE.includes(b.status) ? 0 : 1;
@@ -55,6 +80,14 @@ export default function OrdersScreen() {
         keyExtractor={(o) => o.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarHeight + 16 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void onRefresh()}
+            tintColor="#C9A227"
+            colors={["#C9A227"]}
+          />
+        }
         renderItem={({ item: order }) => (
           <Pressable
             className="mb-3 rounded-2xl border border-border bg-card p-4 active:bg-elevated"

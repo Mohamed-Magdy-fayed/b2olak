@@ -1,9 +1,10 @@
-import { FlatList, Text } from "react-native";
+import { FlatList, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { ItemRow } from "@/components/item-row";
+import { Button } from "@/components/ui/button";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
@@ -30,10 +31,20 @@ export default function CategoryScreen() {
 
   const allItems = items.data?.pages.flatMap((p) => p.items) ?? [];
 
+  if (items.error) {
+    return (
+      <Screen className="items-center justify-center gap-4">
+        <ScreenBackHeader title=" " className="px-5" />
+        <Text className="text-center text-foreground">{t("common.error")}</Text>
+        <Button label={t("common.retry")} onPress={() => void items.refetch()} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen padded={false}>
       <ScreenBackHeader
-        title={category ? ((locale === "ar" ? category.nameAr : category.nameEn) ?? "") : ""}
+        title={category ? ((locale === "ar" ? category.nameAr : category.nameEn) ?? "") : " "}
         className="px-5"
       />
       <FlatList
