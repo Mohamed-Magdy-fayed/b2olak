@@ -132,6 +132,8 @@ export async function requestOtpAction(
     await caller.auth.requestOtp({ phone: parsed.data.phone });
     return { phase: "code", phone: parsed.data.phone };
   } catch (error) {
+    // Server actions bypass the /api/trpc route handler, so log here explicitly.
+    console.error("requestOtpAction failed:", error);
     // A non-mapped error here means the code couldn't be sent (e.g. WhatsApp/SMS
     // provider rejected it) — surface that rather than the generic "unknown".
     const key = errorKeyFrom(error);
@@ -170,6 +172,7 @@ export async function verifyOtpAction(
       next: sanitizeNextPath(formData.get("next") as string),
     });
   } catch (error) {
+    console.error("verifyOtpAction failed:", error);
     return { phase: "code", phone: parsed.data.phone, error: errorKeyFrom(error) };
   }
 
