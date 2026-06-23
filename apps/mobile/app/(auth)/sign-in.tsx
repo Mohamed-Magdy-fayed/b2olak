@@ -29,10 +29,12 @@ export default function SignInScreen() {
         })
       },
       onError: (err) => {
+        // The phone is already validated client-side before we get here, so a
+        // server error means the code couldn't be sent — don't blame the number.
         setError(
           err.message === "errors.tooManyRequests"
             ? t("errors.tooManyRequests")
-            : t("validation.phoneInvalid")
+            : t("auth.otpSendFailed")
         )
       },
     })

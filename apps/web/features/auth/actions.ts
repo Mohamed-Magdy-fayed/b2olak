@@ -132,7 +132,13 @@ export async function requestOtpAction(
     await caller.auth.requestOtp({ phone: parsed.data.phone });
     return { phase: "code", phone: parsed.data.phone };
   } catch (error) {
-    return { phase: "phone", error: errorKeyFrom(error) };
+    // A non-mapped error here means the code couldn't be sent (e.g. WhatsApp/SMS
+    // provider rejected it) — surface that rather than the generic "unknown".
+    const key = errorKeyFrom(error);
+    return {
+      phase: "phone",
+      error: key === "errors.unknown" ? "auth.otpSendFailed" : key,
+    };
   }
 }
 

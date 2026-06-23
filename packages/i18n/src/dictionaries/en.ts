@@ -44,6 +44,7 @@ const en = {
     otpInvalid: "Incorrect code. Try again.",
     otpExpired: "This code expired. Request a new one.",
     otpTooManyAttempts: "Too many attempts. Request a new code.",
+    otpSendFailed: "Couldn't send the code right now. Please try again in a moment.",
     driverNotApproved: "Your driver account is pending review.",
     phoneVerificationRequired:
       "Verify your WhatsApp number before placing orders.",

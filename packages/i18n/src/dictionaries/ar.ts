@@ -42,6 +42,7 @@ const ar = {
     otpInvalid: "الكود غير صحيح. حاول مرة أخرى.",
     otpExpired: "انتهت صلاحية الكود. اطلب كود جديد.",
     otpTooManyAttempts: "محاولات كثيرة. اطلب كود جديد.",
+    otpSendFailed: "تعذّر إرسال الكود الآن. حاول مرة أخرى بعد لحظات.",
     driverNotApproved: "حساب الطيّار قيد المراجعة.",
     phoneVerificationRequired: "فعّل رقم الواتساب الأول قبل ما تطلب.",
     phoneAlreadyInUse: "الرقم ده مرتبط بحساب تاني.",

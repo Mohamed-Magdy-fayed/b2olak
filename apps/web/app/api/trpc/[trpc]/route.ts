@@ -13,12 +13,11 @@ const handler = (req: Request) =>
     responseMeta: () => ({
       headers: { "cache-control": "no-store" },
     }),
-    onError:
-      process.env.NODE_ENV === "development"
-        ? ({ path, error }) => {
-            console.error(`tRPC error on ${path ?? "<no-path>"}:`, error);
-          }
-        : undefined,
+    // Log server errors in every environment — production was previously silent,
+    // which made 200-with-error-body failures (e.g. OTP send) impossible to debug.
+    onError: ({ path, error }) => {
+      console.error(`tRPC error on ${path ?? "<no-path>"}:`, error);
+    },
   });
 
 export { handler as GET, handler as POST };
