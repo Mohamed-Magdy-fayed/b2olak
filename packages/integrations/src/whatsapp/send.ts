@@ -15,12 +15,20 @@ export function phoneToChatId(phoneE164: string): string {
  * Send a WhatsApp message using a pre-loaded config.
  * Callers that already have a db instance should call getWhatsAppConfig(db)
  * once and reuse the result for multiple sends.
+ *
+ * `context` is an optional correlation label (e.g. "otp" or "order:<id>:placed")
+ * logged with each send so duplicate deliveries can be traced to how many times
+ * our code actually called the send.
  */
 export async function sendWhatsAppMessage(
   config: WhatsAppConfig,
   phoneE164: string,
   text: string,
+  context?: string,
 ): Promise<void> {
+  console.info(
+    `[whatsapp] send via ${config.provider} to ${phoneE164}${context ? ` [${context}]` : ""}`,
+  );
   if (config.provider === "wapilot") {
     await sendText({
       instanceId: config.instanceId,

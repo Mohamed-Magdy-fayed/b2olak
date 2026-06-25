@@ -46,6 +46,41 @@ export function setupNotificationHandler() {
   });
 }
 
+/** Pulls the orderId out of a notification's data payload, if present. */
+function orderIdFrom(content: { data?: Record<string, unknown> | null }): string | null {
+  const orderId = content.data?.orderId;
+  return typeof orderId === "string" && orderId.length > 0 ? orderId : null;
+}
+
+/**
+ * Subscribes to notification taps. When the user taps an order notification we
+ * hand the orderId back so the caller can deep-link to the order. Returns an
+ * unsubscribe function; no-ops (and returns a noop) inside Expo Go.
+ */
+export function addOrderTapListener(
+  onOrder: (orderId: string) => void,
+): () => void {
+  const Notifications = loadNotifications();
+  if (!Notifications) return () => {};
+
+  const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+    const orderId = orderIdFrom(response.notification.request.content);
+    if (orderId) onOrder(orderId);
+  });
+  return () => sub.remove();
+}
+
+/**
+ * If the app was cold-started by tapping an order notification, returns that
+ * orderId once; otherwise null. Lets the caller navigate after launch.
+ */
+export async function getInitialOrderTap(): Promise<string | null> {
+  const Notifications = loadNotifications();
+  if (!Notifications) return null;
+  const response = await Notifications.getLastNotificationResponseAsync();
+  return response ? orderIdFrom(response.notification.request.content) : null;
+}
+
 /**
  * Returns the device's Expo push token, or `null` when push isn't available
  * (Expo Go, simulator, permission denied, or any failure). Never throws — a

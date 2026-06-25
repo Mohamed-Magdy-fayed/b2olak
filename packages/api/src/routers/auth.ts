@@ -105,6 +105,7 @@ export const authRouter = createTRPCRouter({
           whatsappConfig,
           input.phone,
           otpMessage(code, user.preferredLocale),
+          "otp:signin",
         );
       }
 
@@ -268,6 +269,7 @@ export const authRouter = createTRPCRouter({
         whatsappConfig,
         input.phone,
         otpMessage(code, ctx.session.user.preferredLocale),
+        "otp:self",
       );
 
       return { ok: true as const };

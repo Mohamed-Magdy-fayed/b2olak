@@ -34,6 +34,11 @@ async function wapilotRequest<T>({
     body: body ? JSON.stringify(body) : undefined,
   });
 
+  // Log the provider response status for every send so we can correlate a
+  // delivered WhatsApp message with how many times *our* code called Wapilot
+  // (i.e. distinguish our own retries from provider-side duplication).
+  console.info(`[wapilot] ${method} ${endpoint} -> HTTP ${response.status}`);
+
   if (!response.ok) {
     const errorData = (await response.json().catch(() => ({}))) as {
       message?: string;

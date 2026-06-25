@@ -74,7 +74,18 @@ function pushDriver(
 export const onOrderStatusChanged = inngest.createFunction(
   { id: "order-status-changed", retries: 2 },
   { event: "order/status.changed" },
-  async ({ event, step }) => {
+  async ({ event, step, attempt }) => {
+    const orderId = event.data.orderId;
+    const to = event.data.toStatus;
+    // Each external side-effect below lives in its OWN step.run so a failure in
+    // one (e.g. an expired push token, or Wapilot returning a non-2xx after it
+    // already delivered) can never re-run a sibling. Without this isolation, a
+    // single combined step that threw would retry and re-send WhatsApp — the
+    // cause of customers receiving the same message multiple times. `attempt`
+    // is logged so duplicate deliveries can be traced to Inngest retries.
+    console.info(
+      `[order-status-changed] order=${orderId} -> ${to} attempt=${attempt}`,
+    );
     const whatsappConfig = await getWhatsAppConfig(db);
 
     const order = await step.run("load-order", () =>
@@ -111,7 +122,46 @@ export const onOrderStatusChanged = inngest.createFunction(
       driverName: order.driver?.name,
       cancelReason: order.cancelReason,
     };
-    const to = event.data.toStatus;
+    const customerLocale = order.customer.preferredLocale;
+    const driverLocale = order.driver?.preferredLocale ?? "ar";
+
+    // One isolated step per side-effect. Each is memoized once it succeeds, so a
+    // later failure (or a retry of the function) never re-sends an already-sent
+    // message. WhatsApp sends carry a correlation label; pushes carry the
+    // orderId so a tap can deep-link to the order.
+    const customerWhatsApp = (text: string) =>
+      order.customer.phone
+        ? step.run("notify-customer-whatsapp", () =>
+            sendWhatsAppMessage(
+              whatsappConfig,
+              order.customer.phone!,
+              text,
+              `order:${orderId}:${to}`,
+            ),
+          )
+        : Promise.resolve();
+
+    const customerPush = (payload: { title: string; body: string }) =>
+      step.run("notify-customer-push", () =>
+        sendExpoPush(order.customer.pushToken, { ...payload, data: { orderId } }),
+      );
+
+    const driverWhatsApp = (text: string) =>
+      order.driver?.phone
+        ? step.run("notify-driver-whatsapp", () =>
+            sendWhatsAppMessage(
+              whatsappConfig,
+              order.driver!.phone!,
+              text,
+              `order:${orderId}:${to}:driver`,
+            ),
+          )
+        : Promise.resolve();
+
+    const driverPush = (payload: { title: string; body: string }) =>
+      step.run("notify-driver-push", () =>
+        sendExpoPush(order.driver?.pushToken, { ...payload, data: { orderId } }),
+      );
 
     if (to === "placed") {
       await step.run("notify-ops", async () => {
@@ -120,110 +170,44 @@ export const onOrderStatusChanged = inngest.createFunction(
         });
         const opsNumber = (setting?.value as { value?: string } | null)?.value;
         if (opsNumber) {
-          await sendWhatsAppMessage(whatsappConfig, opsNumber, opsMessages.placed(info));
+          await sendWhatsAppMessage(
+            whatsappConfig,
+            opsNumber,
+            opsMessages.placed(info),
+            `order:${orderId}:placed:ops`,
+          );
         }
       });
-      await step.run("notify-customer", async () => {
-        const locale = order.customer.preferredLocale;
-        await Promise.all([
-          order.customer.phone
-            ? sendWhatsAppMessage(
-                whatsappConfig,
-                order.customer.phone,
-                customerMessages.placed(info, locale),
-              )
-            : null,
-          sendExpoPush(order.customer.pushToken, pushCustomer("placed", info, locale)),
-        ]);
-      });
+      await customerWhatsApp(customerMessages.placed(info, customerLocale));
+      await customerPush(pushCustomer("placed", info, customerLocale));
       return { ok: true as const };
     }
 
     if (to === "assigned") {
-      await step.run("notify-driver", async () => {
-        const locale = order.driver?.preferredLocale ?? "ar";
-        await Promise.all([
-          order.driver?.phone
-            ? sendWhatsAppMessage(
-                whatsappConfig,
-                order.driver.phone,
-                driverMessages.assigned(info, locale),
-              )
-            : null,
-          sendExpoPush(order.driver?.pushToken, pushDriver("assigned", info, locale)),
-        ]);
-      });
-      await step.run("notify-customer", async () => {
-        const locale = order.customer.preferredLocale;
-        await Promise.all([
-          order.customer.phone
-            ? sendWhatsAppMessage(
-                whatsappConfig,
-                order.customer.phone,
-                customerMessages.assigned(info, locale),
-              )
-            : null,
-          sendExpoPush(order.customer.pushToken, pushCustomer("assigned", info, locale)),
-        ]);
-      });
+      await driverWhatsApp(driverMessages.assigned(info, driverLocale));
+      await driverPush(pushDriver("assigned", info, driverLocale));
+      await customerWhatsApp(customerMessages.assigned(info, customerLocale));
+      await customerPush(pushCustomer("assigned", info, customerLocale));
       return { ok: true as const };
     }
 
     if (to === "shopping" || to === "purchased") {
-      await step.run("notify-customer", () =>
-        sendExpoPush(
-          order.customer.pushToken,
-          pushCustomer(to, info, order.customer.preferredLocale),
-        ),
-      );
+      await customerPush(pushCustomer(to, info, customerLocale));
       return { ok: true as const };
     }
 
     if (to === "delivering" || to === "delivered") {
-      await step.run("notify-customer", async () => {
-        const locale = order.customer.preferredLocale;
-        await Promise.all([
-          order.customer.phone
-            ? sendWhatsAppMessage(
-                whatsappConfig,
-                order.customer.phone,
-                customerMessages[to](info, locale),
-              )
-            : null,
-          sendExpoPush(order.customer.pushToken, pushCustomer(to, info, locale)),
-        ]);
-      });
+      await customerWhatsApp(customerMessages[to](info, customerLocale));
+      await customerPush(pushCustomer(to, info, customerLocale));
       return { ok: true as const };
     }
 
     if (to === "cancelled") {
-      await step.run("notify-customer", async () => {
-        const locale = order.customer.preferredLocale;
-        await Promise.all([
-          order.customer.phone
-            ? sendWhatsAppMessage(
-                whatsappConfig,
-                order.customer.phone,
-                customerMessages.cancelled(info, locale),
-              )
-            : null,
-          sendExpoPush(order.customer.pushToken, pushCustomer("cancelled", info, locale)),
-        ]);
-      });
+      await customerWhatsApp(customerMessages.cancelled(info, customerLocale));
+      await customerPush(pushCustomer("cancelled", info, customerLocale));
       if (order.driver) {
-        await step.run("notify-driver", async () => {
-          const locale = order.driver!.preferredLocale;
-          await Promise.all([
-            order.driver?.phone
-              ? sendWhatsAppMessage(
-                  whatsappConfig,
-                  order.driver.phone!,
-                  driverMessages.cancelled(info, locale),
-                )
-              : null,
-            sendExpoPush(order.driver?.pushToken, pushDriver("cancelled", info, locale)),
-          ]);
-        });
+        await driverWhatsApp(driverMessages.cancelled(info, driverLocale));
+        await driverPush(pushDriver("cancelled", info, driverLocale));
       }
       return { ok: true as const };
     }

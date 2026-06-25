@@ -1,7 +1,7 @@
 import "../global.css"
 
 import { useEffect } from "react"
-import { Stack, SplashScreen } from "expo-router"
+import { router, Stack, SplashScreen } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useFonts } from "expo-font"
 import { useMutation } from "@tanstack/react-query"
@@ -11,9 +11,22 @@ import * as SystemUI from "expo-system-ui"
 import { SystemBars } from "@/components/system-bars"
 import { appFonts } from "@/lib/fonts"
 import { I18nApp } from "@/lib/i18n"
-import { getExpoPushToken, setupNotificationHandler } from "@/lib/notifications"
-import { getToken } from "@/lib/session"
+import {
+  addOrderTapListener,
+  getExpoPushToken,
+  getInitialOrderTap,
+  setupNotificationHandler,
+} from "@/lib/notifications"
+import { getActiveAccount, getToken } from "@/lib/session"
 import { ApiProvider, useTRPC } from "@/lib/trpc"
+
+/** Routes a tapped order notification to the right order screen for the role. */
+async function openOrder(orderId: string) {
+  const account = await getActiveAccount()
+  if (!account) return
+  const base = account.role === "driver" ? "/(driver)" : "/(customer)"
+  router.push(`${base}/orders/${orderId}` as never)
+}
 
 setupNotificationHandler()
 void SplashScreen.preventAutoHideAsync()
@@ -37,6 +50,16 @@ function PushSync() {
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Deep-link order notifications: taps while running, and a cold start launched
+  // by tapping a notification.
+  useEffect(() => {
+    void getInitialOrderTap().then((orderId) => {
+      if (orderId) void openOrder(orderId)
+    })
+    const unsubscribe = addOrderTapListener((orderId) => void openOrder(orderId))
+    return unsubscribe
   }, [])
 
   return null
