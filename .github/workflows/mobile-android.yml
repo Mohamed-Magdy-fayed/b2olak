@@ -9,12 +9,10 @@ on:
 
 jobs:
   build:
-    name: EAS — ${{ matrix.profile }}
+    name: EAS — production AAB
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        profile: [preview, production]
+    # Preview test APKs are built locally on the dev machine (npm run build:apk).
+    # CI only produces the signed, store-ready production AAB on push to main.
 
     steps:
       - uses: actions/checkout@v4
@@ -31,6 +29,6 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build Android (${{ matrix.profile }})
+      - name: Build Android (production)
         working-directory: apps/mobile
-        run: eas build --non-interactive --platform android --profile ${{ matrix.profile }}
+        run: eas build --non-interactive --platform android --profile production
