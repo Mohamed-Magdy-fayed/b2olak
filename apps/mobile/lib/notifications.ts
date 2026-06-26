@@ -14,10 +14,11 @@ import type * as NotificationsModule from "expo-notifications";
 const isExpoGo =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-/** EAS project id — required by the Expo push service to mint a token. */
-const projectId = Constants.expoConfig?.extra?.eas?.projectId as
-  | string
-  | undefined;
+/** EAS project id — required by the Expo push service to mint a token.
+ *  easConfig.projectId is the canonical source in EAS builds; extra.eas.projectId
+ *  is the fallback for local dev builds where easConfig may not be populated. */
+const projectId = (Constants.easConfig?.projectId as string | undefined)
+  ?? (Constants.expoConfig?.extra?.eas?.projectId as string | undefined);
 
 let cached: typeof NotificationsModule | null = null;
 
@@ -119,9 +120,7 @@ export async function getExpoPushToken(): Promise<string | null> {
     const token = await Notifications.getExpoPushTokenAsync({ projectId });
     return token.data;
   } catch (error) {
-    if (__DEV__) {
-      console.warn("[notifications] Failed to get push token:", error);
-    }
+    console.warn("[notifications] Failed to get push token:", error);
     return null;
   }
 }

@@ -6,6 +6,7 @@ import superjson from "superjson";
 import type { AppRouter } from "@workspace/api/root";
 
 import { authenticate } from "./biometric";
+import { getExpoPushToken } from "./notifications";
 import {
   getStoredLocale,
   getToken,
@@ -159,6 +160,11 @@ export async function biometricLogin(
       name: res.user.name ?? "",
       phone: res.user.phone ?? "",
       biometricEnabled: true,
+    });
+    void getExpoPushToken().then((pushToken) => {
+      if (pushToken) {
+        void getClient().auth.registerPushToken.mutate({ token: pushToken });
+      }
     });
     await setItem(
       TRUSTED_ACCOUNT_KEY,

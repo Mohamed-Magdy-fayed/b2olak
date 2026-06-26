@@ -18,11 +18,16 @@ async function wapilotRequest<T>({
   body,
   method,
   token,
+  logLabel,
 }: {
   endpoint: string;
   body?: unknown;
   method: "GET" | "POST";
   token: string;
+  /** Optional label included in the log line (e.g. the recipient chat_id) so
+   *  Vercel/stdout doesn't collapse identical lines from different recipients
+   *  into a single entry with a badge count. */
+  logLabel?: string;
 }): Promise<T> {
   const url = `${baseUrl}${endpoint}`;
   const response = await fetch(url, {
@@ -34,10 +39,12 @@ async function wapilotRequest<T>({
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // Log the provider response status for every send so we can correlate a
-  // delivered WhatsApp message with how many times *our* code called Wapilot
-  // (i.e. distinguish our own retries from provider-side duplication).
-  console.info(`[wapilot] ${method} ${endpoint} -> HTTP ${response.status}`);
+  // Include the recipient so duplicate sends to the *same* chat are
+  // immediately visible, and so Vercel doesn't collapse sends to
+  // *different* recipients (identical log strings) into a badge count.
+  console.info(
+    `[wapilot] ${method} ${endpoint}${logLabel ? ` to=${logLabel}` : ""} -> HTTP ${response.status}`,
+  );
 
   if (!response.ok) {
     const errorData = (await response.json().catch(() => ({}))) as {
@@ -79,5 +86,6 @@ export function sendText({
     method: "POST",
     body: params,
     token,
+    logLabel: params.chat_id,
   });
 }

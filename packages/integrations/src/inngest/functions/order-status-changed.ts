@@ -87,16 +87,20 @@ export const onOrderStatusChanged = inngest.createFunction(
   async ({ event, step, attempt }) => {
     const orderId = event.data.orderId;
     const to = event.data.toStatus;
-    // Each external side-effect below lives in its OWN step.run so a failure in
-    // one (e.g. an expired push token, or Wapilot returning a non-2xx after it
-    // already delivered) can never re-run a sibling. Without this isolation, a
-    // single combined step that threw would retry and re-send WhatsApp — the
-    // cause of customers receiving the same message multiple times. `attempt`
-    // is logged so duplicate deliveries can be traced to Inngest retries.
+    // event.id is logged to distinguish step-replay invocations (same event.id,
+    // multiple HTTP calls as Inngest fans out steps) from a second *event*
+    // (different event.id, same orderId — means the event was emitted twice).
+    // attempt > 0 means Inngest retried the function after a failure; combined
+    // with step isolation each step is memoized so retries should not re-send.
     console.info(
-      `[order-status-changed] order=${orderId} -> ${to} attempt=${attempt}`,
+      `[order-status-changed] event=${event.id} order=${orderId} -> ${to} attempt=${attempt}`,
     );
-    const whatsappConfig = await getWhatsAppConfig(db);
+
+    // Memoized in its own step so the DB round-trip runs exactly once per
+    // event, even across the multiple HTTP replays Inngest makes per step.
+    const whatsappConfig = await step.run("load-wa-config", () =>
+      getWhatsAppConfig(db),
+    );
 
     const order = await step.run("load-order", () =>
       db.query.OrdersTable.findFirst({

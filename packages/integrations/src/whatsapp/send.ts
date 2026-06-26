@@ -26,8 +26,9 @@ export async function sendWhatsAppMessage(
   text: string,
   context?: string,
 ): Promise<void> {
+  const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
   console.info(
-    `[whatsapp] send via ${config.provider} to ${phoneE164}${context ? ` [${context}]` : ""}`,
+    `[whatsapp] send via ${config.provider} to ${phoneE164}${context ? ` [${context}]` : ""} | "${preview}"`,
   );
   if (config.provider === "wapilot") {
     await sendText({

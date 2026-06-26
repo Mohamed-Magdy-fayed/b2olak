@@ -208,8 +208,11 @@ export const ordersRouter = createTRPCRouter({
         return order;
       });
 
+      const placedEventId = `order:${result.id}:null:placed`;
+      console.info(`[order:place] emit event=${placedEventId} order=${result.id}`);
       await Promise.all([
         inngest.send({
+          id: placedEventId,
           name: "order/status.changed",
           data: { orderId: result.id, fromStatus: null, toStatus: "placed" },
         }),

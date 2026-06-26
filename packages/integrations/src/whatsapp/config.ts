@@ -70,6 +70,15 @@ export async function getWhatsAppConfig(db: Db): Promise<WhatsAppConfig> {
     const instanceId = rawInstanceId ? decryptCredential(rawInstanceId) : null;
     const token = rawToken ? decryptCredential(rawToken) : null;
     if (!instanceId || !token) {
+      // Decryption can fail when the DB was written with a different
+      // SETTINGS_ENCRYPTION_KEY (e.g. dev env sharing a prod DB). Try env
+      // vars before giving up so local development still sends real messages.
+      const envInstanceId = process.env.WAPILOT_INSTANCE_ID;
+      const envToken = process.env.WAPILOT_API_TOKEN;
+      if (envInstanceId && envToken) {
+        console.warn("[whatsapp:config] DB credentials unreadable — using WAPILOT_* env vars.");
+        return { provider: "wapilot", instanceId: envInstanceId, token: envToken };
+      }
       console.warn("[whatsapp] Wapilot credentials missing/invalid — falling back to console.");
       return { provider: "console" };
     }

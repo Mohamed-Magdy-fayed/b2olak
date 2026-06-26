@@ -73,6 +73,7 @@ export default function VerifyScreen() {
           phone: data.user.phone ?? "",
         })
         void getExpoPushToken().then((token) => {
+          console.log("[push-debug] expo push token:", token ?? "null — not registered")
           if (token) registerPush.mutate({ token })
         })
         // Drivers always land in the captain shell; customers return to the

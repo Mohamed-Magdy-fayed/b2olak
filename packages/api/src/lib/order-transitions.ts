@@ -52,8 +52,15 @@ export async function applyTransition(
     });
   });
 
+  // The `id` field is Inngest's dedup key (24-hour window): if this send is
+  // retried at the HTTP level, or applyTransition is called twice concurrently
+  // for the same order + transition, Inngest accepts only ONE event and fires
+  // the notification function once.
+  const eventId = `order:${order.id}:${order.status ?? "null"}:${toStatus}`;
+  console.info(`[transition] emit event=${eventId} order=${order.id} ${order.status} -> ${toStatus} actor=${actor.role}`);
   try {
     await inngest.send({
+      id: eventId,
       name: "order/status.changed",
       data: { orderId: order.id, fromStatus: order.status, toStatus },
     });
