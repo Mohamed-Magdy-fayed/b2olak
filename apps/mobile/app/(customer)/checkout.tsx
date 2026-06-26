@@ -1,20 +1,21 @@
 import { useEffect, useState } from "react"
-import { Alert, KeyboardAvoidingView, Pressable, Text, View } from "react-native"
+import { KeyboardAvoidingView, Pressable, Text, View } from "react-native"
 import { KeyboardAwareScrollView, KeyboardProvider } from "react-native-keyboard-controller"
 import { router } from "expo-router"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { AddressFormModal } from "@/components/address-form-modal"
-import { Button } from "@/components/ui/button"
+import { useAppAlert } from "@/components/ui/app-alert"
 import { Card } from "@/components/ui/card"
+import { PlaceOrderButton } from "@/components/place-order-button"
 import { Input } from "@/components/ui/input"
 import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen"
 import { Screen, ScreenHeader } from "@/components/ui/screen"
-import { itemDisplayName } from "@/components/item-row"
 import { useSignedIn } from "@/lib/auth-gate"
 import { useTranslation } from "@/lib/i18n"
 import { cartLineUnitName, useCart } from "@/lib/cart-store"
 import { useTRPC } from "@/lib/trpc"
+import { itemDisplayName } from "@/components/item-utils"
 
 function addressDisplayName(
   address: {
@@ -64,7 +65,9 @@ function addressSubtitle(
 
 export default function CheckoutScreen() {
   const trpc = useTRPC()
+  const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
+  const appAlert = useAppAlert()
   const signedIn = useSignedIn()
   const lines = useCart((s) => s.lines)
   const clear = useCart((s) => s.clear)
@@ -98,7 +101,12 @@ export default function CheckoutScreen() {
     trpc.orders.place.mutationOptions({
       onSuccess: (data) => {
         clear()
-        Alert.alert(t("shop.orderPlaced"), t("shop.orderPlacedMessage"))
+        setNote("")
+        // Warm the detail screen's cache so it paints instantly on navigation.
+        void queryClient.prefetchQuery(
+          trpc.orders.byId.queryOptions({ orderId: data.orderId })
+        )
+        appAlert(t("shop.orderPlaced"), t("shop.orderPlacedMessage"))
         router.replace(`/(customer)/orders/${data.orderId}`)
       },
       onError: (err) => {
@@ -195,8 +203,8 @@ export default function CheckoutScreen() {
           parent Screen owns the bottom safe-area inset, so this only adds a
           small breathing gap. */}
         <KeyboardStickyFooter className="border-t border-border bg-background px-4 py-4">
-          <Button
-            label={place.isPending ? t("shop.placing") : t("shop.placeOrder")}
+          <PlaceOrderButton
+            label={t("shop.placeOrder")}
             loading={place.isPending}
             disabled={!selected || lines.length === 0}
             onPress={() => {

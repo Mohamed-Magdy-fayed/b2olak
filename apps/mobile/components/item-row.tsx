@@ -24,12 +24,7 @@ type CatalogItem = {
   defaultUnit: string | null;
 };
 
-export function itemDisplayName(
-  item: { nameEn: string | null; nameAr: string | null },
-  locale: string,
-) {
-  return (locale === "ar" ? item.nameAr : item.nameEn) ?? item.nameAr ?? item.nameEn ?? "—";
-}
+import { itemDisplayName } from "./item-utils";
 
 /** Catalog row with leading thumbnail, qty stepper — the only way items enter the cart (C3/C5). */
 export function ItemRow({ item }: { item: CatalogItem }) {

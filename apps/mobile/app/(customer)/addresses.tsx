@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -9,6 +9,7 @@ import {
   type EditableAddress,
 } from "@/components/address-form-modal";
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
+import { useAppAlert } from "@/components/ui/app-alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
@@ -71,6 +72,7 @@ export default function AddressesScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
+  const appAlert = useAppAlert();
   const signedIn = useSignedIn();
   // `null` = sheet closed, `"new"` = create, object = edit that address.
   const [editing, setEditing] = useState<EditableAddress | "new" | null>(null);
@@ -90,7 +92,7 @@ export default function AddressesScreen() {
     trpc.addresses.delete.mutationOptions({
       onSuccess: () =>
         void queryClient.invalidateQueries({ queryKey: listOptions.queryKey }),
-      onError: (err) => Alert.alert(t("common.error"), err.message),
+      onError: (err) => appAlert(t("common.error"), err.message),
     }),
   );
 

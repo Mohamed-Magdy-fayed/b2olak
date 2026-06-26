@@ -1,23 +1,19 @@
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Pressable, ScrollView, Text, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { formatQty, isMoneyKind } from "@workspace/validators/units";
 
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
+import { useAppAlert } from "@/components/ui/app-alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
+import { OrderDetailSkeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
+import { useCart } from "@/lib/cart-store";
 
 const ACTIVE = ["placed", "assigned", "shopping", "purchased", "delivering"];
 const TIMELINE = [
@@ -32,8 +28,11 @@ const TIMELINE = [
 export default function OrderDetailScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { t, locale } = useTranslation();
+  const appAlert = useAppAlert();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const cart = useCart();
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
   const { data: order, isLoading } = useQuery({
@@ -47,13 +46,27 @@ export default function OrderDetailScreen() {
 
   const cancel = useMutation(
     trpc.orders.cancel.mutationOptions({
-      onSuccess: () => {
+      // Optimistically flip the status so the UI reflects the cancel instantly;
+      // roll back if the server rejects it.
+      onMutate: async () => {
+        await queryClient.cancelQueries({ queryKey: orderOptions.queryKey });
+        const prev = queryClient.getQueryData(orderOptions.queryKey);
+        queryClient.setQueryData(orderOptions.queryKey, (old) =>
+          old ? ({ ...old, status: "cancelled" } as typeof old) : old,
+        );
+        return { prev };
+      },
+      onError: (err, _vars, ctx) => {
+        if (ctx?.prev)
+          queryClient.setQueryData(orderOptions.queryKey, ctx.prev);
+        appAlert(t("common.error"), err.message);
+      },
+      onSettled: () => {
         void queryClient.invalidateQueries({ queryKey: orderOptions.queryKey });
         void queryClient.invalidateQueries({
           queryKey: trpc.orders.mine.queryKey(),
         });
       },
-      onError: (err) => Alert.alert(t("common.error"), err.message),
     }),
   );
 
@@ -69,15 +82,48 @@ export default function OrderDetailScreen() {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: orderOptions.queryKey });
       },
-      onError: (err) => Alert.alert(t("common.error"), err.message),
+      onError: (err) => appAlert(t("common.error"), err.message),
     }),
   );
 
+  const reorder = useMutation({
+    mutationFn: () =>
+      queryClient.fetchQuery(trpc.orders.reorderData.queryOptions({ orderId: id! })),
+    onSuccess: (items) => {
+      if (items.length === 0) {
+        appAlert(t("common.error"), t("shop.reorderNoItems"));
+        return;
+      }
+      cart.clear();
+      for (const item of items) {
+        if (!item.selectedUnitId) continue;
+        cart.add(
+          {
+            itemId: item.itemId,
+            nameEn: item.nameEn,
+            nameAr: item.nameAr,
+            units: item.units as import("@/lib/cart-store").CartUnit[],
+            unitId: item.selectedUnitId,
+            note: item.customerNote,
+          },
+          item.qty,
+        );
+      }
+      router.push("/(customer)/cart");
+    },
+    onError: (err) => appAlert(t("common.error"), err.message),
+  });
+
   if (isLoading || !order) {
     return (
-      <View className="flex-1 items-center justify-center bg-background">
-        <ActivityIndicator className="mt-16" />
-      </View>
+      <Screen padded={false}>
+        <ScreenBackHeader
+          onBack={() => void router.push("/orders")}
+          title=""
+          className="px-4"
+        />
+        <OrderDetailSkeleton />
+      </Screen>
     );
   }
 
@@ -86,6 +132,7 @@ export default function OrderDetailScreen() {
   );
   const cancelled = order.status === "cancelled";
   const canCancel = order.status === "placed" || order.status === "assigned";
+  const isTerminal = order.status === "delivered" || order.status === "cancelled";
 
   return (
     <Screen padded={false}>
@@ -97,6 +144,7 @@ export default function OrderDetailScreen() {
         keyboardDismissMode="on-drag"
       >
         <ScreenBackHeader
+          onBack={() => void router.push("/orders")}
           title={t("shop.orderNumber", { number: String(order.orderNumber) })}
         />
 
@@ -267,7 +315,7 @@ export default function OrderDetailScreen() {
             label={t("shop.cancelOrder")}
             loading={cancel.isPending}
             onPress={() =>
-              Alert.alert(t("shop.cancelOrder"), t("shop.cancelConfirm"), [
+              appAlert(t("shop.cancelOrder"), t("shop.cancelConfirm"), [
                 { text: t("common.cancel"), style: "cancel" },
                 {
                   text: t("common.confirm"),
@@ -276,6 +324,15 @@ export default function OrderDetailScreen() {
                 },
               ])
             }
+          />
+        </BottomActionBar>
+      ) : null}
+      {isTerminal ? (
+        <BottomActionBar className="px-4">
+          <Button
+            label={t("shop.orderAgain")}
+            loading={reorder.isPending}
+            onPress={() => reorder.mutate()}
           />
         </BottomActionBar>
       ) : null}

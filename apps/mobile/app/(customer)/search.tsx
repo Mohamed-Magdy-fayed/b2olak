@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native"
+import { FlatList, Pressable, Text, View } from "react-native"
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import AsyncStorage from "@react-native-async-storage/async-storage"
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Screen, ScreenHeader } from "@/components/ui/screen"
+import { ItemRowListSkeleton } from "@/components/ui/skeleton"
 import { ensureSignedIn } from "@/lib/auth-gate"
 import { useTranslation } from "@/lib/i18n"
 import { useCart } from "@/lib/cart-store"
@@ -84,9 +85,18 @@ export default function SearchScreen() {
   const search = useQuery({
     ...trpc.catalog.search.queryOptions({ query: debouncedQuery }),
     enabled: debouncedQuery.trim().length >= 2,
+    // Keep results fresh during an active shopping session.
+    staleTime: 2 * 60 * 1000,
   })
-  const { data: categories } = useQuery(trpc.catalog.categories.queryOptions())
-  const { data: units } = useQuery(trpc.catalog.units.queryOptions())
+  // Catalog taxonomy rarely changes — cache for the session to avoid refetch.
+  const { data: categories } = useQuery({
+    ...trpc.catalog.categories.queryOptions(),
+    staleTime: 5 * 60 * 1000,
+  })
+  const { data: units } = useQuery({
+    ...trpc.catalog.units.queryOptions(),
+    staleTime: 5 * 60 * 1000,
+  })
 
   const pushRecent = useCallback(
     async (term: string) => {
@@ -178,7 +188,9 @@ export default function SearchScreen() {
       </View>
 
       {search.isFetching && query.trim().length >= 2 ? (
-        <ActivityIndicator className="mb-3" />
+        <View className="px-5">
+          <ItemRowListSkeleton count={5} />
+        </View>
       ) : null}
 
       {feedback ? (

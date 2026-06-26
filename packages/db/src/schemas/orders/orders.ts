@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -57,9 +57,21 @@ export const OrdersTable = pgTable(
     ...auditColumns,
   },
   (table) => [
-    index("orders_status_created_idx").on(table.status, table.createdAt),
-    index("orders_driver_status_idx").on(table.driverId, table.status),
-    index("orders_customer_created_idx").on(table.customerId, table.createdAt),
+    // Partial indexes — every list/detail query filters `deleted_at IS NULL`,
+    // so scoping the indexes to live rows keeps them small and fast.
+    index("orders_status_created_idx")
+      .on(table.status, table.createdAt)
+      .where(sql`deleted_at IS NULL`),
+    index("orders_driver_status_idx")
+      .on(table.driverId, table.status)
+      .where(sql`deleted_at IS NULL`),
+    index("orders_customer_created_idx")
+      .on(table.customerId, table.createdAt)
+      .where(sql`deleted_at IS NULL`),
+    // Driver list + history sort by recency for a given driver.
+    index("orders_driver_created_idx")
+      .on(table.driverId, table.createdAt)
+      .where(sql`deleted_at IS NULL`),
   ],
 );
 

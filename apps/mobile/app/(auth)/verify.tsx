@@ -239,7 +239,7 @@ export default function VerifyScreen() {
                       autoFocus
                       ltr
                       sanitize={(text) => text.replace(/[^0-9]/g, "").slice(0, 6)}
-                      className="text-center text-2xl tracking-[8px]"
+                      className="text-2xl tracking-[8px]"
                     />
                   )}
                 </form.AppField>

@@ -46,7 +46,9 @@ export const ItemsTable = pgTable(
     ...auditColumns,
   },
   (table) => [
-    index("items_category_status_idx").on(table.categoryId, table.status),
+    index("items_category_status_idx")
+      .on(table.categoryId, table.status)
+      .where(sql`deleted_at IS NULL`),
     index("items_normalized_en_trgm").using(
       "gin",
       sql`${table.normalizedEn} gin_trgm_ops`,

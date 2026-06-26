@@ -1,6 +1,7 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  index,
   pgEnum,
   pgTable,
   text,
@@ -40,7 +41,13 @@ export const DriverProfilesTable = pgTable(
     adminNotes: text(),
     ...auditColumns,
   },
-  (table) => [uniqueIndex("driver_profiles_user_unique").on(table.userId)],
+  (table) => [
+    uniqueIndex("driver_profiles_user_unique").on(table.userId),
+    // Assignable-drivers query: approved + available + not soft-deleted.
+    index("driver_profiles_status_available_idx")
+      .on(table.status, table.isAvailable)
+      .where(sql`deleted_at IS NULL`),
+  ],
 );
 
 export const driverProfilesRelations = relations(

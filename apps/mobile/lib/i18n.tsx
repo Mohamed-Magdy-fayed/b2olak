@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, I18nManager, Platform } from "react-native";
+import { I18nManager, Platform } from "react-native";
 import * as Updates from "expo-updates";
 
 import {
@@ -9,6 +9,7 @@ import {
 } from "@workspace/i18n/dictionaries";
 import { TranslationProvider, useTranslation } from "@workspace/i18n/react";
 
+import { useAppAlert } from "@/components/ui/app-alert";
 import { getStoredLocale, setStoredLocale } from "./session";
 
 export { useTranslation };
@@ -58,6 +59,8 @@ export function I18nApp({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
+  const appAlert = useAppAlert();
+
   const onLocaleChange = useCallback((next: Locale) => {
     void (async () => {
       await setStoredLocale(next);
@@ -68,7 +71,7 @@ export function I18nApp({ children }: { children: React.ReactNode }) {
       const wantsRTL = dirFor(next) === "rtl";
       if (I18nManager.isRTL !== wantsRTL) {
         I18nManager.forceRTL(wantsRTL);
-        Alert.alert(
+        appAlert(
           next === "ar" ? "إعادة تشغيل" : "Restart required",
           next === "ar"
             ? "هيعاد تشغيل التطبيق لتطبيق اتجاه اللغة."

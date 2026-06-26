@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
 import {
   KeyboardProvider,
   KeyboardStickyView,
@@ -28,7 +28,7 @@ import {
   type CatalogItemForCart,
 } from "@/lib/cart-store";
 import { useTranslation } from "@/lib/i18n";
-import { itemDisplayName } from "./item-row";
+import { itemDisplayName } from "./item-utils";
 
 type Props = {
   item: CatalogItemForCart;
@@ -209,6 +209,7 @@ export function QuantityUnitSheet({
                   </Pressable>
                   <Input
                     className="flex-1 text-center"
+                    style={{ direction: "ltr", writingDirection: "ltr" }}
                     keyboardType={kind === "weight" ? "decimal-pad" : "number-pad"}
                     value={inputText}
                     onChangeText={(text) => {
@@ -235,11 +236,24 @@ export function QuantityUnitSheet({
                 className="gap-2 border-t border-border px-4 pt-3"
                 style={{ paddingBottom: insets.bottom }}
               >
-                <Button
-                  label={`${editing ? t("shop.pickerUpdate") : t("shop.addToCart")} · ${summary}`}
+                <Pressable
+                  accessibilityRole="button"
                   disabled={!selectedUnit}
-                  onPress={onConfirm}
-                />
+                  onPress={() => {
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onConfirm();
+                  }}
+                  className="flex-row items-center justify-center rounded-2xl active:opacity-90 bg-primary min-h-14 py-3 px-6 text-primary-foreground"
+                >
+                  {!selectedUnit ? (
+                    <ActivityIndicator
+                      size="small"
+                      color={"#0E0E10"}
+                    />
+                  ) : (
+                    <Text>{`${editing ? t("shop.pickerUpdate") : t("shop.addToCart")} · ${summary}`}</Text>
+                  )}
+                </Pressable>
                 <Button variant="ghost" label={t("common.cancel")} onPress={onClose} />
               </View>
             </View>

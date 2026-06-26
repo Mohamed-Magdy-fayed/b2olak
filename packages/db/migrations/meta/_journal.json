@@ -78,6 +78,13 @@
       "when": 1782420305416,
       "tag": "0010_odd_texas_twister",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782478668246,
+      "tag": "0011_loving_vance_astro",
+      "breakpoints": true
     }
   ]
 }

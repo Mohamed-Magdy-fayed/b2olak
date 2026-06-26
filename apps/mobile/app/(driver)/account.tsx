@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { LanguageToggle } from "@/components/language-toggle";
+import { useAppAlert } from "@/components/ui/app-alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
@@ -26,6 +27,7 @@ export default function DriverAccount() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  const appAlert = useAppAlert();
   const { data } = useQuery(trpc.auth.me.queryOptions());
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricOn, setBiometricOn] = useState(false);
@@ -72,7 +74,7 @@ export default function DriverAccount() {
       // guest (not a login wall). Remove by user id so a stale active token can
       // never leave the driver account stored and bounce us back into /(driver).
       onError: (err: { message: string }) => {
-        Alert.alert(t("common.error"), err.message);
+        appAlert(t("common.error"), err.message);
       },
       onSettled: async () => {
         if (data?.user.id) await removeAccount(data.user.id);

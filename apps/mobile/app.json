@@ -8,14 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "backgroundColor": "#0E0E10",
-    "androidStatusBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#00000000"
-    },
-    "androidNavigationBar": {
-      "barStyle": "light-content",
-      "backgroundColor": "#0E0E10"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.gatelingsolutions.ba2olak",
@@ -31,6 +23,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "backgroundColor": "#0E0E10",
+      "navigationBarColor": "#0E0E10",
       "softwareKeyboardLayoutMode": "pan",
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",

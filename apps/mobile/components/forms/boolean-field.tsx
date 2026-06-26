@@ -1,7 +1,7 @@
 import { Switch, View } from "react-native"
 
 import { Typography } from "@/components/ui/typography"
-import { useFieldContext } from "./hooks"
+import { useFieldContext } from "./form-context"
 
 export function FormBooleanField({ label }: { label: string }) {
   const field = useFieldContext<boolean>()

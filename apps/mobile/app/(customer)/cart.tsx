@@ -9,7 +9,7 @@ import { formatQty, isMoneyKind, stepForKind } from "@workspace/validators/units
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
-import { itemDisplayName } from "@/components/item-row";
+import { useAppAlert } from "@/components/ui/app-alert";
 import { ItemThumb } from "@/components/item-thumb";
 import { QuantityUnitSheet } from "@/components/quantity-unit-sheet";
 import { track } from "@/lib/analytics";
@@ -17,13 +17,13 @@ import { ensureSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
 import { cartLineUnit, cartLineUnitName, useCart, type CartLine } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
+import { itemDisplayName } from "@/components/item-utils";
 
 /** One cart line: thumbnail, kind-aware stepper, tap-to-edit unit + quantity. */
-function CartRow({ line }: { line: CartLine }) {
+function CartRow({ line, onEdit }: { line: CartLine; onEdit: () => void }) {
   const { t, locale } = useTranslation();
   const setQty = useCart((s) => s.setQty);
   const remove = useCart((s) => s.remove);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   const unit = cartLineUnit(line);
   const kind = unit?.kind ?? "count";
@@ -37,7 +37,7 @@ function CartRow({ line }: { line: CartLine }) {
           <Text className="text-base font-semibold text-foreground">
             {itemDisplayName(line, locale)}
           </Text>
-          <Pressable hitSlop={8} onPress={() => setSheetOpen(true)}>
+          <Pressable hitSlop={8} onPress={onEdit}>
             <Text className="text-xs text-primary">
               {isMoneyKind(kind)
                 ? t("shop.egpWorth", { amount: line.qty })
@@ -64,7 +64,7 @@ function CartRow({ line }: { line: CartLine }) {
           >
             <Text className="text-lg font-bold text-foreground">−</Text>
           </Pressable>
-          <Pressable hitSlop={8} onPress={() => setSheetOpen(true)}>
+          <Pressable hitSlop={8} onPress={onEdit}>
             <Text className="min-w-6 text-center text-base font-bold text-foreground">
               {formatQty(line.qty, kind)}
             </Text>
@@ -80,40 +80,61 @@ function CartRow({ line }: { line: CartLine }) {
           </Pressable>
         </View>
       </View>
-
-      {sheetOpen ? (
-        <QuantityUnitSheet
-          item={{
-            id: line.itemId,
-            nameEn: line.nameEn,
-            nameAr: line.nameAr,
-            units: line.units,
-            defaultUnit: unit?.code ?? null,
-          }}
-          visible={sheetOpen}
-          onClose={() => setSheetOpen(false)}
-          initialUnitId={line.unitId}
-          initialQty={line.qty}
-        />
-      ) : null}
     </View>
   );
 }
 
 export default function CartScreen() {
   const trpc = useTRPC();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const lines = useCart((s) => s.lines);
+  const clear = useCart((s) => s.clear);
+  const alert = useAppAlert();
   const { data: fee } = useQuery(trpc.catalog.deliveryFee.queryOptions());
+  // The picker sheet is mounted at the screen root (outside the FlatList) so the
+  // keyboard-aware modal gets correct keyboard framing — a sheet nested in a
+  // scrolling row misbehaves on first open. One sheet serves every line.
+  const [editingLine, setEditingLine] = useState<CartLine | null>(null);
+
+  function confirmClearCart() {
+    alert(t("shop.clearCartConfirmTitle"), t("shop.clearCartConfirmMessage"), [
+      {
+        text: t("shop.clearCart"),
+        style: "destructive",
+        onPress: () => {
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          clear();
+        },
+      },
+      { text: t("common.cancel"), style: "cancel" },
+    ]);
+  }
 
   return (
     <Screen>
-      <ScreenHeader title={t("shop.cartTitle")} />
+      <ScreenHeader
+        title={t("shop.cartTitle")}
+        right={
+          lines.length > 0 ? (
+            <Pressable hitSlop={12} onPress={confirmClearCart}>
+              <Text className="text-sm text-destructive">{t("shop.clearCart")}</Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
 
       {lines.length === 0 ? (
-        <View className="flex-1 items-center justify-center gap-2">
-          <Text className="text-5xl">🛍️</Text>
-          <Text className="text-muted-foreground">{t("shop.cartEmpty")}</Text>
+        <View className="flex-1 items-center justify-center gap-4 px-8">
+          <Text className="text-7xl">🛍️</Text>
+          <View className="items-center gap-1">
+            <Text className="text-xl font-semibold text-foreground">{t("shop.cartEmpty")}</Text>
+            <Text className="text-center text-sm text-muted-foreground">{t("shop.cartEmptyHint")}</Text>
+          </View>
+          <Button
+            label={t("shop.continueShopping")}
+            variant="outline"
+            onPress={() => router.push("/(customer)/")}
+          />
         </View>
       ) : (
         <>
@@ -123,7 +144,9 @@ export default function CartScreen() {
             keyExtractor={(l) => l.itemId}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={() => <View className="h-3" />}
-            renderItem={({ item: line }) => <CartRow line={line} />}
+            renderItem={({ item: line }) => (
+              <CartRow line={line} onEdit={() => setEditingLine(line)} />
+            )}
             contentContainerClassName="pb-4 pt-1"
           />
           <BottomActionBar>
@@ -155,6 +178,22 @@ export default function CartScreen() {
           </BottomActionBar>
         </>
       )}
+
+      {editingLine ? (
+        <QuantityUnitSheet
+          item={{
+            id: editingLine.itemId,
+            nameEn: editingLine.nameEn,
+            nameAr: editingLine.nameAr,
+            units: editingLine.units,
+            defaultUnit: cartLineUnit(editingLine)?.code ?? null,
+          }}
+          visible={editingLine !== null}
+          onClose={() => setEditingLine(null)}
+          initialUnitId={editingLine.unitId}
+          initialQty={editingLine.qty}
+        />
+      ) : null}
     </Screen>
   );
 }

@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import type { Db } from "@workspace/db/client";
@@ -9,6 +9,8 @@ import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
 import { UnitsTable } from "@workspace/db/schemas/catalog/units";
 import { inngest } from "@workspace/integrations/inngest/client";
+import { getDeliveryFeeEgp } from "../lib/settings";
+import { applyTransition } from "../lib/order-transitions";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrderStatusEventsTable } from "@workspace/db/schemas/orders/order-status-events";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
@@ -23,19 +25,30 @@ import {
   customerProcedure,
   protectedProcedure,
 } from "../init";
-import { enforceRateLimit } from "../ratelimit";
+import { getLimiter } from "../ratelimit";
 
 /** Resolve a merged item to its canonical target (follows one merge hop). */
 async function resolveItemIds(db: Db, itemIds: string[]) {
   const items = await db.query.ItemsTable.findMany({
     where: and(inArray(ItemsTable.id, itemIds), isNull(ItemsTable.deletedAt)),
   });
+
+  const mergedTargetIds = items
+    .filter((i) => i.status === "merged" && i.mergedIntoItemId)
+    .map((i) => i.mergedIntoItemId!);
+
+  const targets =
+    mergedTargetIds.length > 0
+      ? await db.query.ItemsTable.findMany({
+          where: inArray(ItemsTable.id, mergedTargetIds),
+        })
+      : [];
+  const targetMap = new Map(targets.map((t) => [t.id, t]));
+
   const map = new Map(items.map((item) => [item.id, item]));
   for (const item of items) {
     if (item.status === "merged" && item.mergedIntoItemId) {
-      const target = await db.query.ItemsTable.findFirst({
-        where: eq(ItemsTable.id, item.mergedIntoItemId),
-      });
+      const target = targetMap.get(item.mergedIntoItemId);
       if (target) map.set(item.id, target);
     }
   }
@@ -46,40 +59,50 @@ export const ordersRouter = createTRPCRouter({
   place: customerProcedure
     .input(placeOrderSchema)
     .mutation(async ({ ctx, input }) => {
-      await enforceRateLimit("order-place", ctx.session.user.id, 5, "1 h");
+      // Run rate-limit check in parallel with the first DB round-trip.
+      // Rate-limited requests are rare; the wasted DB work is negligible.
+      const rlLimiter =
+        process.env.UPSTASH_REDIS_REST_URL || process.env.NODE_ENV === "production"
+          ? getLimiter("order-place", 5, "1 h")
+          : null;
 
       // Scam prevention: only phone-verified accounts may place orders.
       // OTP sign-ins are verified by definition; OAuth-created accounts must
       // link a phone first (auth.requestPhoneLink/confirmPhoneLink).
-      const placer = await ctx.db.query.UsersTable.findFirst({
-        where: and(
-          eq(UsersTable.id, ctx.session.user.id),
-          isNull(UsersTable.deletedAt),
-        ),
-        columns: { phoneVerifiedAt: true },
-      });
+      const [rl, placer, address] = await Promise.all([
+        rlLimiter?.limit(ctx.session.user.id) ?? Promise.resolve({ success: true }),
+        ctx.db.query.UsersTable.findFirst({
+          where: and(
+            eq(UsersTable.id, ctx.session.user.id),
+            isNull(UsersTable.deletedAt),
+          ),
+          columns: { phoneVerifiedAt: true },
+        }),
+        ctx.db.query.AddressesTable.findFirst({
+          where: and(
+            eq(AddressesTable.id, input.addressId),
+            eq(AddressesTable.userId, ctx.session.user.id),
+            isNull(AddressesTable.deletedAt),
+          ),
+        }),
+      ]);
+      if (!rl.success) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "errors.tooManyRequests" });
+      }
       if (!placer?.phoneVerifiedAt) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "auth.phoneVerificationRequired",
         });
       }
-
-      const address = await ctx.db.query.AddressesTable.findFirst({
-        where: and(
-          eq(AddressesTable.id, input.addressId),
-          eq(AddressesTable.userId, ctx.session.user.id),
-          isNull(AddressesTable.deletedAt),
-        ),
-      });
       if (!address) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "orders.addressNotFound" });
       }
 
-      const itemMap = await resolveItemIds(
-        ctx.db,
-        input.items.map((line) => line.itemId),
-      );
+      const [itemMap, deliveryFee] = await Promise.all([
+        resolveItemIds(ctx.db, input.items.map((line) => line.itemId)),
+        getDeliveryFeeEgp(ctx.db),
+      ]);
       for (const line of input.items) {
         if (!itemMap.has(line.itemId)) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "orders.itemNotFound" });
@@ -131,10 +154,6 @@ export const ordersRouter = createTRPCRouter({
       };
       // Validate up-front so a bad line fails before we open the transaction.
       for (const line of input.items) unitInfoForLine(line);
-
-      // settings lib import kept local to avoid cycle noise
-      const { getDeliveryFeeEgp } = await import("../lib/settings");
-      const deliveryFee = await getDeliveryFeeEgp(ctx.db);
 
       const result = await ctx.db.transaction(async (tx) => {
         const [order] = await tx
@@ -189,17 +208,12 @@ export const ordersRouter = createTRPCRouter({
         return order;
       });
 
-      try {
-        await inngest.send({
+      await Promise.all([
+        inngest.send({
           name: "order/status.changed",
           data: { orderId: result.id, fromStatus: null, toStatus: "placed" },
-        });
-      } catch {
-        // notifications are best-effort
-      }
-
-      try {
-        await inngest.send({
+        }),
+        inngest.send({
           name: "order/placed",
           data: {
             orderId: result.id,
@@ -207,10 +221,10 @@ export const ordersRouter = createTRPCRouter({
             value: Number(deliveryFee),
             currency: "EGP",
           },
-        });
-      } catch {
-        // best-effort
-      }
+        }),
+      ]).catch(() => {
+        // notifications are best-effort
+      });
 
       return { orderId: result.id, orderNumber: result.orderNumber };
     }),
@@ -384,6 +398,74 @@ export const ordersRouter = createTRPCRouter({
       return { ok: true as const };
     }),
 
+  /**
+   * Returns order items enriched with full current unit data so the mobile
+   * client can repopulate the cart in one tap ("Order Again"). Skips items
+   * that were marked unavailable by the driver.
+   */
+  reorderData: customerProcedure
+    .input(z.object({ orderId: z.uuid() }))
+    .query(async ({ ctx, input }) => {
+      const order = await ctx.db.query.OrdersTable.findFirst({
+        where: and(
+          eq(OrdersTable.id, input.orderId),
+          eq(OrdersTable.customerId, ctx.session.user.id),
+          isNull(OrdersTable.deletedAt),
+        ),
+        with: {
+          items: {
+            where: ne(OrderItemsTable.status, "unavailable"),
+          },
+        },
+      });
+      if (!order) throw new TRPCError({ code: "NOT_FOUND" });
+
+      const itemIds = [...new Set(order.items.map((l) => l.itemId))];
+      if (itemIds.length === 0) return [];
+
+      const [links, moneyUnits] = await Promise.all([
+        ctx.db.query.ItemUnitsTable.findMany({
+          where: inArray(ItemUnitsTable.itemId, itemIds),
+          with: {
+            unit: {
+              columns: { id: true, code: true, nameEn: true, nameAr: true, kind: true },
+            },
+          },
+          orderBy: (t, { asc }) => [asc(t.sortOrder)],
+        }),
+        ctx.db.query.UnitsTable.findMany({
+          where: and(
+            eq(UnitsTable.kind, "money"),
+            eq(UnitsTable.isActive, true),
+            isNull(UnitsTable.deletedAt),
+          ),
+          columns: { id: true, code: true, nameEn: true, nameAr: true, kind: true },
+        }),
+      ]);
+
+      // Build itemId → CartUnit[] (item-specific units + money units appended)
+      const unitsByItem = new Map<string, { id: string; code: string; nameEn: string; nameAr: string; kind: string }[]>();
+      for (const link of links) {
+        const list = unitsByItem.get(link.itemId) ?? [];
+        list.push(link.unit);
+        unitsByItem.set(link.itemId, list);
+      }
+
+      return order.items.map((line) => {
+        const itemUnits = [...(unitsByItem.get(line.itemId) ?? []), ...moneyUnits];
+        const selectedUnit = itemUnits.find((u) => u.code === line.unit);
+        return {
+          itemId: line.itemId,
+          nameEn: line.nameSnapshotEn,
+          nameAr: line.nameSnapshotAr,
+          qty: Number(line.qty),
+          selectedUnitId: selectedUnit?.id ?? "",
+          units: itemUnits,
+          customerNote: line.customerNote ?? undefined,
+        };
+      });
+    }),
+
   cancel: customerProcedure
     .input(cancelOrderSchema)
     .mutation(async ({ ctx, input }) => {
@@ -399,7 +481,6 @@ export const ordersRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "orders.cannotCancel" });
       }
 
-      const { applyTransition } = await import("../lib/order-transitions");
       await applyTransition(
         ctx.db,
         order,

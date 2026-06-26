@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Text, View } from "react-native"
+import { Keyboard, Text, View } from "react-native"
 import { router, useLocalSearchParams } from "expo-router"
 import { Ionicons } from "@expo/vector-icons"
 import { useMutation } from "@tanstack/react-query"
@@ -46,6 +46,7 @@ export default function SignInScreen() {
     defaultValues: { phone: "" },
     onSubmit: ({ value }) => {
       setError(null)
+      Keyboard.dismiss()
       requestOtp.mutate({ phone: value.phone })
     },
   })

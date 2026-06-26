@@ -22,6 +22,8 @@ import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { cached } from "@workspace/integrations/redis";
 import { normalizeText } from "@workspace/validators/normalize";
 
+import { getDeliveryFeeEgp, getStoreLinks } from "../lib/settings";
+
 import { baseProcedure, createTRPCRouter, customerProcedure } from "../init";
 import { enforceRateLimit, ipFromHeaders } from "../ratelimit";
 import type { Context } from "../init";
@@ -73,7 +75,17 @@ async function attachUnits<T extends { id: string }>(
         items.map((i) => i.id),
       ),
       orderBy: [asc(ItemUnitsTable.sortOrder)],
-      with: { unit: true },
+      with: {
+        unit: {
+          columns: {
+            id: true,
+            code: true,
+            nameEn: true,
+            nameAr: true,
+            kind: true,
+          },
+        },
+      },
     }),
     activeMoneyUnits(db),
   ]);
@@ -113,16 +125,12 @@ async function attachUnits<T extends { id: string }>(
 export const catalogRouter = createTRPCRouter({
   /** Public so the checkout screen can show the fee before placing. */
   deliveryFee: baseProcedure.query(async ({ ctx }) => {
-    const { getDeliveryFeeEgp } = await import("../lib/settings");
     return { amount: await getDeliveryFeeEgp(ctx.db) };
   }),
 
   /** Public store links — shown on the landing page download section. */
   storeLinks: baseProcedure.query(({ ctx }) =>
-    cached("catalog:store-links", 60, async () => {
-      const { getStoreLinks } = await import("../lib/settings");
-      return getStoreLinks(ctx.db);
-    }),
+    cached("catalog:store-links", 60, () => getStoreLinks(ctx.db)),
   ),
 
   categories: baseProcedure.query(({ ctx }) =>

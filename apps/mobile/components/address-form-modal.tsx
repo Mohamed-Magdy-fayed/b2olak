@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMemo, useState } from "react"
 import { Modal, Pressable, Text, View } from "react-native"
 import {
   KeyboardAwareScrollView,
@@ -122,6 +122,61 @@ export function AddressFormModal({
   onClose,
   onSaved,
 }: AddressFormModalProps) {
+  const { t } = useTranslation()
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      onRequestClose={onClose}
+    >
+      {/* RN Modal renders in its own window, so the root KeyboardProvider does
+          not reach inside it — nest a provider here so the form stays keyboard
+          aware within the sheet. */}
+      <KeyboardProvider>
+        <View className="flex-1 justify-end">
+          <Pressable className="flex-1 bg-black/60" onPress={onClose} />
+          <View className="max-h-[85%] rounded-t-2xl bg-card">
+            {/* Drag handle */}
+            <View className="items-center pt-3 pb-1">
+              <View className="h-1 w-10 rounded-full bg-border" />
+            </View>
+            <View className="border-b border-border px-4 py-3">
+              <Text className="text-center text-lg font-bold text-foreground">
+                {address ? t("address.edit") : t("address.add")}
+              </Text>
+            </View>
+
+            {/* Mount a fresh form per target, keyed by address id, so its fields
+                prefill straight from `defaultValues`. This avoids resetting a
+                shared form instance in an effect that races the modal's mount —
+                the cause of edits opening with empty fields. */}
+            {visible ? (
+              <AddressForm
+                key={address?.id ?? "new"}
+                address={address ?? null}
+                onClose={onClose}
+                onSaved={onSaved}
+              />
+            ) : null}
+          </View>
+        </View>
+      </KeyboardProvider>
+    </Modal>
+  )
+}
+
+// ─── AddressForm ──────────────────────────────────────────────────────────────
+
+type AddressFormProps = {
+  address: EditableAddress | null
+  onClose: () => void
+  onSaved: (addressId: string) => void
+}
+
+/** The form body — remounted per target so `defaultValues` does the prefill. */
+function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
@@ -157,7 +212,7 @@ export function AddressFormModal({
   )
 
   const form = useAppForm({
-    defaultValues: emptyForm,
+    defaultValues: address ? formFromAddress(address) : emptyForm,
     onSubmit: ({ value }) => {
       setError(null)
       const payload = {
@@ -176,15 +231,6 @@ export function AddressFormModal({
       else create.mutate(payload)
     },
   })
-
-  // Reset the form whenever the sheet is (re)opened for a new target.
-  useEffect(() => {
-    if (visible) {
-      form.reset(address ? formFromAddress(address) : emptyForm)
-      setError(null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, address])
 
   const cityId = useStore(form.baseStore, (s) => s.values.cityId)
   const districtId = useStore(form.baseStore, (s) => s.values.districtId)
@@ -206,37 +252,15 @@ export function AddressFormModal({
   const areaOptions = useMemo(() => geoOptions(areas, locale), [areas, locale])
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      {/* RN Modal renders in its own window, so the root KeyboardProvider does
-          not reach inside it — nest a provider here so the form stays keyboard
-          aware within the sheet. */}
-      <KeyboardProvider>
-        <View className="flex-1 justify-end">
-          <Pressable className="flex-1 bg-black/60" onPress={onClose} />
-          <View className="max-h-[85%] rounded-t-2xl bg-card">
-            {/* Drag handle */}
-            <View className="items-center pt-3 pb-1">
-              <View className="h-1 w-10 rounded-full bg-border" />
-            </View>
-            <View className="border-b border-border px-4 py-3">
-              <Text className="text-center text-lg font-bold text-foreground">
-                {address ? t("address.edit") : t("address.add")}
-              </Text>
-            </View>
-
-            <KeyboardAwareScrollView
-              className="px-4"
-              contentContainerClassName="gap-4 py-4"
-              bottomOffset={24}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <form.AppField name="label">
+    <>
+      <KeyboardAwareScrollView
+        className="px-4"
+        contentContainerClassName="gap-4 py-4"
+        bottomOffset={24}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <form.AppField name="label">
                 {(field) => <field.StringField label={t("address.label")} />}
               </form.AppField>
 
@@ -374,9 +398,6 @@ export function AddressFormModal({
                 onPress={onClose}
               />
             </KeyboardStickyFooter>
-          </View>
-        </View>
-      </KeyboardProvider>
-    </Modal>
+    </>
   )
 }

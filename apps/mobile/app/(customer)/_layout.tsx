@@ -71,7 +71,7 @@ export default function CustomerLayout() {
         name="account"
         options={{ title: t("shop.tabAccount"), tabBarIcon: tabIcon("person-outline") }}
       />
-      <Tabs.Screen name="category/[id]" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
+      <Tabs.Screen name="category/[id]" options={{ href: null }} />
       <Tabs.Screen name="orders/[id]" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
       <Tabs.Screen name="checkout" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
       <Tabs.Screen name="addresses" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 
 import { LanguageToggle } from "@/components/language-toggle";
+import { useAppAlert } from "@/components/ui/app-alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
@@ -90,6 +91,7 @@ export default function AccountScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
+  const appAlert = useAppAlert();
   const signedIn = useSignedIn();
   const { data } = useQuery({
     ...trpc.auth.me.queryOptions(),
@@ -152,7 +154,7 @@ export default function AccountScreen() {
         });
         setEditingName(false);
       },
-      onError: (err) => Alert.alert(t("common.error"), err.message),
+      onError: (err) => appAlert(t("common.error"), err.message),
     }),
   );
 
@@ -174,15 +176,15 @@ export default function AccountScreen() {
       onSuccess: async () => {
         await removeActiveAccount();
         queryClient.clear();
-        Alert.alert("", t("auth.deleteAccountSuccess"));
+        appAlert("", t("auth.deleteAccountSuccess"));
         router.replace("/(customer)");
       },
-      onError: (err) => Alert.alert(t("common.error"), err.message),
+      onError: (err) => appAlert(t("common.error"), err.message),
     }),
   );
 
   const confirmDeleteAccount = () => {
-    Alert.alert(
+    appAlert(
       t("auth.deleteAccountConfirmTitle"),
       t("auth.deleteAccountConfirmMessage"),
       [
@@ -203,7 +205,7 @@ export default function AccountScreen() {
           queryKey: trpc.auth.listDevices.queryKey(),
         });
       },
-      onError: (err) => Alert.alert(t("common.error"), err.message),
+      onError: (err) => appAlert(t("common.error"), err.message),
     }),
   );
 
@@ -221,7 +223,7 @@ export default function AccountScreen() {
   );
 
   const confirmRevokeDevice = (deviceId: string) => {
-    Alert.alert(
+    appAlert(
       t("account.devices.revoke"),
       t("account.devices.revokeConfirm"),
       [
@@ -236,7 +238,7 @@ export default function AccountScreen() {
   };
 
   const confirmSignOutEverywhere = () => {
-    Alert.alert(
+    appAlert(
       t("account.devices.signOutEverywhere"),
       t("account.devices.signOutEverywhereConfirm"),
       [

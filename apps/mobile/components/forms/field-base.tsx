@@ -9,7 +9,7 @@ import {
 
 import { Typography } from "@/components/ui/typography"
 import { useTranslation } from "@/lib/i18n"
-import { useFieldContext } from "./hooks"
+import { useFieldContext } from "./form-context"
 
 export type MobileFieldProps = {
   label: string

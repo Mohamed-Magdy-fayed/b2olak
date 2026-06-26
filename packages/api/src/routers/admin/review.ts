@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { ItemMergeSuggestionsTable } from "@workspace/db/schemas/catalog/item-merge-suggestions";
@@ -23,21 +23,31 @@ export const adminReviewRouter = createTRPCRouter({
       limit: 50,
     });
 
-    const withSuggestions = await Promise.all(
-      items.map(async (item) => ({
-        ...item,
-        suggestions: await ctx.db.query.ItemMergeSuggestionsTable.findMany({
+    // One batched query for every pending item's suggestions, grouped in memory
+    // (no per-item round-trip). Global order-by keeps each item's list sorted.
+    const itemIds = items.map((item) => item.id);
+    const suggestions = itemIds.length
+      ? await ctx.db.query.ItemMergeSuggestionsTable.findMany({
           where: and(
-            eq(ItemMergeSuggestionsTable.newItemId, item.id),
+            inArray(ItemMergeSuggestionsTable.newItemId, itemIds),
             eq(ItemMergeSuggestionsTable.status, "pending"),
           ),
           with: { candidate: true },
           orderBy: (t, { desc }) => [desc(t.similarityScore)],
-        }),
-      })),
-    );
+        })
+      : [];
 
-    return withSuggestions;
+    const byItem = new Map<string, typeof suggestions>();
+    for (const suggestion of suggestions) {
+      const list = byItem.get(suggestion.newItemId) ?? [];
+      list.push(suggestion);
+      byItem.set(suggestion.newItemId, list);
+    }
+
+    return items.map((item) => ({
+      ...item,
+      suggestions: byItem.get(item.id) ?? [],
+    }));
   }),
 
   merge: adminProcedure

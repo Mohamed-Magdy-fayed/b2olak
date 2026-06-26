@@ -2,7 +2,7 @@ import type { KeyboardTypeOptions, TextInputProps } from "react-native"
 
 import { Input } from "@/components/ui/input"
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
-import { useFieldContext } from "./hooks"
+import { useFieldContext } from "./form-context"
 
 export function FormStringField({
   label,
@@ -45,7 +45,7 @@ export function FormStringField({
         autoCapitalize={autoCapitalize}
         maxLength={maxLength}
         className={className}
-        style={ltr ? { writingDirection: "ltr", textAlign: "left" } : undefined}
+        style={ltr ? { writingDirection: "ltr", textAlign: "center", direction: "ltr" } : undefined}
       />
     </FieldBase>
   )

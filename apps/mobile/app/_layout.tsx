@@ -8,6 +8,7 @@ import { useMutation } from "@tanstack/react-query"
 import { KeyboardProvider } from "react-native-keyboard-controller"
 import * as SystemUI from "expo-system-ui"
 
+import { AppAlertProvider } from "@/components/ui/app-alert"
 import { SystemBars } from "@/components/system-bars"
 import { appFonts } from "@/lib/fonts"
 import { I18nApp } from "@/lib/i18n"
@@ -78,12 +79,14 @@ export default function RootLayout() {
   return (
     <KeyboardProvider navigationBarTranslucent statusBarTranslucent preserveEdgeToEdge>
       <ApiProvider>
-        <I18nApp>
-          <PushSync />
-          <SystemBars />
-          <StatusBar style="light" />
-          <Stack screenOptions={{ headerShown: false }} />
-        </I18nApp>
+        <AppAlertProvider>
+          <I18nApp>
+            <PushSync />
+            <SystemBars />
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false }} />
+          </I18nApp>
+        </AppAlertProvider>
       </ApiProvider>
     </KeyboardProvider>
   )

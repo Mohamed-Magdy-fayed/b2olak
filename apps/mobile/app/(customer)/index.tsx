@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -13,11 +12,14 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 
 import { CategoryCard } from "@/components/category-card";
-import { ItemHScroll } from "@/components/item-h-scroll";
+import { ItemHScroll, type Item } from "@/components/item-h-scroll";
 import { LanguageToggle } from "@/components/language-toggle";
+import { QuantityUnitSheet } from "@/components/quantity-unit-sheet";
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
+import { CategoryGridSkeleton, ItemRailSkeleton } from "@/components/ui/skeleton";
 import { useSignedIn } from "@/lib/auth-gate";
+import { useCart } from "@/lib/cart-store";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -44,6 +46,14 @@ export default function CustomerHome() {
     ...trpc.catalog.reorderItems.queryOptions(),
     enabled: signedIn === true,
   });
+
+  // The picker sheet is mounted at the screen root (outside the ScrollView) so the
+  // keyboard-aware modal gets correct keyboard framing — a sheet nested in a
+  // scroll container misbehaves on first open. One sheet serves every rail card.
+  const [activeItem, setActiveItem] = useState<Item | null>(null);
+  const activeLine = useCart((s) =>
+    activeItem ? s.lines.find((l) => l.itemId === activeItem.id) : undefined,
+  );
 
   return (
     <Screen padded={false}>
@@ -88,21 +98,29 @@ export default function CustomerHome() {
 
         {/* Buy again — hidden when empty or not yet loaded */}
         {reorderLoading ? (
-          <ActivityIndicator className="mb-6" />
+          <ItemRailSkeleton title={t("shop.buyAgain")} />
         ) : (
-          <ItemHScroll title={t("shop.buyAgain")} items={reorderItems ?? []} />
+          <ItemHScroll
+            title={t("shop.buyAgain")}
+            items={reorderItems ?? []}
+            onOpenSheet={setActiveItem}
+          />
         )}
 
         {/* Popular now */}
         {popularLoading ? (
-          <ActivityIndicator className="mb-6" />
+          <ItemRailSkeleton title={t("shop.popularNow")} />
         ) : popularError ? (
           <View className="mb-6 items-center gap-2">
             <Text className="text-muted-foreground">{t("common.error")}</Text>
             <Button label={t("common.retry")} variant="outline" onPress={() => void refetchPopular()} />
           </View>
         ) : (
-          <ItemHScroll title={t("shop.popularNow")} items={popularItems ?? []} />
+          <ItemHScroll
+            title={t("shop.popularNow")}
+            items={popularItems ?? []}
+            onOpenSheet={setActiveItem}
+          />
         )}
 
         {/* Categories grid */}
@@ -111,7 +129,7 @@ export default function CustomerHome() {
         </Text>
 
         {categoriesLoading ? (
-          <ActivityIndicator className="py-12" color="#C9A227" />
+          <CategoryGridSkeleton />
         ) : categoriesError ? (
           <View className="items-center gap-2 py-8">
             <Text className="text-muted-foreground">{t("common.error")}</Text>
@@ -131,6 +149,16 @@ export default function CustomerHome() {
           />
         )}
       </ScrollView>
+
+      {activeItem ? (
+        <QuantityUnitSheet
+          item={activeItem}
+          visible={activeItem !== null}
+          onClose={() => setActiveItem(null)}
+          initialUnitId={activeLine?.unitId}
+          initialQty={activeLine?.qty}
+        />
+      ) : null}
     </Screen>
   );
 }

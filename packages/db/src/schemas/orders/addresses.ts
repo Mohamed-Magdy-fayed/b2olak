@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -45,7 +45,11 @@ export const AddressesTable = pgTable(
     isDefault: boolean().notNull().default(false),
     ...auditColumns,
   },
-  (table) => [index("addresses_user_idx").on(table.userId)],
+  (table) => [
+    index("addresses_user_idx")
+      .on(table.userId)
+      .where(sql`deleted_at IS NULL`),
+  ],
 );
 
 export const addressesRelations = relations(AddressesTable, ({ one }) => ({

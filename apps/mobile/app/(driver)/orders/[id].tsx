@@ -1,7 +1,5 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Pressable,
@@ -22,7 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
+import { OrderDetailSkeleton } from "@/components/ui/skeleton";
 import { StatusChip } from "@/components/ui/status-chip";
+import { useAppAlert } from "@/components/ui/app-alert";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen";
@@ -32,6 +32,7 @@ export default function DriverOrderScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
+  const appAlert = useAppAlert();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [prices, setPrices] = useState<Record<string, string>>({});
@@ -187,19 +188,19 @@ export default function DriverOrderScreen() {
       onSuccess: () => {
         invalidate();
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(t("driver.orderDelivered"), t("driver.orderDeliveredMessage"), [
+        appAlert(t("driver.orderDelivered"), t("driver.orderDeliveredMessage"), [
           { text: t("common.confirm"), onPress: () => router.back() },
         ]);
+        setCashCollected("")
       },
     }),
   );
 
   if (isLoading) {
     return (
-      <Screen>
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator />
-        </View>
+      <Screen padded={false}>
+        <ScreenBackHeader title="" className="px-4" />
+        <OrderDetailSkeleton />
       </Screen>
     );
   }
@@ -245,18 +246,17 @@ export default function DriverOrderScreen() {
   return (
     <KeyboardProvider>
       <Screen>
-        <ScreenBackHeader
-          title={t("shop.orderNumber", { number: String(order.orderNumber) })}
-          right={<StatusChip status={order.status} />}
-        />
-
         <KeyboardAwareScrollView
           className="-mx-5 flex-1 px-4"
+          contentContainerStyle={{ paddingBottom: 24 }}
+          bottomOffset={100}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 12 }}
-          bottomOffset={24}
           keyboardShouldPersistTaps="handled"
         >
+          <ScreenBackHeader
+            title={t("shop.orderNumber", { number: String(order.orderNumber) })}
+            right={<StatusChip status={order.status} />}
+          />
           <KeyboardAvoidingView className="gap-4 pt-1">
             {/* address + contact */}
             <Card className="gap-3">
@@ -460,7 +460,7 @@ export default function DriverOrderScreen() {
                   keyboardType="decimal-pad"
                   value={cashCollected}
                   onChangeText={setCashCollected}
-                  style={{ textAlign: "left", writingDirection: "ltr" }}
+                  style={{ textAlign: "auto", writingDirection: "ltr" }}
                 />
                 <Button
                   label={t("driver.confirmCollected")}
@@ -483,35 +483,41 @@ export default function DriverOrderScreen() {
         </KeyboardAwareScrollView>
 
         {showActionBar ? (
-          <KeyboardStickyFooter className="-mx-5 px-4">
-            {order.status === "assigned" ? (
-              <Button
-                label={t("driver.startShopping")}
-                loading={startShopping.isPending || isLoading || updateLine.isPending || isRefetching}
-                onPress={() => startShopping.mutate({ orderId: order.id })}
-              />
-            ) : null}
-            {order.status === "shopping" ? (
-              <Button
-                label={t("driver.doneShopping")}
-                loading={doneShopping.isPending || isLoading || updateLine.isPending || isRefetching}
-                onPress={() => doneShopping.mutate({ orderId: order.id })}
-              />
-            ) : null}
-            {order.status === "purchased" ? (
-              <Button
-                label={t("driver.startDelivery")}
-                loading={startDelivery.isPending || isLoading || updateLine.isPending || isRefetching}
-                onPress={() => startDelivery.mutate({ orderId: order.id })}
-              />
-            ) : null}
-            {order.status === "delivering" && !collecting ? (
-              <Button
-                label={t("driver.markDelivered")}
-                loading={markDelivered.isPending || isLoading || updateLine.isPending || isRefetching}
-                onPress={() => setCollecting(true)}
-              />
-            ) : null}
+          <KeyboardStickyFooter>
+            <View className="-mx-5 p-4 bg-background border-border border-t">
+              {order.status === "assigned" ? (
+                <Button
+                  label={t("driver.startShopping")}
+                  loading={startShopping.isPending}
+                  disabled={isRefetching || isLoading}
+                  onPress={() => startShopping.mutate({ orderId: order.id })}
+                />
+              ) : null}
+              {order.status === "shopping" ? (
+                <Button
+                  label={t("driver.doneShopping")}
+                  loading={doneShopping.isPending || updateLine.isPending}
+                  disabled={isRefetching || isLoading}
+                  onPress={() => doneShopping.mutate({ orderId: order.id })}
+                />
+              ) : null}
+              {order.status === "purchased" ? (
+                <Button
+                  label={t("driver.startDelivery")}
+                  loading={startDelivery.isPending}
+                  disabled={isRefetching || isLoading}
+                  onPress={() => startDelivery.mutate({ orderId: order.id })}
+                />
+              ) : null}
+              {order.status === "delivering" && !collecting ? (
+                <Button
+                  label={t("driver.markDelivered")}
+                  loading={markDelivered.isPending}
+                  disabled={isRefetching || isLoading}
+                  onPress={() => setCollecting(true)}
+                />
+              ) : null}
+            </View>
           </KeyboardStickyFooter>
         ) : null}
       </Screen>

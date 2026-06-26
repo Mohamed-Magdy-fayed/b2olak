@@ -10,7 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons"
 
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
-import { useFieldContext } from "./hooks"
+import { useFieldContext } from "./form-context"
 
 export type SelectOption = {
   value: string

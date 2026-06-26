@@ -189,20 +189,27 @@ export const adminOrdersRouter = createTRPCRouter({
       with: { user: { columns: { id: true, name: true, phone: true } } },
     });
 
-    return Promise.all(
-      profiles.map(async (profile) => {
-        const [active] = await ctx.db
-          .select({ count: sql<number>`count(*)::int` })
+    const userIds = profiles.map((p) => p.userId);
+    const counts = userIds.length
+      ? await ctx.db
+          .select({
+            driverId: OrdersTable.driverId,
+            active: sql<number>`count(*) filter (where ${OrdersTable.status} in ('assigned','shopping','purchased','delivering'))::int`,
+          })
           .from(OrdersTable)
-          .where(
-            and(
-              eq(OrdersTable.driverId, profile.userId),
-              sql`${OrdersTable.status} in ('assigned','shopping','purchased','delivering')`,
-            ),
-          );
-        return { ...profile, activeOrders: active?.count ?? 0 };
-      }),
+          .where(inArray(OrdersTable.driverId, userIds))
+          .groupBy(OrdersTable.driverId)
+      : [];
+    const activeByDriver = new Map(
+      counts
+        .filter((c): c is typeof c & { driverId: string } => c.driverId !== null)
+        .map((c) => [c.driverId, c.active]),
     );
+
+    return profiles.map((profile) => ({
+      ...profile,
+      activeOrders: activeByDriver.get(profile.userId) ?? 0,
+    }));
   }),
 
   assign: adminProcedure

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from "react-native";
+import { FlatList, Pressable, RefreshControl, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
+import { OrderListSkeleton } from "@/components/ui/skeleton";
 import { StatusChip } from "@/components/ui/status-chip";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
@@ -19,7 +20,11 @@ export default function OrdersScreen() {
 
   const { data, isLoading, error, refetch } = useQuery({
     ...trpc.orders.mine.queryOptions({ cursor: 0 }),
-    refetchInterval: 15_000,
+    // Only poll while something is in-flight; idle lists stop refetching.
+    refetchInterval: (query) =>
+      query.state.data?.orders.some((o) => ACTIVE.includes(o.status))
+        ? 15_000
+        : false,
     enabled: signedIn === true,
   });
 
@@ -58,8 +63,11 @@ export default function OrdersScreen() {
 
   if (isLoading) {
     return (
-      <Screen className="items-center justify-center">
-        <ActivityIndicator className="mt-8" />
+      <Screen padded={false}>
+        <ScreenHeader title={t("shop.ordersTitle")} className="px-4" />
+        <View className="px-5">
+          <OrderListSkeleton count={5} />
+        </View>
       </Screen>
     );
   }

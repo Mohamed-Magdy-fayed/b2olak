@@ -72,7 +72,17 @@ function pushDriver(
 
 /** In-app push + WhatsApp pings per order event. */
 export const onOrderStatusChanged = inngest.createFunction(
-  { id: "order-status-changed", retries: 2 },
+  {
+    id: "order-status-changed",
+    retries: 2,
+    // Serialize notifications per order. Without this, two fast status changes
+    // run in parallel and their WhatsApp/push sends race — the customer can see
+    // "On the way" before "Driver assigned". limit:1 keyed on the order makes
+    // Inngest process one transition's notifications at a time, in enqueue
+    // order; since the status machine gates transitions (B can't be sent until
+    // A commits), enqueue order is already the correct order.
+    concurrency: { limit: 1, key: "event.data.orderId" },
+  },
   { event: "order/status.changed" },
   async ({ event, step, attempt }) => {
     const orderId = event.data.orderId;

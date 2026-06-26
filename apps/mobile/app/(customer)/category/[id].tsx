@@ -6,6 +6,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { ItemRow } from "@/components/item-row";
 import { Button } from "@/components/ui/button";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
+import { ItemRowListSkeleton } from "@/components/ui/skeleton";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -60,7 +61,9 @@ export default function CategoryScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         ListEmptyComponent={
-          items.isLoading ? null : (
+          items.isLoading ? (
+            <ItemRowListSkeleton count={8} />
+          ) : (
             <Text className="py-12 text-center text-muted-foreground">
               {t("shop.noResults")}
             </Text>

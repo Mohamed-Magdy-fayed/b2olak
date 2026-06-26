@@ -1,14 +1,12 @@
-import { createFormHook, createFormHookContexts } from "@tanstack/react-form"
+import { createFormHook } from "@tanstack/react-form"
 
 import { FormBooleanField } from "./boolean-field"
+import { fieldContext, formContext, useFormContext } from "./form-context"
 import { FormNumberField } from "./number-field"
 import { FormPhoneField } from "./phone-field"
 import { FormSelectField } from "./select-field"
 import { FormStringField } from "./string-field"
 import { FormTextareaField } from "./textarea-field"
-
-const { fieldContext, formContext, useFieldContext, useFormContext } =
-  createFormHookContexts()
 
 const { useAppForm: useAppFormBase } = createFormHook({
   fieldComponents: {
@@ -49,4 +47,4 @@ const useAppForm: typeof useAppFormBase = (opts) =>
     },
   })
 
-export { useAppForm, useFieldContext, useFormContext }
+export { useAppForm, useFormContext }

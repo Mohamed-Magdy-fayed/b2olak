@@ -15,7 +15,7 @@ type Window = `${number} ${"s" | "m" | "h"}`;
 
 const limiters = new Map<string, Ratelimit>();
 
-function getLimiter(name: string, tokens: number, window: Window): Ratelimit {
+export function getLimiter(name: string, tokens: number, window: Window): Ratelimit {
   const key = `${name}:${tokens}:${window}`;
   let limiter = limiters.get(key);
   if (!limiter) {
