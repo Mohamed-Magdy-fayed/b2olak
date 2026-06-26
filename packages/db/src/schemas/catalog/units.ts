@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   boolean,
   integer,
+  pgEnum,
   pgTable,
   uniqueIndex,
   varchar,
@@ -9,6 +10,16 @@ import {
 
 import { auditColumns, id } from "../../helpers";
 import { ItemUnitsTable } from "./item-units";
+
+/**
+ * How a unit's quantity is interpreted, which drives the customer quantity
+ * picker: `count` → whole-number steps (piece, pack), `weight` → fractional
+ * steps (kg, gram, liter — ½, ¼, ⅛…), `money` → an EGP amount ("buy 10 EGP
+ * worth"). Money units are offered on every item and aren't linked per-item.
+ */
+export const unitKindValues = ["count", "weight", "money"] as const;
+export type UnitKind = (typeof unitKindValues)[number];
+export const unitKindEnum = pgEnum("unit_kind", unitKindValues);
 
 /**
  * Managed catalog of units of measure (KG, piece, bottle, carton…). Replaces
@@ -22,6 +33,7 @@ export const UnitsTable = pgTable(
     code: varchar({ length: 32 }).notNull(),
     nameEn: varchar({ length: 64 }).notNull(),
     nameAr: varchar({ length: 64 }).notNull(),
+    kind: unitKindEnum().notNull().default("count"),
     sortOrder: integer().notNull().default(0),
     isActive: boolean().notNull().default(true),
     ...auditColumns,

@@ -29,7 +29,7 @@ export function Screen({
   const insets = useSafeAreaInsets();
   return (
     <View
-      className={`flex-1 bg-background ${padded ? "px-5" : ""} ${className ?? ""}`}
+      className={`flex-1 bg-background ${padded ? "px-4" : ""} ${className ?? ""}`}
       style={[{ paddingTop: insets.top + 12, paddingBottom: insets.bottom }, style]}
       {...props}
     >

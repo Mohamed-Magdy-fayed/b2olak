@@ -8,7 +8,6 @@ import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { StatusChip } from "@/components/ui/status-chip";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTRPC } from "@/lib/trpc";
 
 const ACTIVE = ["placed", "assigned", "shopping", "purchased", "delivering"];
@@ -17,7 +16,6 @@ export default function OrdersScreen() {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const signedIn = useSignedIn();
-  const tabBarHeight = useTabBarHeight();
 
   const { data, isLoading, error, refetch } = useQuery({
     ...trpc.orders.mine.queryOptions({ cursor: 0 }),
@@ -74,12 +72,14 @@ export default function OrdersScreen() {
 
   return (
     <Screen padded={false}>
-      <ScreenHeader title={t("shop.ordersTitle")} className="px-5" />
+      <ScreenHeader title={t("shop.ordersTitle")} className="px-4" />
       <FlatList
         data={orders}
         keyExtractor={(o) => o.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: tabBarHeight + 16 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

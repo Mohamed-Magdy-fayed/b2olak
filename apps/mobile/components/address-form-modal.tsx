@@ -216,163 +216,165 @@ export function AddressFormModal({
           not reach inside it — nest a provider here so the form stays keyboard
           aware within the sheet. */}
       <KeyboardProvider>
-        <Pressable className="flex-1 bg-black/60" onPress={onClose} />
-        <View className="max-h-[85%] rounded-t-2xl bg-card">
-          {/* Drag handle */}
-          <View className="items-center pt-3 pb-1">
-            <View className="h-1 w-10 rounded-full bg-border" />
+        <View className="flex-1 justify-end">
+          <Pressable className="flex-1 bg-black/60" onPress={onClose} />
+          <View className="max-h-[85%] rounded-t-2xl bg-card">
+            {/* Drag handle */}
+            <View className="items-center pt-3 pb-1">
+              <View className="h-1 w-10 rounded-full bg-border" />
+            </View>
+            <View className="border-b border-border px-4 py-3">
+              <Text className="text-center text-lg font-bold text-foreground">
+                {address ? t("address.edit") : t("address.add")}
+              </Text>
+            </View>
+
+            <KeyboardAwareScrollView
+              className="px-4"
+              contentContainerClassName="gap-4 py-4"
+              bottomOffset={24}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              <form.AppField name="label">
+                {(field) => <field.StringField label={t("address.label")} />}
+              </form.AppField>
+
+              {/* City picker */}
+              <form.AppField
+                name="cityId"
+                listeners={{
+                  onChange: () => {
+                    form.setFieldValue("districtId", "")
+                    form.setFieldValue("areaId", "")
+                  },
+                }}
+                validators={{
+                  onSubmit: ({ value }) =>
+                    value ? undefined : "validation.required",
+                }}
+              >
+                {(field) => (
+                  <field.SelectField
+                    label={t("address.city")}
+                    placeholder={t("address.selectCity")}
+                    options={cityOptions}
+                  />
+                )}
+              </form.AppField>
+
+              {/* District picker — enabled only after city is chosen */}
+              <form.AppField
+                name="districtId"
+                listeners={{
+                  onChange: () => form.setFieldValue("areaId", ""),
+                }}
+                validators={{
+                  onSubmit: ({ value }) =>
+                    value ? undefined : "validation.required",
+                }}
+              >
+                {(field) => (
+                  <field.SelectField
+                    label={t("address.district")}
+                    placeholder={t("address.selectDistrict")}
+                    options={districtOptions}
+                    disabled={!cityId}
+                  />
+                )}
+              </form.AppField>
+
+              {/* Area picker — enabled only after district is chosen */}
+              <form.AppField
+                name="areaId"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    value ? undefined : "validation.required",
+                }}
+              >
+                {(field) => (
+                  <field.SelectField
+                    label={t("address.area")}
+                    placeholder={t("address.selectArea")}
+                    options={areaOptions}
+                    disabled={!districtId}
+                  />
+                )}
+              </form.AppField>
+
+              {/* Building — required */}
+              <form.AppField
+                name="building"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    value.trim() ? undefined : "validation.required",
+                }}
+              >
+                {(field) => (
+                  <field.StringField label={`${t("address.building")} *`} />
+                )}
+              </form.AppField>
+
+              <form.AppField name="floor">
+                {(field) => <field.StringField label={t("address.floor")} />}
+              </form.AppField>
+              <form.AppField name="apartment">
+                {(field) => (
+                  <field.StringField label={t("address.apartment")} />
+                )}
+              </form.AppField>
+              <form.AppField name="landmark">
+                {(field) => <field.StringField label={t("address.landmark")} />}
+              </form.AppField>
+
+              {/* Contact phone — LTR override intentionally preserved */}
+              <form.AppField
+                name="contactPhone"
+                validators={{
+                  onSubmit: ({ value }) =>
+                    egyptianPhoneSchema.safeParse(value).success
+                      ? undefined
+                      : "validation.phoneInvalid",
+                }}
+              >
+                {(field) => (
+                  <field.PhoneField label={t("address.contactPhone")} />
+                )}
+              </form.AppField>
+
+              {/* isDefault toggle */}
+              <form.AppField name="isDefault">
+                {(field) => (
+                  <field.BooleanField label={t("address.isDefault")} />
+                )}
+              </form.AppField>
+
+              {error ? (
+                <View className="flex-row items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3">
+                  <Ionicons
+                    name="alert-circle-outline"
+                    size={16}
+                    color="#F0584F"
+                  />
+                  <Text className="flex-1 text-sm text-destructive">{error}</Text>
+                </View>
+              ) : null}
+            </KeyboardAwareScrollView>
+
+            {/* Fixed footer — lifts above the keyboard while editing fields. */}
+            <KeyboardStickyFooter className="gap-2 border-t bg-background border-border px-4 py-4">
+              <Button
+                label={t("address.save")}
+                loading={create.isPending || update.isPending}
+                onPress={() => void form.handleSubmit()}
+              />
+              <Button
+                variant="ghost"
+                label={t("common.cancel")}
+                onPress={onClose}
+              />
+            </KeyboardStickyFooter>
           </View>
-          <View className="border-b border-border px-5 py-3">
-            <Text className="text-center text-lg font-bold text-foreground">
-              {address ? t("address.edit") : t("address.add")}
-            </Text>
-          </View>
-
-          <KeyboardAwareScrollView
-            className="px-5"
-            contentContainerClassName="gap-4 py-4"
-            bottomOffset={24}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <form.AppField name="label">
-              {(field) => <field.StringField label={t("address.label")} />}
-            </form.AppField>
-
-            {/* City picker */}
-            <form.AppField
-              name="cityId"
-              listeners={{
-                onChange: () => {
-                  form.setFieldValue("districtId", "")
-                  form.setFieldValue("areaId", "")
-                },
-              }}
-              validators={{
-                onSubmit: ({ value }) =>
-                  value ? undefined : "validation.required",
-              }}
-            >
-              {(field) => (
-                <field.SelectField
-                  label={t("address.city")}
-                  placeholder={t("address.selectCity")}
-                  options={cityOptions}
-                />
-              )}
-            </form.AppField>
-
-            {/* District picker — enabled only after city is chosen */}
-            <form.AppField
-              name="districtId"
-              listeners={{
-                onChange: () => form.setFieldValue("areaId", ""),
-              }}
-              validators={{
-                onSubmit: ({ value }) =>
-                  value ? undefined : "validation.required",
-              }}
-            >
-              {(field) => (
-                <field.SelectField
-                  label={t("address.district")}
-                  placeholder={t("address.selectDistrict")}
-                  options={districtOptions}
-                  disabled={!cityId}
-                />
-              )}
-            </form.AppField>
-
-            {/* Area picker — enabled only after district is chosen */}
-            <form.AppField
-              name="areaId"
-              validators={{
-                onSubmit: ({ value }) =>
-                  value ? undefined : "validation.required",
-              }}
-            >
-              {(field) => (
-                <field.SelectField
-                  label={t("address.area")}
-                  placeholder={t("address.selectArea")}
-                  options={areaOptions}
-                  disabled={!districtId}
-                />
-              )}
-            </form.AppField>
-
-            {/* Building — required */}
-            <form.AppField
-              name="building"
-              validators={{
-                onSubmit: ({ value }) =>
-                  value.trim() ? undefined : "validation.required",
-              }}
-            >
-              {(field) => (
-                <field.StringField label={`${t("address.building")} *`} />
-              )}
-            </form.AppField>
-
-            <form.AppField name="floor">
-              {(field) => <field.StringField label={t("address.floor")} />}
-            </form.AppField>
-            <form.AppField name="apartment">
-              {(field) => (
-                <field.StringField label={t("address.apartment")} />
-              )}
-            </form.AppField>
-            <form.AppField name="landmark">
-              {(field) => <field.StringField label={t("address.landmark")} />}
-            </form.AppField>
-
-            {/* Contact phone — LTR override intentionally preserved */}
-            <form.AppField
-              name="contactPhone"
-              validators={{
-                onSubmit: ({ value }) =>
-                  egyptianPhoneSchema.safeParse(value).success
-                    ? undefined
-                    : "validation.phoneInvalid",
-              }}
-            >
-              {(field) => (
-                <field.PhoneField label={t("address.contactPhone")} />
-              )}
-            </form.AppField>
-
-            {/* isDefault toggle */}
-            <form.AppField name="isDefault">
-              {(field) => (
-                <field.BooleanField label={t("address.isDefault")} />
-              )}
-            </form.AppField>
-
-            {error ? (
-              <View className="flex-row items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3">
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={16}
-                  color="#F0584F"
-                />
-                <Text className="flex-1 text-sm text-destructive">{error}</Text>
-              </View>
-            ) : null}
-          </KeyboardAwareScrollView>
-
-          {/* Fixed footer — lifts above the keyboard while editing fields. */}
-          <KeyboardStickyFooter className="gap-2 border-t border-border px-5 pt-3 pb-8">
-            <Button
-              label={t("address.save")}
-              loading={create.isPending || update.isPending}
-              onPress={() => void form.handleSubmit()}
-            />
-            <Button
-              variant="ghost"
-              label={t("common.cancel")}
-              onPress={onClose}
-            />
-          </KeyboardStickyFooter>
         </View>
       </KeyboardProvider>
     </Modal>

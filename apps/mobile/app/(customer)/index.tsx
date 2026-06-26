@@ -18,7 +18,6 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { useSignedIn } from "@/lib/auth-gate";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
 
@@ -26,7 +25,6 @@ export default function CustomerHome() {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const signedIn = useSignedIn();
-  const tabBarHeight = useTabBarHeight();
 
   const { data: categories, isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useQuery(
     trpc.catalog.categories.queryOptions(),
@@ -50,9 +48,11 @@ export default function CustomerHome() {
   return (
     <Screen padded={false}>
       <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingBottom: 16 }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

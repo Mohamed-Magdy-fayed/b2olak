@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { formatQty, isMoneyKind } from "@workspace/validators/units";
 import { useTRPC } from "@/lib/trpc/client";
 import { OrderTimeline } from "@/features/shop/order-timeline";
 import { OrderStatusBadge } from "@/features/shop/order-status-badge";
@@ -168,6 +169,12 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
             const unavailable = line.status === "unavailable";
             const lineUnits = unitOptions?.[line.id] ?? [];
             const canEditUnit = editable && lineUnits.length > 1;
+            const money = isMoneyKind(line.unitKind);
+            // Money lines read "10 EGP worth"; the Select shows "EGP worth" so
+            // the inline prefix is just the amount (no fraction/"×").
+            const qtyPrefix = money
+              ? String(Number(line.qty))
+              : formatQty(Number(line.qty), line.unitKind);
             return (
               <div
                 key={line.id}
@@ -175,7 +182,7 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
               >
                 {canEditUnit ? (
                   <span className="flex flex-1 items-center gap-1.5 text-sm text-foreground">
-                    {name} — {line.qty}
+                    {name} — {qtyPrefix}
                     <Select
                       value={line.unit}
                       onValueChange={(v) =>
@@ -204,7 +211,10 @@ export function OrderDetailClient({ orderId }: { orderId: string }) {
                   <span
                     className={`flex-1 text-sm ${unavailable ? "text-muted-foreground line-through" : "text-foreground"}`}
                   >
-                    {name} — {line.qty} {t(`units.${line.unit}` as never)}
+                    {name} —{" "}
+                    {money
+                      ? t("shop.egpWorth", { amount: Number(line.qty) })
+                      : `${qtyPrefix} ${t(`units.${line.unit}` as never)}`}
                   </span>
                 )}
                 {line.status !== "pending" && (

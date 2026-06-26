@@ -12,6 +12,7 @@ import { MoreHorizontalIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { unitKindValues, type UnitKind } from "@workspace/validators/units";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -57,6 +58,7 @@ type UnitRow = {
   code: string;
   nameEn: string;
   nameAr: string;
+  kind: UnitKind;
   sortOrder: number;
   isActive: boolean;
 };
@@ -66,6 +68,7 @@ type UnitFormState = {
   code: string;
   nameEn: string;
   nameAr: string;
+  kind: UnitKind;
   sortOrder: number;
   isActive: boolean;
 };
@@ -76,9 +79,15 @@ const emptyForm: UnitFormValues = {
   code: "",
   nameEn: "",
   nameAr: "",
+  kind: "count",
   sortOrder: 0,
   isActive: true,
 };
+
+/** i18n key for a unit kind's label (admin.units.kind{Count,Weight,Money}). */
+function kindLabelKey(kind: UnitKind): string {
+  return `admin.units.kind${kind.charAt(0).toUpperCase()}${kind.slice(1)}`;
+}
 
 // ---------------------------------------------------------------------------
 // Global filter function for client mode
@@ -144,11 +153,21 @@ function UnitFormBody({
 }) {
   const { t } = useTranslation();
 
+  const kindOptions = useMemo(
+    () =>
+      unitKindValues.map((k) => ({
+        value: k,
+        label: String(t(kindLabelKey(k) as never)),
+      })),
+    [t],
+  );
+
   const form = useAppForm({
     defaultValues: {
       code: initial.code,
       nameEn: initial.nameEn,
       nameAr: initial.nameAr,
+      kind: initial.kind as string,
       sortOrder: initial.sortOrder as number | null,
       isActive: initial.isActive,
     },
@@ -157,6 +176,7 @@ function UnitFormBody({
         code: value.code,
         nameEn: value.nameEn,
         nameAr: value.nameAr,
+        kind: value.kind as UnitKind,
         sortOrder: value.sortOrder ?? 0,
         isActive: value.isActive,
       }),
@@ -195,6 +215,14 @@ function UnitFormBody({
             <field.StringField
               label={String(t("admin.units.nameEn"))}
               className="text-start"
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="kind">
+          {(field) => (
+            <field.SelectField
+              label={String(t("admin.units.kind"))}
+              options={kindOptions}
             />
           )}
         </form.AppField>
@@ -239,6 +267,7 @@ export function UnitsTable() {
         code: u.code,
         nameEn: u.nameEn,
         nameAr: u.nameAr,
+        kind: u.kind,
         sortOrder: u.sortOrder,
         isActive: u.isActive,
       })),
@@ -389,6 +418,25 @@ export function UnitsTable() {
       },
 
       {
+        id: "kind",
+        accessorKey: "kind",
+        enableSorting: true,
+        enableHiding: true,
+        meta: { label: String(t("admin.units.kind")) },
+        header: ({ column }) => (
+          <DataTableColumnHeader
+            column={column}
+            title={String(t("admin.units.kind"))}
+          />
+        ),
+        cell: ({ row }) => (
+          <Badge variant="secondary">
+            {String(t(kindLabelKey(row.original.kind) as never))}
+          </Badge>
+        ),
+      },
+
+      {
         id: "sortOrder",
         accessorKey: "sortOrder",
         enableSorting: true,
@@ -459,6 +507,7 @@ export function UnitsTable() {
                       code: unit.code,
                       nameEn: unit.nameEn,
                       nameAr: unit.nameAr,
+                      kind: unit.kind,
                       sortOrder: unit.sortOrder,
                       isActive: unit.isActive,
                     })
@@ -542,11 +591,12 @@ export function UnitsTable() {
       .rows.map((r) => r.original);
     if (selectedRows.length === 0) return;
     const csv = rowsToCsv(
-      ["code", "nameEn", "nameAr", "sortOrder", "isActive"],
+      ["code", "nameEn", "nameAr", "kind", "sortOrder", "isActive"],
       selectedRows.map((row) => ({
         code: row.code,
         nameEn: row.nameEn,
         nameAr: row.nameAr,
+        kind: row.kind,
         sortOrder: row.sortOrder,
         isActive: String(row.isActive),
       })),
@@ -591,6 +641,7 @@ export function UnitsTable() {
                 code: row.code,
                 nameEn: row.nameEn,
                 nameAr: row.nameAr,
+                kind: row.kind,
                 sortOrder: row.sortOrder,
                 isActive: String(row.isActive),
               })}

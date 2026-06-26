@@ -98,7 +98,7 @@ export const driverRouter = createTRPCRouter({
         inArray(OrdersTable.status, ["delivered", "cancelled"]),
         isNull(OrdersTable.deletedAt),
       ),
-      orderBy: [desc(OrdersTable.deliveredAt), desc(OrdersTable.createdAt)],
+      orderBy: desc(OrdersTable.assignedAt),
       limit: 30,
     });
 
@@ -147,22 +147,33 @@ export const driverRouter = createTRPCRouter({
         throw new TRPCError({ code: "BAD_REQUEST", message: "orders.invalidTransition" });
       }
 
-      const needsPrice = input.status === "found" || input.status === "substituted";
+      const resolving = input.status === "found" || input.status === "substituted";
+      // Money lines ("buy X EGP worth"): the line total IS the amount spent —
+      // there's no per-unit price. It defaults to the requested worth (qty) and
+      // the driver can adjust via actualUnitPrice (interpreted as the total).
+      const isMoney = line.unitKind === "money";
+      const needsPrice = resolving && !isMoney;
       if (needsPrice && input.actualUnitPrice === undefined) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "driver.priceRequired" });
       }
 
-      const lineTotalStr = needsPrice
-        ? toMoney(lineTotal(input.actualUnitPrice!, Number(line.qty)))
-        : null;
+      let actualUnitPriceStr: string | null = null;
+      let lineTotalStr: string | null = null;
+      if (resolving) {
+        if (isMoney) {
+          const spent = input.actualUnitPrice ?? Number(line.qty);
+          lineTotalStr = toMoney(spent);
+        } else {
+          actualUnitPriceStr = toMoney(input.actualUnitPrice!);
+          lineTotalStr = toMoney(lineTotal(input.actualUnitPrice!, Number(line.qty)));
+        }
+      }
 
       await ctx.db
         .update(OrderItemsTable)
         .set({
           status: input.status,
-          actualUnitPrice: needsPrice
-            ? toMoney(input.actualUnitPrice!)
-            : null,
+          actualUnitPrice: actualUnitPriceStr,
           actualLineTotal: lineTotalStr,
           updatedBy: ctx.session.user.id,
         })

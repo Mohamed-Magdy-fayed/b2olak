@@ -9,11 +9,9 @@ import { Card } from "@/components/ui/card";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { StatusChip } from "@/components/ui/status-chip";
 import { useTranslation } from "@/lib/i18n";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTRPC } from "@/lib/trpc";
 
 export default function DriverHome() {
-  const tabBarHeight = useTabBarHeight();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
@@ -67,9 +65,11 @@ export default function DriverHome() {
   return (
     <Screen padded={false}>
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -91,9 +91,8 @@ export default function DriverHome() {
               className={`size-2.5 rounded-full ${isAvailable ? "bg-success" : "bg-muted-foreground"}`}
             />
             <Text
-              className={`text-base font-semibold ${
-                isAvailable ? "text-success" : "text-muted-foreground"
-              }`}
+              className={`text-base font-semibold ${isAvailable ? "text-success" : "text-muted-foreground"
+                }`}
             >
               {isAvailable ? t("driver.available") : t("driver.unavailable")}
             </Text>

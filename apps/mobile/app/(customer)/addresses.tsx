@@ -14,7 +14,6 @@ import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTRPC } from "@/lib/trpc";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -73,7 +72,6 @@ export default function AddressesScreen() {
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
   const signedIn = useSignedIn();
-  const tabBarHeight = useTabBarHeight();
   // `null` = sheet closed, `"new"` = create, object = edit that address.
   const [editing, setEditing] = useState<EditableAddress | "new" | null>(null);
 
@@ -99,12 +97,13 @@ export default function AddressesScreen() {
   return (
     <>
       <Screen padded={false}>
-        <ScreenBackHeader title={t("address.title")} className="px-5" />
+        <ScreenBackHeader title={t("address.title")} className="px-4" />
         <ScrollView
-          className="flex-1 px-5"
+          className="flex-1 px-4"
           contentContainerClassName="gap-3"
           contentContainerStyle={{ paddingBottom: 16 }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
           {(addresses ?? []).map((address) => (
@@ -144,7 +143,7 @@ export default function AddressesScreen() {
           ) : null}
         </ScrollView>
 
-        <BottomActionBar className="px-5" tabBarHeight={tabBarHeight}>
+        <BottomActionBar className="px-4">
           <Button label={t("address.add")} onPress={() => setEditing("new")} />
         </BottomActionBar>
       </Screen>

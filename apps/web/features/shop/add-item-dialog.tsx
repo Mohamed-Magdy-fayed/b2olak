@@ -7,6 +7,7 @@ import { useStore } from "@tanstack/react-form";
 import { TRPCClientError } from "@trpc/client";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { defaultQtyForKind } from "@workspace/validators/units";
 import { useTRPC } from "@/lib/trpc/client";
 import { useAppForm } from "@/components/forms/hooks";
 import { useCart } from "@/features/shop/cart-store";
@@ -51,20 +52,24 @@ export function AddItemDialog() {
         toast.success(msg);
         const chosen = (units ?? []).find((u) => u.id === variables.unitId);
         if (chosen) {
-          add({
-            itemId: data.item.id,
-            nameEn: data.item.nameEn,
-            nameAr: data.item.nameAr,
-            units: [
-              {
-                id: chosen.id,
-                code: chosen.code,
-                nameEn: chosen.nameEn,
-                nameAr: chosen.nameAr,
-              },
-            ],
-            unitId: chosen.id,
-          });
+          add(
+            {
+              itemId: data.item.id,
+              nameEn: data.item.nameEn,
+              nameAr: data.item.nameAr,
+              units: [
+                {
+                  id: chosen.id,
+                  code: chosen.code,
+                  nameEn: chosen.nameEn,
+                  nameAr: chosen.nameAr,
+                  kind: chosen.kind,
+                },
+              ],
+              unitId: chosen.id,
+            },
+            defaultQtyForKind(chosen.kind),
+          );
         }
         void queryClient.invalidateQueries({
           queryKey: trpc.catalog.search.queryKey(),

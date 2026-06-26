@@ -2,11 +2,9 @@ import { ScrollView, Text, View } from "react-native";
 
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useTranslation } from "@/lib/i18n";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 
 export default function PrivacyScreen() {
   const { t } = useTranslation();
-  const tabBarHeight = useTabBarHeight();
 
   const sections = [
     { title: t("privacy.s1Title"), body: t("privacy.s1Body") },
@@ -18,11 +16,13 @@ export default function PrivacyScreen() {
 
   return (
     <Screen padded={false}>
-      <ScreenBackHeader title={t("privacy.title")} className="px-5" />
+      <ScreenBackHeader title={t("privacy.title")} className="px-4" />
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Text className="mb-5 text-sm text-muted-foreground">
           {t("privacy.lastUpdated")}

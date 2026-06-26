@@ -8,6 +8,10 @@ import { useCart } from "@/lib/cart-store";
 
 const GOLD = "#C9A227";
 const MUTED = "#9B968C";
+// Full-screen pushed detail views hide the tab bar entirely. `href: null` only
+// removes a screen's tab *button* — the bar stays mounted behind the screen and
+// peeks out below sticky footers (e.g. the checkout CTA above the keyboard).
+const HIDDEN_TAB_BAR = { display: "none" } as const;
 // Breathing room below the tab label so it doesn't hug the bottom edge on
 // devices without a home indicator (where insets.bottom is 0).
 const TAB_BAR_GAP = 8;
@@ -38,7 +42,7 @@ export default function CustomerLayout() {
           borderTopWidth: 1,
           height: 56 + insets.bottom + TAB_BAR_GAP,
           paddingBottom: insets.bottom + TAB_BAR_GAP,
-          paddingTop: 6,
+          paddingBlock: 6,
         },
         tabBarBadgeStyle: { backgroundColor: GOLD, color: "#0E0E10" },
       }}
@@ -67,12 +71,12 @@ export default function CustomerLayout() {
         name="account"
         options={{ title: t("shop.tabAccount"), tabBarIcon: tabIcon("person-outline") }}
       />
-      <Tabs.Screen name="category/[id]" options={{ href: null }} />
-      <Tabs.Screen name="orders/[id]" options={{ href: null }} />
-      <Tabs.Screen name="checkout" options={{ href: null }} />
-      <Tabs.Screen name="addresses" options={{ href: null }} />
-      <Tabs.Screen name="terms" options={{ href: null }} />
-      <Tabs.Screen name="privacy" options={{ href: null }} />
+      <Tabs.Screen name="category/[id]" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
+      <Tabs.Screen name="orders/[id]" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
+      <Tabs.Screen name="checkout" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
+      <Tabs.Screen name="addresses" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
+      <Tabs.Screen name="terms" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
+      <Tabs.Screen name="privacy" options={{ href: null, tabBarStyle: HIDDEN_TAB_BAR }} />
     </Tabs>
   );
 }

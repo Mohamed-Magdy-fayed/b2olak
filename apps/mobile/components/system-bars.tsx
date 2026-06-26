@@ -17,7 +17,10 @@ export function SystemBars() {
   useEffect(() => {
     if (Platform.OS !== "android") return;
 
-    const apply = () => void NavigationBar.setVisibilityAsync("visible");
+    const apply = () => {
+      void NavigationBar.NavigationBar.setHidden(false);
+      void NavigationBar.NavigationBar.setStyle("auto");
+    }
     apply();
 
     const sub = AppState.addEventListener("change", (state) => {

@@ -1,7 +1,7 @@
 import type { KeyboardTypeOptions, TextInputProps } from "react-native"
 
 import { Input } from "@/components/ui/input"
-import { FieldBase, type MobileFieldProps } from "./field-base"
+import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
 import { useFieldContext } from "./hooks"
 
 export function FormStringField({
@@ -28,11 +28,13 @@ export function FormStringField({
   sanitize?: (text: string) => string
 }) {
   const field = useFieldContext<string>()
+  const invalid = useFieldInvalid()
 
   return (
     <FieldBase label={label} description={description}>
       <Input
         value={field.state.value}
+        invalid={invalid}
         onChangeText={(text) =>
           field.handleChange(sanitize ? sanitize(text) : text)
         }

@@ -1,9 +1,18 @@
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 
+import { formatQty, stepForKind } from "@workspace/validators/units";
+
 import { useTranslation } from "@/lib/i18n";
-import { cartLineFromItem, type CartUnit, useCart } from "@/lib/cart-store";
+import {
+  cartLineUnit,
+  cartLineUnitName,
+  type CartUnit,
+  useCart,
+} from "@/lib/cart-store";
+import { QuantityUnitSheet } from "./quantity-unit-sheet";
 import { ItemThumb } from "./item-thumb";
 
 type CatalogItem = {
@@ -26,8 +35,8 @@ export function itemDisplayName(
 export function ItemRow({ item }: { item: CatalogItem }) {
   const { t, locale } = useTranslation();
   const line = useCart((s) => s.lines.find((l) => l.itemId === item.id));
-  const add = useCart((s) => s.add);
   const setQty = useCart((s) => s.setQty);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const name = itemDisplayName(item, locale);
   const defaultUnitObj =
@@ -36,6 +45,9 @@ export function ItemRow({ item }: { item: CatalogItem }) {
     ? (locale === "ar" ? defaultUnitObj.nameAr : defaultUnitObj.nameEn)
     : "";
   const disabled = item.units.length === 0;
+
+  const lineUnit = line ? cartLineUnit(line) : undefined;
+  const step = stepForKind(lineUnit?.kind ?? "count");
 
   return (
     <View className="flex-row items-center gap-4 border-b border-border py-4">
@@ -54,19 +66,25 @@ export function ItemRow({ item }: { item: CatalogItem }) {
             className="size-9 items-center justify-center rounded-full bg-card active:opacity-70"
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setQty(item.id, line.qty - 1);
+              setQty(item.id, line.qty - step);
             }}
           >
             <Ionicons name="remove" size={18} color="#9B968C" />
           </Pressable>
-          <Text className="min-w-6 text-center text-base font-bold text-foreground">
-            {line.qty}
-          </Text>
+          {/* Tapping the quantity opens the picker to change unit/amount. */}
+          <Pressable hitSlop={8} onPress={() => setSheetOpen(true)}>
+            <Text className="min-w-6 text-center text-base font-bold text-foreground">
+              {formatQty(line.qty, lineUnit?.kind ?? "count")}
+            </Text>
+            <Text className="text-center text-[10px] text-muted-foreground">
+              {cartLineUnitName(line, locale)}
+            </Text>
+          </Pressable>
           <Pressable
             className="size-9 items-center justify-center rounded-full bg-primary active:opacity-70"
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setQty(item.id, line.qty + 1);
+              setQty(item.id, line.qty + step);
             }}
           >
             <Ionicons name="add" size={18} color="#0E0E10" />
@@ -74,11 +92,11 @@ export function ItemRow({ item }: { item: CatalogItem }) {
         </View>
       ) : (
         <Pressable
-          className={`rounded-2xl px-5 py-2.5 active:opacity-70 ${disabled ? "bg-elevated" : "bg-primary"}`}
+          className={`rounded-2xl px-4 py-2.5 active:opacity-70 ${disabled ? "bg-elevated" : "bg-primary"}`}
           disabled={disabled}
           onPress={() => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            add(cartLineFromItem(item));
+            setSheetOpen(true);
           }}
         >
           <Text className={`text-sm font-semibold ${disabled ? "text-muted-foreground" : "text-primary-foreground"}`}>
@@ -86,6 +104,16 @@ export function ItemRow({ item }: { item: CatalogItem }) {
           </Text>
         </Pressable>
       )}
+
+      {sheetOpen ? (
+        <QuantityUnitSheet
+          item={item}
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          initialUnitId={line?.unitId}
+          initialQty={line?.qty}
+        />
+      ) : null}
     </View>
   );
 }

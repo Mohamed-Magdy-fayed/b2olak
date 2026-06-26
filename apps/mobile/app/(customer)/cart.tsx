@@ -1,28 +1,109 @@
+import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+
+import { formatQty, isMoneyKind, stepForKind } from "@workspace/validators/units";
 
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { itemDisplayName } from "@/components/item-row";
 import { ItemThumb } from "@/components/item-thumb";
+import { QuantityUnitSheet } from "@/components/quantity-unit-sheet";
 import { track } from "@/lib/analytics";
 import { ensureSignedIn } from "@/lib/auth-gate";
 import { useTranslation } from "@/lib/i18n";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
-import { cartLineUnitName, useCart } from "@/lib/cart-store";
+import { cartLineUnit, cartLineUnitName, useCart, type CartLine } from "@/lib/cart-store";
 import { useTRPC } from "@/lib/trpc";
+
+/** One cart line: thumbnail, kind-aware stepper, tap-to-edit unit + quantity. */
+function CartRow({ line }: { line: CartLine }) {
+  const { t, locale } = useTranslation();
+  const setQty = useCart((s) => s.setQty);
+  const remove = useCart((s) => s.remove);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const unit = cartLineUnit(line);
+  const kind = unit?.kind ?? "count";
+  const step = stepForKind(kind);
+
+  return (
+    <View className="gap-2 rounded-2xl border border-border bg-card p-3">
+      <View className="flex-row items-center gap-3">
+        <ItemThumb label={itemDisplayName(line, locale)} size={52} />
+        <View className="flex-1 gap-0.5">
+          <Text className="text-base font-semibold text-foreground">
+            {itemDisplayName(line, locale)}
+          </Text>
+          <Pressable hitSlop={8} onPress={() => setSheetOpen(true)}>
+            <Text className="text-xs text-primary">
+              {isMoneyKind(kind)
+                ? t("shop.egpWorth", { amount: line.qty })
+                : `${formatQty(line.qty, kind)} ${cartLineUnitName(line, locale)}`}
+            </Text>
+          </Pressable>
+          <Pressable
+            hitSlop={16}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              remove(line.itemId);
+            }}
+          >
+            <Text className="text-xs text-destructive">{t("shop.remove")}</Text>
+          </Pressable>
+        </View>
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            className="size-9 items-center justify-center rounded-full bg-muted"
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setQty(line.itemId, line.qty - step);
+            }}
+          >
+            <Text className="text-lg font-bold text-foreground">−</Text>
+          </Pressable>
+          <Pressable hitSlop={8} onPress={() => setSheetOpen(true)}>
+            <Text className="min-w-6 text-center text-base font-bold text-foreground">
+              {formatQty(line.qty, kind)}
+            </Text>
+          </Pressable>
+          <Pressable
+            className="size-9 items-center justify-center rounded-full bg-primary"
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setQty(line.itemId, line.qty + step);
+            }}
+          >
+            <Text className="text-lg font-bold text-primary-foreground">+</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {sheetOpen ? (
+        <QuantityUnitSheet
+          item={{
+            id: line.itemId,
+            nameEn: line.nameEn,
+            nameAr: line.nameAr,
+            units: line.units,
+            defaultUnit: unit?.code ?? null,
+          }}
+          visible={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          initialUnitId={line.unitId}
+          initialQty={line.qty}
+        />
+      ) : null}
+    </View>
+  );
+}
 
 export default function CartScreen() {
   const trpc = useTRPC();
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const lines = useCart((s) => s.lines);
-  const setQty = useCart((s) => s.setQty);
-  const setUnit = useCart((s) => s.setUnit);
-  const remove = useCart((s) => s.remove);
-  const tabBarHeight = useTabBarHeight();
   const { data: fee } = useQuery(trpc.catalog.deliveryFee.queryOptions());
 
   return (
@@ -42,87 +123,10 @@ export default function CartScreen() {
             keyExtractor={(l) => l.itemId}
             showsVerticalScrollIndicator={false}
             ItemSeparatorComponent={() => <View className="h-3" />}
-            renderItem={({ item: line }) => (
-              <View className="gap-2 rounded-2xl border border-border bg-card p-3">
-                <View className="flex-row items-center gap-3">
-                  <ItemThumb label={itemDisplayName(line, locale)} size={52} />
-                  <View className="flex-1 gap-0.5">
-                    <Text className="text-base font-semibold text-foreground">
-                      {itemDisplayName(line, locale)}
-                    </Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {cartLineUnitName(line, locale)}
-                    </Text>
-                    <Pressable
-                      hitSlop={16}
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        remove(line.itemId);
-                      }}
-                    >
-                      <Text className="text-xs text-destructive">
-                        {t("shop.remove")}
-                      </Text>
-                    </Pressable>
-                  </View>
-                  <View className="flex-row items-center gap-3">
-                    <Pressable
-                      className="size-9 items-center justify-center rounded-full bg-muted"
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setQty(line.itemId, line.qty - 1);
-                      }}
-                    >
-                      <Text className="text-lg font-bold text-foreground">−</Text>
-                    </Pressable>
-                    <Text className="min-w-6 text-center text-base font-bold text-foreground">
-                      {line.qty}
-                    </Text>
-                    <Pressable
-                      className="size-9 items-center justify-center rounded-full bg-primary"
-                      onPress={() => {
-                        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setQty(line.itemId, line.qty + 1);
-                      }}
-                    >
-                      <Text className="text-lg font-bold text-primary-foreground">
-                        +
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {/* Unit picker — shown only when the item has more than one unit */}
-                {(line.units?.length ?? 0) > 1 ? (
-                  <View className="flex-row flex-wrap gap-1.5">
-                    {line.units.map((u) => (
-                      <Pressable
-                        key={u.id}
-                        onPress={() => setUnit(line.itemId, u.id)}
-                        className={`rounded-full border px-2.5 py-1 ${
-                          line.unitId === u.id
-                            ? "border-primary bg-primary/10"
-                            : "border-border bg-elevated"
-                        }`}
-                      >
-                        <Text
-                          className={`text-xs ${
-                            line.unitId === u.id
-                              ? "font-semibold text-primary"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {locale === "ar" ? u.nameAr : u.nameEn}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            )}
+            renderItem={({ item: line }) => <CartRow line={line} />}
             contentContainerClassName="pb-4 pt-1"
           />
-          <BottomActionBar tabBarHeight={tabBarHeight}>
+          <BottomActionBar>
             <Text className="text-muted-foreground">
               {t("shop.itemsAtMarketPrice")}
             </Text>

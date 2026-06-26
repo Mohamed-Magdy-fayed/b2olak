@@ -76,7 +76,7 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null
 
   return (
-    <KeyboardProvider>
+    <KeyboardProvider navigationBarTranslucent statusBarTranslucent preserveEdgeToEdge>
       <ApiProvider>
         <I18nApp>
           <PushSync />

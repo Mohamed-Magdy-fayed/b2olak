@@ -1,4 +1,4 @@
-export { FieldBase, type MobileFieldProps } from "./field-base"
+export { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
 export { FormBooleanField } from "./boolean-field"
 export { FormNumberField } from "./number-field"
 export { FormPhoneField } from "./phone-field"

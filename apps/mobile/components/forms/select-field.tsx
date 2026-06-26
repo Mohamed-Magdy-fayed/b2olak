@@ -9,7 +9,7 @@ import {
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 
-import { FieldBase, type MobileFieldProps } from "./field-base"
+import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
 import { useFieldContext } from "./hooks"
 
 export type SelectOption = {
@@ -33,6 +33,7 @@ export function FormSelectField({
   disabled?: boolean
 }) {
   const field = useFieldContext<string>()
+  const invalid = useFieldInvalid()
   const [open, setOpen] = useState(false)
   const selected = options.find((o) => o.value === field.state.value)
 
@@ -41,14 +42,12 @@ export function FormSelectField({
       <Pressable
         onPress={() => !disabled && setOpen(true)}
         onBlur={() => field.handleBlur()}
-        className={`bg-elevated h-12 w-full flex-row items-center rounded-2xl border border-input px-4 ${
-          disabled ? "opacity-40" : ""
-        }`}
+        className={`bg-elevated h-12 w-full flex-row items-center rounded-2xl border px-4 ${invalid ? "border-destructive" : "border-input"
+          } ${disabled ? "opacity-40" : ""}`}
       >
         <Text
-          className={`flex-1 text-base ${
-            selected ? "text-foreground" : "text-muted-foreground"
-          }`}
+          className={`flex-1 text-base ${selected ? "text-foreground" : "text-muted-foreground"
+            }`}
         >
           {selected ? selected.label : (placeholder ?? "")}
         </Text>
@@ -62,7 +61,7 @@ export function FormSelectField({
         onRequestClose={() => setOpen(false)}
       >
         <Pressable className="flex-1 bg-black/60" onPress={() => setOpen(false)} />
-        <View className="max-h-[60%] rounded-t-2xl bg-card px-5 pt-4 pb-8">
+        <View className="max-h-[60%] rounded-t-2xl bg-card px-4 pt-4 pb-8">
           <View className="mb-1 items-center">
             <View className="mb-3 h-1 w-10 rounded-full bg-border" />
           </View>
@@ -82,14 +81,12 @@ export function FormSelectField({
                     field.handleChange(option.value)
                     setOpen(false)
                   }}
-                  className={`flex-row items-center justify-between border-b border-border py-3.5 ${
-                    isSelected ? "bg-primary/10" : ""
-                  }`}
+                  className={`flex-row items-center justify-between border-b border-border py-3.5 ${isSelected ? "bg-primary/10" : ""
+                    }`}
                 >
                   <Text
-                    className={`flex-1 text-base ${
-                      isSelected ? "font-bold text-primary" : "text-foreground"
-                    }`}
+                    className={`flex-1 text-base ${isSelected ? "font-bold text-primary" : "text-foreground"
+                      }`}
                   >
                     {option.label}
                   </Text>

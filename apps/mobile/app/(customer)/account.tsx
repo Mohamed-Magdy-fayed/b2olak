@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -18,7 +19,6 @@ import {
   getTrustedAccount,
   type TrustedAccount,
 } from "@/lib/device-auth";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTranslation } from "@/lib/i18n";
 import {
   getActiveAccount,
@@ -90,7 +90,6 @@ export default function AccountScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t, locale } = useTranslation();
-  const tabBarHeight = useTabBarHeight();
   const signedIn = useSignedIn();
   const { data } = useQuery({
     ...trpc.auth.me.queryOptions(),
@@ -271,13 +270,15 @@ export default function AccountScreen() {
         <ScreenHeader
           title={t("shop.tabAccount")}
           right={<LanguageToggle />}
-          className="px-5"
+          className="px-4"
         />
         <ScrollView
-          className="flex-1 px-5"
+          className="flex-1 px-4"
           contentContainerClassName="gap-4"
-          contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+          contentContainerStyle={{ paddingBottom: 16 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
         >
           <Card className="gap-2">
             <Text className="font-display text-lg text-foreground">
@@ -314,133 +315,136 @@ export default function AccountScreen() {
       <ScreenHeader
         title={t("shop.tabAccount")}
         right={<LanguageToggle />}
-        className="px-5"
+        className="px-4"
       />
-      <ScrollView
-        className="flex-1 px-5"
+      <KeyboardAwareScrollView
+        className="flex-1 px-4"
         contentContainerClassName="gap-4"
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        bottomOffset={24}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Card className="gap-2">
-        {editingName ? (
-          <NameEditForm
-            initialName={data?.user.name ?? ""}
-            isPending={updateProfile.isPending}
-            onSubmit={(name) => updateProfile.mutate({ name })}
-            onCancel={() => setEditingName(false)}
-          />
-        ) : (
-          <View className="flex-row items-center justify-between gap-3">
-            <View className="flex-1 gap-1">
-              <Text className="font-display text-lg text-foreground">
-                {data?.user.name ?? "—"}
-              </Text>
-              {data?.user.phone ? (
-                <Text className="text-muted-foreground">{data.user.phone}</Text>
-              ) : null}
-            </View>
-            <Pressable
-              onPress={startEditName}
-              hitSlop={8}
-              className="size-10 items-center justify-center rounded-full bg-elevated active:opacity-80"
-              accessibilityLabel={t("shop.editName")}
-            >
-              <Ionicons name="pencil" size={18} color="#C9A227" />
-            </Pressable>
-          </View>
-        )}
-      </Card>
-
-      <Pressable
-        className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-4 active:bg-elevated"
-        onPress={() => router.push("/(customer)/addresses")}
-      >
-        <Ionicons name="location-outline" size={20} color="#C9A227" />
-        <Text className="font-semibold text-foreground">
-          {t("address.title")}
-        </Text>
-      </Pressable>
-
-      {biometricAvailable ? (
-        <Card className="flex-row items-center justify-between gap-3">
-          <View className="flex-1 gap-1">
-            <View className="flex-row items-center gap-2">
-              <Ionicons name="finger-print-outline" size={18} color="#F5F2EC" />
-              <Text className="font-semibold text-foreground">
-                {t("auth.biometric.accountToggleLabel")}
-              </Text>
-            </View>
-            <Text className="text-sm text-muted-foreground">
-              {t("auth.biometric.accountToggleHint")}
-            </Text>
-          </View>
-          <Switch
-            value={biometricOn}
-            onValueChange={(next) => void toggleBiometric(next)}
-            trackColor={{ true: "#C9A227" }}
-          />
-        </Card>
-      ) : null}
-
-      {devices && devices.length > 0 ? (
-        <Card className="gap-3">
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="phone-portrait-outline" size={18} color="#F5F2EC" />
-            <Text className="font-semibold text-foreground">
-              {t("account.devices.title")}
-            </Text>
-          </View>
-          <View className="gap-2">
-            {devices.map((d) => (
-              <View
-                key={d.deviceId}
-                className="flex-row items-center justify-between gap-3 rounded-xl border border-border bg-elevated p-3"
-              >
-                <View className="flex-1 gap-0.5">
-                  <Text className="font-medium text-foreground">
-                    {d.label ?? t("account.devices.defaultLabel")}
-                  </Text>
-                  <Text className="text-xs text-muted-foreground">
-                    {d.lastUsedAt
-                      ? t("account.devices.lastUsed", {
-                        date: new Date(d.lastUsedAt).toLocaleDateString(locale),
-                      })
-                      : t("account.devices.added", {
-                        date: new Date(d.createdAt).toLocaleDateString(locale),
-                      })}
-                  </Text>
-                </View>
-                <Pressable
-                  onPress={() => confirmRevokeDevice(d.deviceId)}
-                  hitSlop={8}
-                  accessibilityLabel={t("account.devices.revoke")}
-                >
-                  <Text className="text-sm font-semibold text-destructive">
-                    {t("account.devices.revoke")}
-                  </Text>
-                </Pressable>
+          {editingName ? (
+            <NameEditForm
+              initialName={data?.user.name ?? ""}
+              isPending={updateProfile.isPending}
+              onSubmit={(name) => updateProfile.mutate({ name })}
+              onCancel={() => setEditingName(false)}
+            />
+          ) : (
+            <View className="flex-row items-center justify-between gap-3">
+              <View className="flex-1 gap-1">
+                <Text className="font-display text-lg text-foreground">
+                  {data?.user.name ?? "—"}
+                </Text>
+                {data?.user.phone ? (
+                  <Text className="text-muted-foreground">{data.user.phone}</Text>
+                ) : null}
               </View>
-            ))}
-          </View>
+              <Pressable
+                onPress={startEditName}
+                hitSlop={8}
+                className="size-10 items-center justify-center rounded-full bg-elevated active:opacity-80"
+                accessibilityLabel={t("shop.editName")}
+              >
+                <Ionicons name="pencil" size={18} color="#C9A227" />
+              </Pressable>
+            </View>
+          )}
         </Card>
-      ) : null}
 
-      <Button
-        variant="outline"
-        label={t("auth.signOut")}
-        loading={signOut.isPending}
-        onPress={() => signOut.mutate()}
-      />
+        <Pressable
+          className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-4 active:bg-elevated"
+          onPress={() => router.push("/(customer)/addresses")}
+        >
+          <Ionicons name="location-outline" size={20} color="#C9A227" />
+          <Text className="font-semibold text-foreground">
+            {t("address.title")}
+          </Text>
+        </Pressable>
 
-      <Button
-        variant="outline"
-        label={t("account.devices.signOutEverywhere")}
-        loading={signOutEverywhere.isPending}
-        onPress={confirmSignOutEverywhere}
-      />
+        {biometricAvailable ? (
+          <Card className="flex-row items-center justify-between gap-3">
+            <View className="flex-1 gap-1">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="finger-print-outline" size={18} color="#F5F2EC" />
+                <Text className="font-semibold text-foreground">
+                  {t("auth.biometric.accountToggleLabel")}
+                </Text>
+              </View>
+              <Text className="text-sm text-muted-foreground">
+                {t("auth.biometric.accountToggleHint")}
+              </Text>
+            </View>
+            <Switch
+              value={biometricOn}
+              onValueChange={(next) => void toggleBiometric(next)}
+              trackColor={{ true: "#C9A227" }}
+            />
+          </Card>
+        ) : null}
 
-      <LegalLinks t={t} />
+        {devices && devices.length > 0 ? (
+          <Card className="gap-3">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="phone-portrait-outline" size={18} color="#F5F2EC" />
+              <Text className="font-semibold text-foreground">
+                {t("account.devices.title")}
+              </Text>
+            </View>
+            <View className="gap-2">
+              {devices.map((d) => (
+                <View
+                  key={d.deviceId}
+                  className="flex-row items-center justify-between gap-3 rounded-xl border border-border bg-elevated p-3"
+                >
+                  <View className="flex-1 gap-0.5">
+                    <Text className="font-medium text-foreground">
+                      {d.label ?? t("account.devices.defaultLabel")}
+                    </Text>
+                    <Text className="text-xs text-muted-foreground">
+                      {d.lastUsedAt
+                        ? t("account.devices.lastUsed", {
+                          date: new Date(d.lastUsedAt).toLocaleDateString(locale),
+                        })
+                        : t("account.devices.added", {
+                          date: new Date(d.createdAt).toLocaleDateString(locale),
+                        })}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => confirmRevokeDevice(d.deviceId)}
+                    hitSlop={8}
+                    accessibilityLabel={t("account.devices.revoke")}
+                  >
+                    <Text className="text-sm font-semibold text-destructive">
+                      {t("account.devices.revoke")}
+                    </Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          </Card>
+        ) : null}
+
+        <Button
+          variant="outline"
+          label={t("auth.signOut")}
+          loading={signOut.isPending}
+          onPress={() => signOut.mutate()}
+        />
+
+        <Button
+          variant="outline"
+          label={t("account.devices.signOutEverywhere")}
+          loading={signOutEverywhere.isPending}
+          onPress={confirmSignOutEverywhere}
+        />
+
+        <LegalLinks t={t} />
 
         <Button
           variant="destructive"
@@ -448,7 +452,7 @@ export default function AccountScreen() {
           loading={deleteAccount.isPending}
           onPress={confirmDeleteAccount}
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </Screen>
   );
 }

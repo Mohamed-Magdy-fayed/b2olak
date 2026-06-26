@@ -16,7 +16,7 @@ import { z } from "zod";
 import { CategoriesTable } from "@workspace/db/schemas/catalog/categories";
 import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
-import { UnitsTable } from "@workspace/db/schemas/catalog/units";
+import { UnitsTable, type UnitKind } from "@workspace/db/schemas/catalog/units";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { cached } from "@workspace/integrations/redis";
@@ -38,25 +38,53 @@ type CatalogUnit = {
   code: string;
   nameEn: string;
   nameAr: string;
+  kind: UnitKind;
 };
+
+/** Active money-kind units ("EGP worth") — offered on every item, not linked per-item. */
+function activeMoneyUnits(db: Context["db"]) {
+  return cached("catalog:money-units", 60, () =>
+    db.query.UnitsTable.findMany({
+      where: and(
+        eq(UnitsTable.kind, "money"),
+        eq(UnitsTable.isActive, true),
+        isNull(UnitsTable.deletedAt),
+      ),
+      orderBy: [asc(UnitsTable.sortOrder)],
+    }),
+  );
+}
 
 /**
  * Enrich a list of items with the units they can be ordered in plus the
  * default unit code (preselected at checkout). One query for the whole batch.
+ * Active money units are appended to every item so "buy X EGP worth" is always
+ * available; they never become the default.
  */
 async function attachUnits<T extends { id: string }>(
   db: Context["db"],
   items: T[],
 ): Promise<(T & { units: CatalogUnit[]; defaultUnit: string | null })[]> {
   if (items.length === 0) return [];
-  const links = await db.query.ItemUnitsTable.findMany({
-    where: inArray(
-      ItemUnitsTable.itemId,
-      items.map((i) => i.id),
-    ),
-    orderBy: [asc(ItemUnitsTable.sortOrder)],
-    with: { unit: true },
-  });
+  const [links, moneyUnits] = await Promise.all([
+    db.query.ItemUnitsTable.findMany({
+      where: inArray(
+        ItemUnitsTable.itemId,
+        items.map((i) => i.id),
+      ),
+      orderBy: [asc(ItemUnitsTable.sortOrder)],
+      with: { unit: true },
+    }),
+    activeMoneyUnits(db),
+  ]);
+
+  const moneyCatalogUnits: CatalogUnit[] = moneyUnits.map((u) => ({
+    id: u.id,
+    code: u.code,
+    nameEn: u.nameEn,
+    nameAr: u.nameAr,
+    kind: u.kind,
+  }));
 
   const byItem = new Map<string, { units: CatalogUnit[]; defaultUnit: string | null }>();
   for (const link of links) {
@@ -66,6 +94,7 @@ async function attachUnits<T extends { id: string }>(
       code: link.unit.code,
       nameEn: link.unit.nameEn,
       nameAr: link.unit.nameAr,
+      kind: link.unit.kind,
     });
     if (link.isDefault) entry.defaultUnit = link.unit.code;
     byItem.set(link.itemId, entry);
@@ -75,7 +104,7 @@ async function attachUnits<T extends { id: string }>(
     const entry = byItem.get(item.id) ?? { units: [], defaultUnit: null };
     return {
       ...item,
-      units: entry.units,
+      units: [...entry.units, ...moneyCatalogUnits],
       defaultUnit: entry.defaultUnit ?? entry.units[0]?.code ?? null,
     };
   });

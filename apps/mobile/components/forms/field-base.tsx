@@ -17,6 +17,16 @@ export type MobileFieldProps = {
 }
 
 /**
+ * Whether the field should render its error state — touched and failing
+ * validation. Single source of truth shared by `FieldBase` (label/message) and
+ * each field control (red border).
+ */
+export function useFieldInvalid() {
+  const field = useFieldContext()
+  return field.state.meta.isTouched && !field.state.meta.isValid
+}
+
+/**
  * Mobile field wrapper — the RN counterpart of the web `FormBase`. Renders the
  * label, the control, an optional hint, and the first validation error once the
  * field is touched. Error messages are i18n keys resolved via the shared
@@ -27,9 +37,9 @@ export function FieldBase({
   description,
   children,
 }: MobileFieldProps & { children: ReactNode }) {
-  const field = useFieldContext()
   const { t, locale } = useTranslation()
-  const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid
+  const isInvalid = useFieldInvalid()
+  const field = useFieldContext()
 
   const errors = flattenValidationErrors(field.state.meta.errors)
     .map((entry) => extractValidationErrorMessage(entry))
@@ -43,7 +53,11 @@ export function FieldBase({
 
   return (
     <View className="gap-1.5">
-      <Typography className="text-sm font-medium text-foreground">
+      <Typography
+        className={`text-sm font-medium ${
+          isInvalid ? "text-destructive" : "text-foreground"
+        }`}
+      >
         {label}
       </Typography>
       {children}

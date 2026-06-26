@@ -53,7 +53,7 @@ export default function DriverLayout() {
           name="account"
           options={{ title: t("driver.tabAccount"), tabBarIcon: tabIcon("person-outline") }}
         />
-        <Tabs.Screen name="orders/[id]" options={{ href: null }} />
+        <Tabs.Screen name="orders/[id]" options={{ href: null, tabBarStyle: { display: "none" } }} />
       </Tabs>
     </AuthGuard>
   );

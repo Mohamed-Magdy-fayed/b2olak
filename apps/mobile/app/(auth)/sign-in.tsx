@@ -8,11 +8,13 @@ import { egyptianPhoneSchema } from "@workspace/validators/auth"
 
 import { LanguageToggle } from "@/components/language-toggle"
 import { Button } from "@/components/ui/button"
+import { DismissKeyboard } from "@/components/ui/dismiss-keyboard"
 import { KeyboardAvoidingView } from "@/components/ui/keyboard-screen"
 import { Screen } from "@/components/ui/screen"
 import { useAppForm } from "@/components/forms"
 import { useTranslation } from "@/lib/i18n"
 import { useTRPC } from "@/lib/trpc"
+import { KeyboardProvider } from "react-native-keyboard-controller"
 
 export default function SignInScreen() {
   const trpc = useTRPC()
@@ -49,66 +51,70 @@ export default function SignInScreen() {
   })
 
   return (
-    <KeyboardAvoidingView behavior="padding" className="flex-1">
-      <Screen padded>
-        <View className="flex-1 justify-center gap-8">
-          {/* Language toggle — top-end */}
-          <View className="items-end">
-            <LanguageToggle />
-          </View>
-
-          {/* Wordmark + subtitle */}
-          <View className="items-center gap-3">
-            <Text className="font-display text-5xl text-primary">
-              {t("mobile.welcomeTitle")}
-            </Text>
-            <Text className="text-center text-base text-muted-foreground">
-              {t("mobile.welcomeSubtitle")}
-            </Text>
-            {returnTo?.includes("checkout") ? (
-              <View className="flex-row items-center gap-2">
-                <Ionicons name="cart-outline" size={16} color="#C9A227" />
-                <Text className="text-sm font-semibold text-primary">
-                  {t("shop.cartSavedHint")}
-                </Text>
+    <KeyboardProvider>
+      <KeyboardAvoidingView behavior="padding" className="flex-1">
+        <Screen padded>
+          <DismissKeyboard>
+            <View className="flex-1 justify-center gap-8">
+              {/* Language toggle — top-end */}
+              <View className="items-end">
+                <LanguageToggle />
               </View>
-            ) : null}
-          </View>
 
-          {/* Phone form */}
-          <View className="gap-3">
-            <form.AppField
-              name="phone"
-              validators={{
-                onSubmit: ({ value }) =>
-                  egyptianPhoneSchema.safeParse(value).success
-                    ? undefined
-                    : "validation.phoneInvalid",
-              }}
-            >
-              {(field) => (
-                <field.PhoneField
-                  label={t("mobile.phoneLabel")}
-                  placeholder={t("mobile.phonePlaceholder")}
-                  autoFocus
+              {/* Wordmark + subtitle */}
+              <View className="items-center gap-3">
+                <Text className="font-display text-5xl text-primary">
+                  {t("mobile.welcomeTitle")}
+                </Text>
+                <Text className="text-center text-base text-muted-foreground">
+                  {t("mobile.welcomeSubtitle")}
+                </Text>
+                {returnTo?.includes("checkout") ? (
+                  <View className="flex-row items-center gap-2">
+                    <Ionicons name="cart-outline" size={16} color="#C9A227" />
+                    <Text className="text-sm font-semibold text-primary">
+                      {t("shop.cartSavedHint")}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Phone form */}
+              <View className="gap-3">
+                <form.AppField
+                  name="phone"
+                  validators={{
+                    onSubmit: ({ value }) =>
+                      egyptianPhoneSchema.safeParse(value).success
+                        ? undefined
+                        : "validation.phoneInvalid",
+                  }}
+                >
+                  {(field) => (
+                    <field.PhoneField
+                      label={t("mobile.phoneLabel")}
+                      placeholder={t("mobile.phonePlaceholder")}
+                      autoFocus
+                    />
+                  )}
+                </form.AppField>
+                {error ? (
+                  <Text className="text-sm text-destructive">{error}</Text>
+                ) : null}
+                <Button
+                  label={
+                    requestOtp.isPending
+                      ? t("mobile.sending")
+                      : t("mobile.sendCode")
+                  }
+                  loading={requestOtp.isPending}
+                  onPress={() => void form.handleSubmit()}
                 />
-              )}
-            </form.AppField>
-            {error ? (
-              <Text className="text-sm text-destructive">{error}</Text>
-            ) : null}
-            <Button
-              label={
-                requestOtp.isPending
-                  ? t("mobile.sending")
-                  : t("mobile.sendCode")
-              }
-              loading={requestOtp.isPending}
-              onPress={() => void form.handleSubmit()}
-            />
-          </View>
-        </View>
-      </Screen>
-    </KeyboardAvoidingView>
+              </View>
+            </View>
+          </DismissKeyboard>
+        </Screen>
+      </KeyboardAvoidingView>
+    </KeyboardProvider>
   )
 }

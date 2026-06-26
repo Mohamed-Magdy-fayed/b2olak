@@ -1,5 +1,5 @@
 import { Input } from "@/components/ui/input"
-import { FieldBase, type MobileFieldProps } from "./field-base"
+import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
 import { useFieldContext } from "./hooks"
 
 /** Egyptian phone field — numeric keypad, always LTR so digits read correctly. */
@@ -13,11 +13,13 @@ export function FormPhoneField({
   autoFocus?: boolean
 }) {
   const field = useFieldContext<string>()
+  const invalid = useFieldInvalid()
 
   return (
     <FieldBase label={label} description={description}>
       <Input
         value={field.state.value}
+        invalid={invalid}
         onChangeText={(text) => field.handleChange(text)}
         onBlur={() => field.handleBlur()}
         placeholder={placeholder}

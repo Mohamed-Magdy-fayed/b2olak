@@ -7,6 +7,7 @@ import { UsersTable } from "@workspace/db/schemas/auth/users";
 import { AddressesTable } from "@workspace/db/schemas/orders/addresses";
 import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
+import { UnitsTable } from "@workspace/db/schemas/catalog/units";
 import { inngest } from "@workspace/integrations/inngest/client";
 import { OrderItemsTable } from "@workspace/db/schemas/orders/order-items";
 import { OrderStatusEventsTable } from "@workspace/db/schemas/orders/order-status-events";
@@ -86,31 +87,50 @@ export const ordersRouter = createTRPCRouter({
       }
 
       // Security: a unit may only be ordered if it is linked to the (canonical)
-      // item. Build (itemId:unitId) → unit code for the snapshot, then reject
-      // any line whose chosen unit isn't an allowed unit for that item.
+      // item — EXCEPT money-kind units ("EGP worth"), which are offered on every
+      // item and so are allowed globally. Build (itemId:unitId) → {code, kind}
+      // for the snapshot, then reject any line whose unit isn't allowed.
       const canonicalIds = [
         ...new Set([...itemMap.values()].map((item) => item.id)),
       ];
-      const links = await ctx.db.query.ItemUnitsTable.findMany({
-        where: inArray(ItemUnitsTable.itemId, canonicalIds),
-        with: { unit: { columns: { code: true } } },
-      });
-      const unitCodeByKey = new Map(
-        links.map((link) => [`${link.itemId}:${link.unitId}`, link.unit.code]),
+      const [links, moneyUnits] = await Promise.all([
+        ctx.db.query.ItemUnitsTable.findMany({
+          where: inArray(ItemUnitsTable.itemId, canonicalIds),
+          with: { unit: { columns: { code: true, kind: true } } },
+        }),
+        ctx.db.query.UnitsTable.findMany({
+          where: and(
+            eq(UnitsTable.kind, "money"),
+            eq(UnitsTable.isActive, true),
+            isNull(UnitsTable.deletedAt),
+          ),
+          columns: { id: true, code: true, kind: true },
+        }),
+      ]);
+      const unitInfoByKey = new Map(
+        links.map((link) => [
+          `${link.itemId}:${link.unitId}`,
+          { code: link.unit.code, kind: link.unit.kind },
+        ]),
       );
-      const unitCodeForLine = (line: { itemId: string; unitId: string }) => {
+      const moneyUnitById = new Map(
+        moneyUnits.map((u) => [u.id, { code: u.code, kind: u.kind }]),
+      );
+      const unitInfoForLine = (line: { itemId: string; unitId: string }) => {
         const item = itemMap.get(line.itemId)!;
-        const code = unitCodeByKey.get(`${item.id}:${line.unitId}`);
-        if (!code) {
+        const info =
+          unitInfoByKey.get(`${item.id}:${line.unitId}`) ??
+          moneyUnitById.get(line.unitId);
+        if (!info) {
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: "orders.unitNotAllowed",
           });
         }
-        return code;
+        return info;
       };
       // Validate up-front so a bad line fails before we open the transaction.
-      for (const line of input.items) unitCodeForLine(line);
+      for (const line of input.items) unitInfoForLine(line);
 
       // settings lib import kept local to avoid cycle noise
       const { getDeliveryFeeEgp } = await import("../lib/settings");
@@ -142,13 +162,15 @@ export const ordersRouter = createTRPCRouter({
         await tx.insert(OrderItemsTable).values(
           input.items.map((line) => {
             const item = itemMap.get(line.itemId)!;
+            const unit = unitInfoForLine(line);
             return {
               orderId: order.id,
               itemId: item.id,
               nameSnapshotEn: item.nameEn,
               nameSnapshotAr: item.nameAr,
               qty: String(line.qty),
-              unit: unitCodeForLine(line),
+              unit: unit.code,
+              unitKind: unit.kind,
               customerNote: line.note,
               createdBy: ctx.session.user.id,
             };
@@ -220,7 +242,7 @@ export const ordersRouter = createTRPCRouter({
         where: and(eq(OrdersTable.id, input.orderId), isNull(OrdersTable.deletedAt)),
         with: {
           items: true,
-          statusEvents: { orderBy: (t, { asc }) => [asc(t.createdAt)] },
+          statusEvents: true,
           driver: { columns: { id: true, name: true, phone: true } },
         },
       });
@@ -258,11 +280,22 @@ export const ordersRouter = createTRPCRouter({
       if (!canCustomerEditItems(order.status)) return {};
 
       const itemIds = [...new Set(order.items.map((line) => line.itemId))];
-      const links = await ctx.db.query.ItemUnitsTable.findMany({
-        where: inArray(ItemUnitsTable.itemId, itemIds),
-        with: { unit: { columns: { code: true } } },
-        orderBy: (t, { asc }) => [asc(t.sortOrder)],
-      });
+      const [links, moneyUnits] = await Promise.all([
+        ctx.db.query.ItemUnitsTable.findMany({
+          where: inArray(ItemUnitsTable.itemId, itemIds),
+          with: { unit: { columns: { code: true } } },
+          orderBy: (t, { asc }) => [asc(t.sortOrder)],
+        }),
+        ctx.db.query.UnitsTable.findMany({
+          where: and(
+            eq(UnitsTable.kind, "money"),
+            eq(UnitsTable.isActive, true),
+            isNull(UnitsTable.deletedAt),
+          ),
+          columns: { code: true },
+        }),
+      ]);
+      const moneyCodes = moneyUnits.map((u) => u.code);
       const codesByItem = new Map<string, string[]>();
       for (const link of links) {
         const list = codesByItem.get(link.itemId) ?? [];
@@ -270,9 +303,10 @@ export const ordersRouter = createTRPCRouter({
         codesByItem.set(link.itemId, list);
       }
 
+      // Money units ("EGP worth") are orderable on every item — always allowed.
       const result: Record<string, string[]> = {};
       for (const line of order.items) {
-        result[line.id] = codesByItem.get(line.itemId) ?? [];
+        result[line.id] = [...(codesByItem.get(line.itemId) ?? []), ...moneyCodes];
       }
       return result;
     }),
@@ -315,13 +349,27 @@ export const ordersRouter = createTRPCRouter({
       });
       if (!line) throw new TRPCError({ code: "NOT_FOUND" });
 
-      // The chosen unit must be linked to this line's item.
+      // The chosen unit must be linked to this line's item, OR be an active
+      // money unit ("EGP worth", offered on every item). Capture its kind so
+      // the order line's snapshot stays consistent with the new unit.
       const links = await ctx.db.query.ItemUnitsTable.findMany({
         where: eq(ItemUnitsTable.itemId, line.itemId),
-        with: { unit: { columns: { code: true } } },
+        with: { unit: { columns: { code: true, kind: true } } },
       });
-      const allowed = links.some((link) => link.unit.code === input.unit);
-      if (!allowed) {
+      const linked = links.find((link) => link.unit.code === input.unit);
+      const moneyUnit = linked
+        ? null
+        : await ctx.db.query.UnitsTable.findFirst({
+            where: and(
+              eq(UnitsTable.code, input.unit),
+              eq(UnitsTable.kind, "money"),
+              eq(UnitsTable.isActive, true),
+              isNull(UnitsTable.deletedAt),
+            ),
+            columns: { kind: true },
+          });
+      const kind = linked?.unit.kind ?? moneyUnit?.kind;
+      if (!kind) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "orders.unitNotAllowed",
@@ -330,7 +378,7 @@ export const ordersRouter = createTRPCRouter({
 
       await ctx.db
         .update(OrderItemsTable)
-        .set({ unit: input.unit, updatedBy: ctx.session.user.id })
+        .set({ unit: input.unit, unitKind: kind, updatedBy: ctx.session.user.id })
         .where(eq(OrderItemsTable.id, line.id));
 
       return { ok: true as const };

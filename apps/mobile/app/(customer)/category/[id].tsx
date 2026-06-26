@@ -34,7 +34,7 @@ export default function CategoryScreen() {
   if (items.error) {
     return (
       <Screen className="items-center justify-center gap-4">
-        <ScreenBackHeader title=" " className="px-5" />
+        <ScreenBackHeader title=" " className="px-4" />
         <Text className="text-center text-foreground">{t("common.error")}</Text>
         <Button label={t("common.retry")} onPress={() => void items.refetch()} />
       </Screen>
@@ -45,7 +45,7 @@ export default function CategoryScreen() {
     <Screen padded={false}>
       <ScreenBackHeader
         title={category ? ((locale === "ar" ? category.nameAr : category.nameEn) ?? "") : " "}
-        className="px-5"
+        className="px-4"
       />
       <FlatList
         data={allItems}
@@ -57,6 +57,8 @@ export default function CategoryScreen() {
           }
         }}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         ListEmptyComponent={
           items.isLoading ? null : (
             <Text className="py-12 text-center text-muted-foreground">

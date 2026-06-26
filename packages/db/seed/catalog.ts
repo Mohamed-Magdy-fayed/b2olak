@@ -10,13 +10,14 @@ import { SystemSettingsTable } from "../src/schemas/system/system-settings";
 import { db } from "./db";
 import { seedCategories, seedItems } from "./catalog-data";
 
-/** Base units of measure — mirrors migration 0009. */
+/** Base units of measure — mirrors migration 0009 + the unit-kind migration. */
 const seedUnits = [
-  { code: "piece", en: "Piece", ar: "قطعة", sortOrder: 0 },
-  { code: "kg", en: "Kilogram", ar: "كيلوجرام", sortOrder: 1 },
-  { code: "gram", en: "Gram", ar: "جرام", sortOrder: 2 },
-  { code: "liter", en: "Liter", ar: "لتر", sortOrder: 3 },
-  { code: "pack", en: "Pack", ar: "عبوة", sortOrder: 4 },
+  { code: "piece", en: "Piece", ar: "قطعة", kind: "count", sortOrder: 0 },
+  { code: "kg", en: "Kilogram", ar: "كيلوجرام", kind: "weight", sortOrder: 1 },
+  { code: "gram", en: "Gram", ar: "جرام", kind: "weight", sortOrder: 2 },
+  { code: "liter", en: "Liter", ar: "لتر", kind: "weight", sortOrder: 3 },
+  { code: "pack", en: "Pack", ar: "عبوة", kind: "count", sortOrder: 4 },
+  { code: "egp", en: "EGP worth", ar: "بقيمة (جنيه)", kind: "money", sortOrder: 5 },
 ] as const;
 
 export async function seedCatalog() {
@@ -29,12 +30,18 @@ export async function seedCatalog() {
         code: unit.code,
         nameEn: unit.en,
         nameAr: unit.ar,
+        kind: unit.kind,
         sortOrder: unit.sortOrder,
         createdBy: "seed",
       })
       .onConflictDoUpdate({
         target: UnitsTable.code,
-        set: { nameEn: unit.en, nameAr: unit.ar, sortOrder: unit.sortOrder },
+        set: {
+          nameEn: unit.en,
+          nameAr: unit.ar,
+          kind: unit.kind,
+          sortOrder: unit.sortOrder,
+        },
       })
       .returning();
     if (row) unitIdByCode.set(unit.code, row.id);

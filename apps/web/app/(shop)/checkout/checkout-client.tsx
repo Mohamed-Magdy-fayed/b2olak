@@ -7,8 +7,9 @@ import { toast } from "sonner";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { formatQty, isMoneyKind } from "@workspace/validators/units";
 import { useTRPC } from "@/lib/trpc/client";
-import { cartLineUnitName, useCart } from "@/features/shop/cart-store";
+import { cartLineUnit, cartLineUnitName, useCart } from "@/features/shop/cart-store";
 import { itemDisplayName, addressLabel, addressSummary } from "@/features/shop/helpers";
 import { PhoneVerifyCard } from "@/features/shop/phone-verify-card";
 import { AddressForm } from "@/features/shop/address-form";
@@ -104,37 +105,44 @@ export function CheckoutClient() {
       {/* Item summary */}
       <Card>
         <CardContent className="flex flex-col gap-2 pt-6">
-          {lines.map((line) => (
-            <div key={line.itemId} className="flex items-center justify-between gap-2 text-sm">
-              <span className="flex-1 text-foreground">
-                {itemDisplayName(line, locale)}
-              </span>
-              {line.units.length > 1 ? (
-                <div className="flex items-center gap-1 text-muted-foreground">
-                  <span>{line.qty} ×</span>
-                  <Select
-                    value={line.unitId}
-                    onValueChange={(v) => v && setUnit(line.itemId, v)}
-                  >
-                    <SelectTrigger className="h-7 w-auto gap-1 px-2 py-0 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {line.units.map((u) => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {locale === "ar" ? u.nameAr : u.nameEn}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <span className="text-muted-foreground">
-                  {line.qty} × {cartLineUnitName(line, locale)}
+          {lines.map((line) => {
+            const kind = cartLineUnit(line)?.kind ?? "count";
+            // Money lines read "10 EGP worth"; others read "2 × kg".
+            const qtyPrefix = isMoneyKind(kind)
+              ? String(line.qty)
+              : `${formatQty(line.qty, kind)} ×`;
+            return (
+              <div key={line.itemId} className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex-1 text-foreground">
+                  {itemDisplayName(line, locale)}
                 </span>
-              )}
-            </div>
-          ))}
+                {line.units.length > 1 ? (
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <span>{qtyPrefix}</span>
+                    <Select
+                      value={line.unitId}
+                      onValueChange={(v) => v && setUnit(line.itemId, v)}
+                    >
+                      <SelectTrigger className="h-7 w-auto gap-1 px-2 py-0 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {line.units.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {locale === "ar" ? u.nameAr : u.nameEn}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {qtyPrefix} {cartLineUnitName(line, locale)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
           <div className="mt-2 flex justify-between border-t border-border pt-2 text-sm">
             <span className="font-semibold text-foreground">{t("shop.deliveryFee")}</span>
             <span className="font-bold text-foreground">

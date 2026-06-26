@@ -2,17 +2,20 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Pressable,
-  ScrollView,
   Text,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView, KeyboardProvider } from "react-native-keyboard-controller";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+import { formatQty, isMoneyKind } from "@workspace/validators/units";
 
 import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
@@ -22,6 +25,7 @@ import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { StatusChip } from "@/components/ui/status-chip";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
+import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen";
 
 /** One screen drives the whole fulfillment journey (D3→D5) by order status. */
 export default function DriverOrderScreen() {
@@ -36,7 +40,7 @@ export default function DriverOrderScreen() {
   const [cashCollected, setCashCollected] = useState("");
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
-  const { data: order, isLoading } = useQuery({ ...orderOptions, enabled: !!id });
+  const { data: order, isLoading, isRefetching } = useQuery({ ...orderOptions, enabled: !!id });
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: orderOptions.queryKey });
@@ -91,22 +95,28 @@ export default function DriverOrderScreen() {
           if (!old) return old;
           return {
             ...old,
-            items: old.items.map((it) =>
-              it.id === vars.orderItemId
-                ? {
-                    ...it,
-                    status: vars.status,
-                    actualUnitPrice:
-                      vars.actualUnitPrice != null
-                        ? vars.actualUnitPrice.toFixed(2)
-                        : null,
-                    actualLineTotal:
-                      vars.actualUnitPrice != null
-                        ? (vars.actualUnitPrice * Number(it.qty)).toFixed(2)
-                        : null,
-                  }
-                : it,
-            ),
+            items: old.items.map((it) => {
+              if (it.id !== vars.orderItemId) return it;
+              const money = isMoneyKind(it.unitKind);
+              const resolving =
+                vars.status === "found" || vars.status === "substituted";
+              return {
+                ...it,
+                status: vars.status,
+                // Money lines have no per-unit price; the total is the worth.
+                actualUnitPrice:
+                  !money && vars.actualUnitPrice != null
+                    ? vars.actualUnitPrice.toFixed(2)
+                    : null,
+                actualLineTotal: !resolving
+                  ? null
+                  : money
+                    ? (vars.actualUnitPrice ?? Number(it.qty)).toFixed(2)
+                    : vars.actualUnitPrice != null
+                      ? (vars.actualUnitPrice * Number(it.qty)).toFixed(2)
+                      : null,
+              };
+            }),
           };
         });
         return { previous };
@@ -201,6 +211,12 @@ export default function DriverOrderScreen() {
     line.nameSnapshotEn ??
     "—";
 
+  // Kind-aware quantity label: money → "10 EGP worth", else "½ kg".
+  const lineQtyLabel = (line: (typeof order.items)[number]) =>
+    isMoneyKind(line.unitKind)
+      ? t("shop.egpWorth", { amount: Number(line.qty) })
+      : `${formatQty(Number(line.qty), line.unitKind)} ${t(`units.${line.unit}` as never)}`;
+
   const shoppingMode = ["shopping", "purchased"].includes(order.status);
   const itemsTotal = order.actualItemsTotal ?? "0.00";
   const codTotal =
@@ -227,265 +243,278 @@ export default function DriverOrderScreen() {
     (order.status === "delivering" && !collecting);
 
   return (
-    <Screen>
-      <ScreenBackHeader
-        title={t("shop.orderNumber", { number: String(order.orderNumber) })}
-        right={<StatusChip status={order.status} />}
-      />
+    <KeyboardProvider>
+      <Screen>
+        <ScreenBackHeader
+          title={t("shop.orderNumber", { number: String(order.orderNumber) })}
+          right={<StatusChip status={order.status} />}
+        />
 
-      <ScrollView
-        className="-mx-5 flex-1 px-5"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 12 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* address + contact */}
-        <Card className="gap-3">
-          <View className="flex-row items-center gap-2">
-            <Ionicons name="location-outline" size={16} color="#C9A227" />
-            <Text className="font-semibold text-foreground">
-              {t("driver.address")}
-            </Text>
-          </View>
-          <Text className="text-foreground" selectable>
-            {order.city}، {addressBlock}
-          </Text>
-          {order.customerNote ? (
-            <View className="flex-row items-start gap-2 rounded-xl bg-elevated px-3 py-2">
-              <Ionicons name="chatbubble-outline" size={14} color="#9B968C" />
-              <Text className="flex-1 text-sm text-muted-foreground">
-                {t("driver.customerNote")}: {order.customerNote}
-              </Text>
-            </View>
-          ) : null}
-          <Pressable
-            className="h-10 flex-row items-center justify-center gap-2 rounded-2xl border border-border px-4 active:opacity-80"
-            onPress={() => void Linking.openURL(`tel:${order.contactPhone}`)}
-          >
-            <Ionicons name="call-outline" size={16} color="#C9A227" />
-            <Text className="text-sm font-medium text-foreground">
-              {t("driver.callCustomer")}
-            </Text>
-          </Pressable>
-        </Card>
-
-        {/* item checklist */}
-        <Card className="gap-4">
-          {order.items.map((line, index) => {
-            const resolved = line.status !== "pending";
-            const isLast = index === order.items.length - 1;
-            return (
-              <View
-                key={line.id}
-                className={`gap-2 ${!isLast ? "border-b border-border pb-4" : ""}`}
-              >
-                <View className="flex-row items-start justify-between gap-2">
-                  <Text
-                    className={`flex-1 text-base font-semibold ${
-                      line.status === "unavailable"
-                        ? "text-muted-foreground line-through"
-                        : "text-foreground"
-                    }`}
-                  >
-                    {lineName(line)} — {line.qty} {line.unit}
-                  </Text>
-                  {resolved ? (
-                    <View
-                      className={`flex-row items-center gap-1 rounded-full px-2.5 py-1 ${
-                        line.status === "unavailable"
-                          ? "bg-destructive/10"
-                          : "bg-success/10"
-                      }`}
-                    >
-                      <Ionicons
-                        name={
-                          line.status === "unavailable"
-                            ? "close-circle-outline"
-                            : "checkmark-circle-outline"
-                        }
-                        size={12}
-                        color={
-                          line.status === "unavailable" ? "#F0584F" : "#34D399"
-                        }
-                      />
-                      <Text
-                        className={`text-xs font-bold ${
-                          line.status === "unavailable"
-                            ? "text-destructive"
-                            : "text-success"
-                        }`}
-                      >
-                        {t(`shop.lineStatus.${line.status}` as never)}
-                        {line.actualLineTotal
-                          ? ` • ${line.actualLineTotal}`
-                          : ""}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-                {line.customerNote ? (
-                  <View className="flex-row items-center gap-1.5">
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={13}
-                      color="#9B968C"
-                    />
-                    <Text className="text-xs text-muted-foreground">
-                      {line.customerNote}
-                    </Text>
-                  </View>
-                ) : null}
-                {shoppingMode ? (
-                  <View className="flex-row items-center gap-2">
-                    <Input
-                      className="h-12 flex-1"
-                      placeholder={t("driver.enterPrice")}
-                      keyboardType="decimal-pad"
-                      value={prices[line.id] ?? line.actualUnitPrice ?? ""}
-                      onChangeText={(value) =>
-                        setPrices((p) => ({ ...p, [line.id]: value }))
-                      }
-                      style={{ textAlign: "left", writingDirection: "ltr", minWidth: 80 }}
-                    />
-                    <Pressable
-                      className="size-12 items-center justify-center rounded-full bg-success active:opacity-80"
-                      onPress={() => {
-                        const price = Number(
-                          prices[line.id] ?? line.actualUnitPrice,
-                        );
-                        if (!price || price <= 0) {
-                          setError(t("driver.priceRequired"));
-                          return;
-                        }
-                        updateLine.mutate({
-                          orderItemId: line.id,
-                          status: "found",
-                          actualUnitPrice: price,
-                        });
-                      }}
-                    >
-                      <Ionicons name="checkmark" size={22} color="#0E0E10" />
-                    </Pressable>
-                    <Pressable
-                      className="size-12 items-center justify-center rounded-full bg-destructive active:opacity-80"
-                      onPress={() =>
-                        updateLine.mutate({
-                          orderItemId: line.id,
-                          status: "unavailable",
-                        })
-                      }
-                    >
-                      <Ionicons name="close" size={22} color="#F5F2EC" />
-                    </Pressable>
-                  </View>
-                ) : null}
+        <KeyboardAwareScrollView
+          className="-mx-5 flex-1 px-4"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24, gap: 12 }}
+          bottomOffset={24}
+          keyboardShouldPersistTaps="handled"
+        >
+          <KeyboardAvoidingView className="gap-4 pt-1">
+            {/* address + contact */}
+            <Card className="gap-3">
+              <View className="flex-row items-center gap-2">
+                <Ionicons name="location-outline" size={16} color="#C9A227" />
+                <Text className="font-semibold text-foreground">
+                  {t("driver.address")}
+                </Text>
               </View>
-            );
-          })}
+              <Text className="text-foreground" selectable>
+                {order.city}، {addressBlock}
+              </Text>
+              {order.customerNote ? (
+                <View className="flex-row items-start gap-2 rounded-xl bg-elevated px-3 py-2">
+                  <Ionicons name="chatbubble-outline" size={14} color="#9B968C" />
+                  <Text className="flex-1 text-sm text-muted-foreground">
+                    {t("driver.customerNote")}: {order.customerNote}
+                  </Text>
+                </View>
+              ) : null}
+              <Pressable
+                className="h-10 flex-row items-center justify-center gap-2 rounded-2xl border border-border px-4 active:opacity-80"
+                onPress={() => void Linking.openURL(`tel:${order.contactPhone}`)}
+              >
+                <Ionicons name="call-outline" size={16} color="#C9A227" />
+                <Text className="text-sm font-medium text-foreground">
+                  {t("driver.callCustomer")}
+                </Text>
+              </Pressable>
+            </Card>
 
-          {/* COD totals */}
-          <View className="gap-2 border-t border-border pt-3">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-muted-foreground">
-                {t("driver.itemsTotal")}
-              </Text>
-              <Text className="text-sm text-foreground">{itemsTotal} EGP</Text>
-            </View>
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-muted-foreground">
-                {t("shop.deliveryFee")}
-              </Text>
-              <Text className="text-sm text-foreground">
-                {order.deliveryFee} EGP
-              </Text>
-            </View>
-            <View className="mt-1 flex-row items-center justify-between rounded-xl bg-primary/10 px-3 py-2.5">
-              <Text className="font-semibold text-foreground">
-                {t("driver.codToCollect")}
-              </Text>
-              <Text className="font-display text-xl text-primary">
-                {codTotal} EGP
-              </Text>
-            </View>
-          </View>
-        </Card>
+            {/* item checklist */}
+            <Card className="gap-4">
+              {order.items.map((line, index) => {
+                const resolved = line.status !== "pending";
+                const money = isMoneyKind(line.unitKind);
+                const isLast = index === order.items.length - 1;
+                return (
+                  <View
+                    key={line.id}
+                    className={`gap-2 ${!isLast ? "border-b border-border pb-4" : ""}`}
+                  >
+                    <View className="flex-row items-start justify-between gap-2">
+                      <Text
+                        className={`flex-1 text-base font-semibold ${line.status === "unavailable"
+                          ? "text-muted-foreground line-through"
+                          : "text-foreground"
+                          }`}
+                      >
+                        {lineName(line)} — {lineQtyLabel(line)}
+                      </Text>
+                      {resolved ? (
+                        <View
+                          className={`flex-row items-center gap-1 rounded-full px-2.5 py-1 ${line.status === "unavailable"
+                            ? "bg-destructive/10"
+                            : "bg-success/10"
+                            }`}
+                        >
+                          <Ionicons
+                            name={
+                              line.status === "unavailable"
+                                ? "close-circle-outline"
+                                : "checkmark-circle-outline"
+                            }
+                            size={12}
+                            color={
+                              line.status === "unavailable" ? "#F0584F" : "#34D399"
+                            }
+                          />
+                          <Text
+                            className={`text-xs font-bold ${line.status === "unavailable"
+                              ? "text-destructive"
+                              : "text-success"
+                              }`}
+                          >
+                            {t(`shop.lineStatus.${line.status}` as never)}
+                            {line.actualLineTotal
+                              ? ` • ${line.actualLineTotal}`
+                              : ""}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    {line.customerNote ? (
+                      <View className="flex-row items-center gap-1.5">
+                        <Ionicons
+                          name="chatbubble-outline"
+                          size={13}
+                          color="#9B968C"
+                        />
+                        <Text className="text-xs text-muted-foreground">
+                          {line.customerNote}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {shoppingMode ? (
+                      <View className="flex-row items-center gap-2">
+                        <Input
+                          className="h-12 flex-1"
+                          placeholder={
+                            money
+                              ? t("shop.egpWorth", { amount: Number(line.qty) })
+                              : t("driver.enterPrice")
+                          }
+                          keyboardType="decimal-pad"
+                          value={
+                            prices[line.id] ??
+                            line.actualLineTotal ??
+                            line.actualUnitPrice ??
+                            ""
+                          }
+                          onChangeText={(value) =>
+                            setPrices((p) => ({ ...p, [line.id]: value }))
+                          }
+                          style={{ textAlign: "auto", writingDirection: "ltr", minWidth: 80 }}
+                        />
+                        <Pressable
+                          className="size-12 items-center justify-center rounded-full bg-success active:opacity-80"
+                          onPress={() => {
+                            const raw = prices[line.id] ?? line.actualUnitPrice ?? "";
+                            const price = Number(raw);
+                            // Money lines default to the requested worth — price optional.
+                            if (!money && (!price || price <= 0)) {
+                              setError(t("driver.priceRequired"));
+                              return;
+                            }
+                            updateLine.mutate({
+                              orderItemId: line.id,
+                              status: "found",
+                              actualUnitPrice:
+                                raw && price > 0 ? price : undefined,
+                            });
+                          }}
+                        >
+                          <Ionicons name="checkmark" size={22} color="#0E0E10" />
+                        </Pressable>
+                        <Pressable
+                          className="size-12 items-center justify-center rounded-full bg-destructive active:opacity-80"
+                          onPress={() =>
+                            updateLine.mutate({
+                              orderItemId: line.id,
+                              status: "unavailable",
+                            })
+                          }
+                        >
+                          <Ionicons name="close" size={22} color="#F5F2EC" />
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })}
 
-        {error ? (
-          <View className="flex-row items-center gap-2 rounded-2xl bg-destructive/10 px-4 py-3">
-            <Ionicons
-              name="alert-circle-outline"
-              size={16}
-              color="#F0584F"
-            />
-            <Text className="flex-1 text-sm text-destructive">{error}</Text>
-          </View>
+              {/* COD totals */}
+              <View className="gap-2 border-t border-border pt-3">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-muted-foreground">
+                    {t("driver.itemsTotal")}
+                  </Text>
+                  <Text className="text-sm text-foreground">{itemsTotal} EGP</Text>
+                </View>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-muted-foreground">
+                    {t("shop.deliveryFee")}
+                  </Text>
+                  <Text className="text-sm text-foreground">
+                    {order.deliveryFee} EGP
+                  </Text>
+                </View>
+                <View className="mt-1 flex-row items-center justify-between rounded-xl bg-primary/10 px-3 py-2.5">
+                  <Text className="font-semibold text-foreground">
+                    {t("driver.codToCollect")}
+                  </Text>
+                  <Text className="font-display text-xl text-primary">
+                    {codTotal} EGP
+                  </Text>
+                </View>
+              </View>
+            </Card>
+
+            {error ? (
+              <View className="flex-row items-center gap-2 rounded-2xl bg-destructive/10 px-4 py-3">
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={16}
+                  color="#F0584F"
+                />
+                <Text className="flex-1 text-sm text-destructive">{error}</Text>
+              </View>
+            ) : null}
+
+            {order.status === "delivering" && collecting ? (
+              <Card className="gap-3">
+                <Text className="font-semibold text-foreground">
+                  {t("driver.cashCollectedLabel")}
+                </Text>
+                <Text className="text-sm text-muted-foreground">
+                  {t("driver.cashCollectedHint", { amount: codTotal })}
+                </Text>
+                <Input
+                  keyboardType="decimal-pad"
+                  value={cashCollected}
+                  onChangeText={setCashCollected}
+                  style={{ textAlign: "left", writingDirection: "ltr" }}
+                />
+                <Button
+                  label={t("driver.confirmCollected")}
+                  loading={markDelivered.isPending}
+                  onPress={() => {
+                    const amount = Number(cashCollected);
+                    if (!amount || amount <= 0) {
+                      setError(t("driver.amountRequired"));
+                      return;
+                    }
+                    markDelivered.mutate({
+                      orderId: order.id,
+                      amountCollected: amount,
+                    });
+                  }}
+                />
+              </Card>
+            ) : null}
+          </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
+
+        {showActionBar ? (
+          <KeyboardStickyFooter className="-mx-5 px-4">
+            {order.status === "assigned" ? (
+              <Button
+                label={t("driver.startShopping")}
+                loading={startShopping.isPending || isLoading || updateLine.isPending || isRefetching}
+                onPress={() => startShopping.mutate({ orderId: order.id })}
+              />
+            ) : null}
+            {order.status === "shopping" ? (
+              <Button
+                label={t("driver.doneShopping")}
+                loading={doneShopping.isPending || isLoading || updateLine.isPending || isRefetching}
+                onPress={() => doneShopping.mutate({ orderId: order.id })}
+              />
+            ) : null}
+            {order.status === "purchased" ? (
+              <Button
+                label={t("driver.startDelivery")}
+                loading={startDelivery.isPending || isLoading || updateLine.isPending || isRefetching}
+                onPress={() => startDelivery.mutate({ orderId: order.id })}
+              />
+            ) : null}
+            {order.status === "delivering" && !collecting ? (
+              <Button
+                label={t("driver.markDelivered")}
+                loading={markDelivered.isPending || isLoading || updateLine.isPending || isRefetching}
+                onPress={() => setCollecting(true)}
+              />
+            ) : null}
+          </KeyboardStickyFooter>
         ) : null}
-
-        {order.status === "delivering" && collecting ? (
-          <Card className="gap-3">
-            <Text className="font-semibold text-foreground">
-              {t("driver.cashCollectedLabel")}
-            </Text>
-            <Text className="text-sm text-muted-foreground">
-              {t("driver.cashCollectedHint", { amount: codTotal })}
-            </Text>
-            <Input
-              keyboardType="decimal-pad"
-              value={cashCollected}
-              onChangeText={setCashCollected}
-              style={{ textAlign: "left", writingDirection: "ltr" }}
-            />
-            <Button
-              label={t("driver.confirmCollected")}
-              loading={markDelivered.isPending}
-              onPress={() => {
-                const amount = Number(cashCollected);
-                if (!amount || amount <= 0) {
-                  setError(t("driver.amountRequired"));
-                  return;
-                }
-                markDelivered.mutate({
-                  orderId: order.id,
-                  amountCollected: amount,
-                });
-              }}
-            />
-          </Card>
-        ) : null}
-      </ScrollView>
-
-      {showActionBar ? (
-        <BottomActionBar className="-mx-5 px-5">
-          {order.status === "assigned" ? (
-            <Button
-              label={t("driver.startShopping")}
-              loading={startShopping.isPending}
-              onPress={() => startShopping.mutate({ orderId: order.id })}
-            />
-          ) : null}
-          {order.status === "shopping" ? (
-            <Button
-              label={t("driver.doneShopping")}
-              loading={doneShopping.isPending}
-              onPress={() => doneShopping.mutate({ orderId: order.id })}
-            />
-          ) : null}
-          {order.status === "purchased" ? (
-            <Button
-              label={t("driver.startDelivery")}
-              loading={startDelivery.isPending}
-              onPress={() => startDelivery.mutate({ orderId: order.id })}
-            />
-          ) : null}
-          {order.status === "delivering" && !collecting ? (
-            <Button
-              label={t("driver.markDelivered")}
-              loading={markDelivered.isPending}
-              onPress={() => setCollecting(true)}
-            />
-          ) : null}
-        </BottomActionBar>
-      ) : null}
-    </Screen>
+      </Screen>
+    </KeyboardProvider>
   );
 }

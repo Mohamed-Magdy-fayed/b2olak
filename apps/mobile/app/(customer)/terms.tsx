@@ -2,11 +2,9 @@ import { ScrollView, Text, View } from "react-native";
 
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useTranslation } from "@/lib/i18n";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 
 export default function TermsScreen() {
   const { t } = useTranslation();
-  const tabBarHeight = useTabBarHeight();
 
   const sections = [
     { title: t("terms.s1Title"), body: t("terms.s1Body") },
@@ -17,11 +15,13 @@ export default function TermsScreen() {
 
   return (
     <Screen padded={false}>
-      <ScreenBackHeader title={t("terms.title")} className="px-5" />
+      <ScreenBackHeader title={t("terms.title")} className="px-4" />
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <Text className="mb-5 text-sm text-muted-foreground">
           {t("terms.lastUpdated")}

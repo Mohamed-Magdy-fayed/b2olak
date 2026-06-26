@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { unitKindValues } from "./units";
+
 /** 2–80 chars, Arabic/Latin letters + digits + spaces, no URLs (docs/05 §abuse). */
 export const itemNameSchema = z
   .string()
@@ -32,6 +34,7 @@ export const unitUpsertSchema = z.object({
     .regex(/^[a-z0-9-]+$/, { error: "validation.slugInvalid" }),
   nameEn: z.string().trim().min(1).max(64),
   nameAr: z.string().trim().min(1).max(64),
+  kind: z.enum(unitKindValues).default("count"),
   sortOrder: z.number().int().min(0).max(1000).default(0),
   isActive: z.boolean().default(true),
 });

@@ -5,6 +5,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Ionicons } from "@expo/vector-icons"
 
+import { defaultQtyForKind } from "@workspace/validators/units"
+
 import { ItemRow } from "@/components/item-row"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -13,7 +15,6 @@ import { Screen, ScreenHeader } from "@/components/ui/screen"
 import { ensureSignedIn } from "@/lib/auth-gate"
 import { useTranslation } from "@/lib/i18n"
 import { useCart } from "@/lib/cart-store"
-import { useTabBarHeight } from "@/lib/use-tab-bar-height"
 import { useTRPC } from "@/lib/trpc"
 
 const RECENT_SEARCHES_KEY = "ba2olak-recent-searches"
@@ -54,7 +55,6 @@ export default function SearchScreen() {
   const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
   const addToCart = useCart((s) => s.add)
-  const tabBarHeight = useTabBarHeight()
 
   const [query, setQuery] = useState("")
   const [debouncedQuery, setDebouncedQuery] = useState("")
@@ -114,13 +114,16 @@ export default function SearchScreen() {
         // The server returns the item without units attached — use the
         // unit the user chose (we have the unit object from the units list).
         const chosenUnit = (units ?? []).find((u) => u.id === unitId)
-        addToCart({
-          itemId: data.item.id,
-          nameEn: data.item.nameEn,
-          nameAr: data.item.nameAr,
-          units: chosenUnit ? [chosenUnit] : [],
-          unitId: chosenUnit?.id ?? "",
-        })
+        addToCart(
+          {
+            itemId: data.item.id,
+            nameEn: data.item.nameEn,
+            nameAr: data.item.nameAr,
+            units: chosenUnit ? [chosenUnit] : [],
+            unitId: chosenUnit?.id ?? "",
+          },
+          defaultQtyForKind(chosenUnit?.kind ?? "count"),
+        )
         void queryClient.invalidateQueries({
           queryKey: trpc.catalog.search.queryKey(),
         })
@@ -156,8 +159,8 @@ export default function SearchScreen() {
 
   return (
     <Screen padded={false}>
-      <ScreenHeader title={t("shop.tabSearch")} className="px-5" />
-      <View className="px-5">
+      <ScreenHeader title={t("shop.tabSearch")} className="px-4" />
+      <View className="px-4">
         <Input
           value={query}
           onChangeText={(value) => {
@@ -184,12 +187,14 @@ export default function SearchScreen() {
         </Card>
       ) : null}
 
+
       {adding ? (
         <KeyboardAwareScrollView
-          className="flex-1 px-5"
+          className="flex-1 px-4"
           contentContainerClassName="gap-3 pb-6"
           bottomOffset={24}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
         >
           <Card className="gap-3">
@@ -204,11 +209,10 @@ export default function SearchScreen() {
                 <Pressable
                   key={category.id}
                   onPress={() => setCategoryId(category.id)}
-                  className={`rounded-full border px-3 py-1.5 ${
-                    categoryId === category.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-card"
-                  }`}
+                  className={`rounded-full border px-3 py-1.5 ${categoryId === category.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-card"
+                    }`}
                 >
                   <Text
                     className={
@@ -230,11 +234,10 @@ export default function SearchScreen() {
                 <Pressable
                   key={u.id}
                   onPress={() => setUnitId(u.id)}
-                  className={`rounded-full border px-3 py-1.5 ${
-                    unitId === u.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-card"
-                  }`}
+                  className={`rounded-full border px-3 py-1.5 ${unitId === u.id
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-card"
+                    }`}
                 >
                   <Text
                     className={
@@ -287,7 +290,7 @@ export default function SearchScreen() {
           )}
           contentContainerStyle={{
             paddingHorizontal: 20,
-            paddingBottom: tabBarHeight + 16,
+            paddingBottom: 16,
           }}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={

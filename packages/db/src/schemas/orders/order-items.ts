@@ -10,6 +10,7 @@ import {
 
 import { auditColumns, id } from "../../helpers";
 import { ItemsTable } from "../catalog/items";
+import { unitKindEnum } from "../catalog/units";
 import { orderItemStatusEnum } from "./enums";
 import { OrdersTable } from "./orders";
 
@@ -33,6 +34,8 @@ export const OrderItemsTable = pgTable(
     qty: numeric({ precision: 10, scale: 3 }).notNull(),
     /** Snapshot of the unit `code` at order time (catalog edits never rewrite history). */
     unit: varchar({ length: 32 }).notNull(),
+    /** Snapshot of the unit `kind` — lets display/driver totals interpret `qty` without a join. */
+    unitKind: unitKindEnum().notNull().default("count"),
     customerNote: text(),
     status: orderItemStatusEnum().notNull().default("pending"),
     actualUnitPrice: numeric({ precision: 10, scale: 2 }),

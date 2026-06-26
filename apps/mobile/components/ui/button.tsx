@@ -18,9 +18,9 @@ const buttonVariants = cva(
         destructive: "bg-destructive",
       },
       size: {
-        default: "h-14 px-6",
-        sm: "h-10 px-4",
-        lg: "h-16 px-7",
+        default: "min-h-14 py-3 px-6",
+        sm: "min-h-10 py-2 px-4",
+        lg: "min-h-16 py-3.5 px-7",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react"
-import { Text, View } from "react-native"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { AppState, Text, View } from "react-native"
 import { router, useLocalSearchParams, type Href } from "expo-router"
 import { useMutation } from "@tanstack/react-query"
+import { useStore } from "@tanstack/react-form"
+import * as Clipboard from "expo-clipboard"
 
 import { otpCodeSchema } from "@workspace/validators/auth"
 
 import { BiometricEnableSheet } from "@/components/biometric-enable-sheet"
 import { Button } from "@/components/ui/button"
+import { DismissKeyboard } from "@/components/ui/dismiss-keyboard"
 import { KeyboardAvoidingView } from "@/components/ui/keyboard-screen"
 import { Screen, ScreenBackHeader } from "@/components/ui/screen"
 import { useAppForm } from "@/components/forms"
@@ -20,6 +23,7 @@ import {
   upsertAccount,
 } from "@/lib/session"
 import { useTRPC } from "@/lib/trpc"
+import { KeyboardProvider } from "react-native-keyboard-controller"
 
 type Dest = Href
 
@@ -44,6 +48,9 @@ export default function VerifyScreen() {
   const [pendingDest, setPendingDest] = useState<Dest | null>(null)
   const [pendingUser, setPendingUser] = useState<PendingUser | null>(null)
   const [enabling, setEnabling] = useState(false)
+  // Guards against re-submitting the same code (auto-submit fires on the 6th
+  // digit, which we only want to honor once per code).
+  const submittedRef = useRef(false)
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -92,6 +99,8 @@ export default function VerifyScreen() {
         }
       },
       onError: (err) => {
+        // Let the user (or a fresh clipboard read) trigger another attempt.
+        submittedRef.current = false
         const key = err.message
         setError(
           key === "auth.otpExpired"
@@ -119,6 +128,45 @@ export default function VerifyScreen() {
       verify.mutate({ phone, code: value.code })
     },
   })
+
+  // OTP arrives over WhatsApp (not SMS), so the OS one-time-code keyboard
+  // autofill can't see it. Instead we read a copied 6-digit code from the
+  // clipboard — the natural flow is: tap-copy in WhatsApp, return to the app.
+  const tryClipboardAutofill = useCallback(async () => {
+    if (verify.isPending) return
+    if (otpCodeSchema.safeParse(form.getFieldValue("code")).success) return
+    try {
+      const text = (await Clipboard.getStringAsync()).trim()
+      const code = text.match(/\b(\d{6})\b/)?.[1]
+      if (code && otpCodeSchema.safeParse(code).success) {
+        form.setFieldValue("code", code)
+      }
+    } catch {
+      // clipboard unavailable / permission denied — user can still type
+    }
+  }, [form, verify.isPending])
+
+  // Read on mount and whenever the app returns to the foreground (i.e. back
+  // from WhatsApp). Foregrounding is the only reliable "they just copied" cue.
+  useEffect(() => {
+    void tryClipboardAutofill()
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void tryClipboardAutofill()
+    })
+    return () => sub.remove()
+  }, [tryClipboardAutofill])
+
+  // Auto-verify once a valid 6-digit code is present (typed or filled), so the
+  // user never has to reach for the Verify button.
+  const code = useStore(form.store, (s) => s.values.code)
+  useEffect(() => {
+    if (otpCodeSchema.safeParse(code).success && !submittedRef.current) {
+      submittedRef.current = true
+      void form.handleSubmit()
+    } else if (code.length < 6) {
+      submittedRef.current = false
+    }
+  }, [code, form])
 
   const enableBiometric = async () => {
     if (!pendingDest || !pendingUser) return
@@ -154,68 +202,70 @@ export default function VerifyScreen() {
   }
 
   return (
-    <>
+    <KeyboardProvider>
       <KeyboardAvoidingView behavior="padding" className="flex-1">
         <Screen padded>
           {/* Back to sign-in */}
           <ScreenBackHeader title="" />
 
-          <View className="flex-1 justify-center gap-8">
-            {/* Heading */}
-            <View className="items-center gap-2">
-              <Text className="font-display text-3xl text-primary">
-                {t("mobile.welcomeTitle")}
-              </Text>
-              <Text className="text-center text-base text-muted-foreground">
-                {t("mobile.codeSentTo", { phone })}
-              </Text>
-            </View>
+          <DismissKeyboard>
+            <View className="flex-1 justify-center gap-8">
+              {/* Heading */}
+              <View className="items-center gap-2">
+                <Text className="font-display text-3xl text-primary">
+                  {t("mobile.welcomeTitle")}
+                </Text>
+                <Text className="text-center text-base text-muted-foreground">
+                  {t("mobile.codeSentTo", { phone })}
+                </Text>
+              </View>
 
-            {/* OTP form */}
-            <View className="gap-3">
-              <form.AppField
-                name="code"
-                validators={{
-                  onSubmit: ({ value }) =>
-                    otpCodeSchema.safeParse(value).success
-                      ? undefined
-                      : "validation.otpInvalid",
-                }}
-              >
-                {(field) => (
-                  <field.StringField
-                    label={t("mobile.codeLabel")}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    autoFocus
-                    ltr
-                    sanitize={(text) => text.replace(/[^0-9]/g, "").slice(0, 6)}
-                    className="text-center text-2xl tracking-[8px]"
-                  />
-                )}
-              </form.AppField>
-              {error ? (
-                <Text className="text-sm text-destructive">{error}</Text>
-              ) : null}
-              <Button
-                label={
-                  verify.isPending ? t("mobile.verifying") : t("mobile.verify")
-                }
-                loading={verify.isPending}
-                onPress={() => void form.handleSubmit()}
-              />
-              <Button
-                variant="ghost"
-                label={
-                  cooldown > 0
-                    ? t("mobile.resendIn", { seconds: String(cooldown) })
-                    : t("mobile.resend")
-                }
-                disabled={cooldown > 0 || resend.isPending}
-                onPress={() => resend.mutate({ phone })}
-              />
+              {/* OTP form */}
+              <View className="gap-3">
+                <form.AppField
+                  name="code"
+                  validators={{
+                    onSubmit: ({ value }) =>
+                      otpCodeSchema.safeParse(value).success
+                        ? undefined
+                        : "validation.otpInvalid",
+                  }}
+                >
+                  {(field) => (
+                    <field.StringField
+                      label={t("mobile.codeLabel")}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      autoFocus
+                      ltr
+                      sanitize={(text) => text.replace(/[^0-9]/g, "").slice(0, 6)}
+                      className="text-center text-2xl tracking-[8px]"
+                    />
+                  )}
+                </form.AppField>
+                {error ? (
+                  <Text className="text-sm text-destructive">{error}</Text>
+                ) : null}
+                <Button
+                  label={
+                    verify.isPending ? t("mobile.verifying") : t("mobile.verify")
+                  }
+                  loading={verify.isPending}
+                  onPress={() => void form.handleSubmit()}
+                />
+                <Button
+                  variant="ghost"
+                  label={
+                    cooldown > 0
+                      ? t("mobile.resendIn", { seconds: String(cooldown) })
+                      : t("mobile.resend")
+                  }
+                  disabled={cooldown > 0 || resend.isPending}
+                  onPress={() => resend.mutate({ phone })}
+                />
+              </View>
             </View>
-          </View>
+          </DismissKeyboard>
         </Screen>
       </KeyboardAvoidingView>
       <BiometricEnableSheet
@@ -224,6 +274,6 @@ export default function VerifyScreen() {
         onEnable={() => void enableBiometric()}
         onSkip={() => void skipBiometric()}
       />
-    </>
+    </KeyboardProvider>
   )
 }

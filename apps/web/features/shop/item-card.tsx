@@ -1,15 +1,17 @@
 "use client";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { formatQty, stepForKind } from "@workspace/validators/units";
 
 import {
-  cartLineFromItem,
+  cartLineUnit,
   useCart,
+  type CartLine,
   type CartUnit,
 } from "@/features/shop/cart-store";
 import { itemDisplayName } from "@/features/shop/helpers";
 import { ItemImage } from "@/features/shop/item-image";
-import { QtyStepper } from "@/features/shop/qty-stepper";
+import { QuantityUnitPopover } from "@/features/shop/quantity-unit-popover";
 import { Button } from "@workspace/ui/components/button";
 
 type CatalogItem = {
@@ -28,11 +30,57 @@ function defaultUnitLabel(item: CatalogItem, locale: string): string {
   return u ? (locale === "ar" ? u.nameAr : u.nameEn) : "";
 }
 
+/**
+ * Kind-aware stepper for an item already in the cart: +/- step by the unit's
+ * kind, and the quantity itself opens the picker to change unit/amount.
+ */
+function CartStepper({ item, line }: { item: CatalogItem; line: CartLine }) {
+  const setQty = useCart((s) => s.setQty);
+  const unit = cartLineUnit(line);
+  const kind = unit?.kind ?? "count";
+  const step = stepForKind(kind);
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="icon"
+        className="size-8 rounded-full"
+        aria-label="-"
+        onClick={() => setQty(item.id, line.qty - step)}
+      >
+        −
+      </Button>
+      <QuantityUnitPopover
+        item={item}
+        editing
+        initialUnitId={line.unitId}
+        initialQty={line.qty}
+        trigger={
+          <button
+            type="button"
+            className="min-w-8 rounded-md px-1 text-center text-sm font-bold tabular-nums hover:bg-muted"
+          >
+            {formatQty(line.qty, kind)}
+          </button>
+        }
+      />
+      <Button
+        variant="default"
+        size="icon"
+        className="size-8 rounded-full"
+        aria-label="+"
+        onClick={() => setQty(item.id, line.qty + step)}
+      >
+        +
+      </Button>
+    </div>
+  );
+}
+
 export function ItemCard({ item }: { item: CatalogItem }) {
   const { t, locale } = useTranslation();
   const line = useCart((s) => s.lines.find((l) => l.itemId === item.id));
-  const add = useCart((s) => s.add);
-  const setQty = useCart((s) => s.setQty);
 
   const displayName = itemDisplayName(item, locale);
 
@@ -52,21 +100,17 @@ export function ItemCard({ item }: { item: CatalogItem }) {
       <div className="mt-auto px-0.5">
         {line ? (
           <div className="flex justify-center">
-            <QtyStepper
-              qty={line.qty}
-              onDecrement={() => setQty(item.id, line.qty - 1)}
-              onIncrement={() => setQty(item.id, line.qty + 1)}
-            />
+            <CartStepper item={item} line={line} />
           </div>
         ) : (
-          <Button
-            size="sm"
-            className="w-full text-xs"
-            disabled={item.units.length === 0}
-            onClick={() => add(cartLineFromItem(item))}
-          >
-            {t("shop.addToCart")}
-          </Button>
+          <QuantityUnitPopover
+            item={item}
+            trigger={
+              <Button size="sm" className="w-full text-xs" disabled={item.units.length === 0}>
+                {t("shop.addToCart")}
+              </Button>
+            }
+          />
         )}
       </div>
     </div>
@@ -80,8 +124,6 @@ export function ItemCard({ item }: { item: CatalogItem }) {
 export function ItemCardRow({ item }: { item: CatalogItem }) {
   const { t, locale } = useTranslation();
   const line = useCart((s) => s.lines.find((l) => l.itemId === item.id));
-  const add = useCart((s) => s.add);
-  const setQty = useCart((s) => s.setQty);
 
   return (
     <div className="flex items-center justify-between border-b border-border py-3">
@@ -101,19 +143,16 @@ export function ItemCardRow({ item }: { item: CatalogItem }) {
         </div>
       </div>
       {line ? (
-        <QtyStepper
-          qty={line.qty}
-          onDecrement={() => setQty(item.id, line.qty - 1)}
-          onIncrement={() => setQty(item.id, line.qty + 1)}
-        />
+        <CartStepper item={item} line={line} />
       ) : (
-        <Button
-          size="sm"
-          disabled={item.units.length === 0}
-          onClick={() => add(cartLineFromItem(item))}
-        >
-          {t("shop.addToCart")}
-        </Button>
+        <QuantityUnitPopover
+          item={item}
+          trigger={
+            <Button size="sm" disabled={item.units.length === 0}>
+              {t("shop.addToCart")}
+            </Button>
+          }
+        />
       )}
     </div>
   );

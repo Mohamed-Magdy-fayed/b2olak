@@ -5,36 +5,128 @@ import { ShoppingCart, Trash2 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { useTranslation } from "@workspace/i18n/react";
+import { formatQty, isMoneyKind, stepForKind } from "@workspace/validators/units";
 import { useTRPC } from "@/lib/trpc/client";
-import { cartLineUnitName, useCart } from "@/features/shop/cart-store";
+import {
+  cartLineUnit,
+  cartLineUnitName,
+  useCart,
+  type CartLine,
+} from "@/features/shop/cart-store";
 import { itemDisplayName } from "@/features/shop/helpers";
 import { ItemImage } from "@/features/shop/item-image";
-import { QtyStepper } from "@/features/shop/qty-stepper";
+import { QuantityUnitPopover } from "@/features/shop/quantity-unit-popover";
 
-import { buttonVariants } from "@workspace/ui/components/button";
+import { Button, buttonVariants } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import {
   StickyActionBar,
   stickyActionBarSpacerClassName,
 } from "@/components/sticky-action-bar";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+
+/** One cart line: thumbnail, kind-aware stepper, tap-to-edit unit + quantity. */
+function CartLineCard({ line }: { line: CartLine }) {
+  const { t, locale } = useTranslation();
+  const setQty = useCart((s) => s.setQty);
+  const setNote = useCart((s) => s.setNote);
+  const remove = useCart((s) => s.remove);
+
+  const unit = cartLineUnit(line);
+  const kind = unit?.kind ?? "count";
+  const step = stepForKind(kind);
+
+  const item = {
+    id: line.itemId,
+    nameEn: line.nameEn,
+    nameAr: line.nameAr,
+    units: line.units,
+    defaultUnit: unit?.code ?? null,
+  };
+
+  const qtyLabel = isMoneyKind(kind)
+    ? t("shop.egpWorth", { amount: line.qty })
+    : `${formatQty(line.qty, kind)} ${cartLineUnitName(line, locale)}`;
+
+  return (
+    <Card className="overflow-hidden rounded-2xl">
+      <CardContent className="p-3">
+        <div className="flex items-start gap-3">
+          <div className="size-14 shrink-0">
+            <ItemImage src={null} alt={itemDisplayName(line, locale)} className="size-14" />
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+            <span className="text-sm font-semibold leading-tight text-foreground">
+              {itemDisplayName(line, locale)}
+            </span>
+            <QuantityUnitPopover
+              item={item}
+              editing
+              initialUnitId={line.unitId}
+              initialQty={line.qty}
+              trigger={
+                <button
+                  type="button"
+                  className="w-fit rounded-md text-xs font-medium text-primary hover:underline"
+                >
+                  {qtyLabel}
+                </button>
+              }
+            />
+          </div>
+
+          {/* Kind-aware stepper */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              className="size-8 rounded-full"
+              aria-label="-"
+              onClick={() => setQty(line.itemId, line.qty - step)}
+            >
+              −
+            </Button>
+            <span className="min-w-8 text-center text-sm font-bold tabular-nums">
+              {formatQty(line.qty, kind)}
+            </span>
+            <Button
+              variant="default"
+              size="icon"
+              className="size-8 rounded-full"
+              aria-label="+"
+              onClick={() => setQty(line.itemId, line.qty + step)}
+            >
+              +
+            </Button>
+          </div>
+        </div>
+
+        {/* Note input */}
+        <input
+          className="mt-3 w-full rounded-xl border border-input bg-accent px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          placeholder={t("shop.itemNote")}
+          value={line.note ?? ""}
+          onChange={(e) => setNote(line.itemId, e.target.value)}
+        />
+
+        {/* Remove */}
+        <button
+          className="mt-2 flex items-center gap-1 text-xs text-destructive transition-colors hover:text-destructive/80"
+          onClick={() => remove(line.itemId)}
+        >
+          <Trash2 className="size-3" aria-hidden />
+          {t("shop.remove")}
+        </button>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function CartPage() {
-  const { t, locale } = useTranslation();
+  const { t } = useTranslation();
   const trpc = useTRPC();
 
   const lines = useCart((s) => s.lines);
-  const setQty = useCart((s) => s.setQty);
-  const setNote = useCart((s) => s.setNote);
-  const setUnit = useCart((s) => s.setUnit);
-  const remove = useCart((s) => s.remove);
-
   const { data: feeData } = useQuery(trpc.catalog.deliveryFee.queryOptions());
 
   if (lines.length === 0) {
@@ -62,73 +154,7 @@ export default function CartPage() {
 
       <div className="flex flex-col gap-3">
         {lines.map((line) => (
-          <Card key={line.itemId} className="overflow-hidden rounded-2xl">
-            <CardContent className="p-3">
-              <div className="flex items-start gap-3">
-                {/* Thumbnail */}
-                <div className="size-14 shrink-0">
-                  <ItemImage
-                    src={null}
-                    alt={itemDisplayName(line, locale)}
-                    className="size-14"
-                  />
-                </div>
-
-                {/* Name + unit + stepper */}
-                <div className="flex flex-1 flex-col gap-1.5 min-w-0">
-                  <span className="text-sm font-semibold text-foreground leading-tight">
-                    {itemDisplayName(line, locale)}
-                  </span>
-
-                  {line.units.length > 1 ? (
-                    <Select
-                      value={line.unitId}
-                      onValueChange={(v) => v && setUnit(line.itemId, v)}
-                    >
-                      <SelectTrigger className="h-7 w-auto gap-1 px-2 py-0 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {line.units.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {locale === "ar" ? u.nameAr : u.nameEn}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">
-                      {cartLineUnitName(line, locale)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Qty stepper */}
-                <QtyStepper
-                  qty={line.qty}
-                  onDecrement={() => setQty(line.itemId, line.qty - 1)}
-                  onIncrement={() => setQty(line.itemId, line.qty + 1)}
-                />
-              </div>
-
-              {/* Note input */}
-              <input
-                className="mt-3 w-full rounded-xl border border-input bg-accent px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                placeholder={t("shop.itemNote")}
-                value={line.note ?? ""}
-                onChange={(e) => setNote(line.itemId, e.target.value)}
-              />
-
-              {/* Remove */}
-              <button
-                className="mt-2 flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
-                onClick={() => remove(line.itemId)}
-              >
-                <Trash2 className="size-3" aria-hidden />
-                {t("shop.remove")}
-              </button>
-            </CardContent>
-          </Card>
+          <CartLineCard key={line.itemId} line={line} />
         ))}
       </div>
 

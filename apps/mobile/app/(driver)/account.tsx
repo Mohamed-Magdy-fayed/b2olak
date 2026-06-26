@@ -20,11 +20,9 @@ import {
   removeActiveAccount,
   setAccountBiometric,
 } from "@/lib/session";
-import { useTabBarHeight } from "@/lib/use-tab-bar-height";
 import { useTRPC } from "@/lib/trpc";
 
 export default function DriverAccount() {
-  const tabBarHeight = useTabBarHeight();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -88,9 +86,11 @@ export default function DriverAccount() {
   return (
     <Screen padded={false}>
       <ScrollView
-        className="flex-1 px-5"
+        className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: tabBarHeight + 16 }}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <ScreenHeader
           title={t("driver.tabAccount")}
