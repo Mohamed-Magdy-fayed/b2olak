@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { AppState, Text, View } from "react-native"
 import { router, useLocalSearchParams, type Href } from "expo-router"
 import { useMutation } from "@tanstack/react-query"
-import { useStore } from "@tanstack/react-form"
-import * as Clipboard from "expo-clipboard"
 
 import { otpCodeSchema } from "@workspace/validators/auth"
 
@@ -24,6 +22,7 @@ import {
 } from "@/lib/session"
 import { useTRPC } from "@/lib/trpc"
 import { KeyboardProvider } from "react-native-keyboard-controller"
+import { useSelector } from "@tanstack/react-store"
 
 type Dest = Href
 
@@ -130,36 +129,9 @@ export default function VerifyScreen() {
     },
   })
 
-  // OTP arrives over WhatsApp (not SMS), so the OS one-time-code keyboard
-  // autofill can't see it. Instead we read a copied 6-digit code from the
-  // clipboard — the natural flow is: tap-copy in WhatsApp, return to the app.
-  const tryClipboardAutofill = useCallback(async () => {
-    if (verify.isPending) return
-    if (otpCodeSchema.safeParse(form.getFieldValue("code")).success) return
-    try {
-      const text = (await Clipboard.getStringAsync()).trim()
-      const code = text.match(/\b(\d{6})\b/)?.[1]
-      if (code && otpCodeSchema.safeParse(code).success) {
-        form.setFieldValue("code", code)
-      }
-    } catch {
-      // clipboard unavailable / permission denied — user can still type
-    }
-  }, [form, verify.isPending])
-
-  // Read on mount and whenever the app returns to the foreground (i.e. back
-  // from WhatsApp). Foregrounding is the only reliable "they just copied" cue.
-  useEffect(() => {
-    void tryClipboardAutofill()
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") void tryClipboardAutofill()
-    })
-    return () => sub.remove()
-  }, [tryClipboardAutofill])
-
   // Auto-verify once a valid 6-digit code is present (typed or filled), so the
   // user never has to reach for the Verify button.
-  const code = useStore(form.store, (s) => s.values.code)
+  const code = useSelector(form.store, (s) => s.values.code)
   useEffect(() => {
     if (otpCodeSchema.safeParse(code).success && !submittedRef.current) {
       submittedRef.current = true
