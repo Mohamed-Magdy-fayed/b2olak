@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 
-import { getToken } from "@/lib/session";
+import { getActiveAccount, getToken } from "@/lib/session";
 
 /**
  * Guest-first gate. Browsing and cart-building are open to everyone; the
@@ -38,4 +38,28 @@ export function useSignedIn(): boolean | null {
   }, [check]);
 
   return signedIn;
+}
+
+/**
+ * Reactive auth flag for guest-aware screens. `null` while first resolving, so
+ * callers can avoid flashing the wrong state. Re-checks on focus and on app
+ * resume (e.g. after returning from the sign-in flow).
+ */
+export function useSignedInCustomerPhone(): string {
+  const [signedInCustomerPhone, setSignedInCustomerPhone] = useState<string>("");
+
+  const check = useCallback(() => {
+    void getActiveAccount().then((account) => setSignedInCustomerPhone(account?.phone ?? ""));
+  }, []);
+
+  useFocusEffect(check);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") check();
+    });
+    return () => sub.remove();
+  }, [check]);
+
+  return signedInCustomerPhone;
 }

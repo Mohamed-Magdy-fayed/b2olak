@@ -16,6 +16,7 @@ import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen"
 import { FocusChainProvider, useAppForm } from "@/components/forms"
 import { useTranslation } from "@/lib/i18n"
 import { useTRPC } from "@/lib/trpc"
+import { useSignedInCustomerPhone } from "@/lib/auth-gate"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -182,6 +183,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
   const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
   const insets = useSafeAreaInsets()
+  const customerPhone = useSignedInCustomerPhone()
   const [error, setError] = useState<string | null>(null)
 
   const listKey = trpc.addresses.list.queryOptions().queryKey
@@ -214,7 +216,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
   )
 
   const form = useAppForm({
-    defaultValues: address ? formFromAddress(address) : emptyForm,
+    defaultValues: address ? formFromAddress(address) : { ...emptyForm, contactPhone: customerPhone },
     onSubmit: ({ value }) => {
       setError(null)
       const payload = {
@@ -263,146 +265,146 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
         showsVerticalScrollIndicator={false}
       >
         <form.AppField name="label">
-                {(field) => <field.StringField label={t("address.label")} />}
-              </form.AppField>
+          {(field) => <field.StringField label={t("address.label")} />}
+        </form.AppField>
 
-              {/* City picker */}
-              <form.AppField
-                name="cityId"
-                listeners={{
-                  onChange: () => {
-                    form.setFieldValue("districtId", "")
-                    form.setFieldValue("areaId", "")
-                  },
-                }}
-                validators={{
-                  onSubmit: ({ value }) =>
-                    value ? undefined : "validation.required",
-                }}
-              >
-                {(field) => (
-                  <field.SelectField
-                    label={t("address.city")}
-                    placeholder={t("address.selectCity")}
-                    options={cityOptions}
-                  />
-                )}
-              </form.AppField>
+        {/* City picker */}
+        <form.AppField
+          name="cityId"
+          listeners={{
+            onChange: () => {
+              form.setFieldValue("districtId", "")
+              form.setFieldValue("areaId", "")
+            },
+          }}
+          validators={{
+            onSubmit: ({ value }) =>
+              value ? undefined : "validation.required",
+          }}
+        >
+          {(field) => (
+            <field.SelectField
+              label={t("address.city")}
+              placeholder={t("address.selectCity")}
+              options={cityOptions}
+            />
+          )}
+        </form.AppField>
 
-              {/* District picker — enabled only after city is chosen */}
-              <form.AppField
-                name="districtId"
-                listeners={{
-                  onChange: () => form.setFieldValue("areaId", ""),
-                }}
-                validators={{
-                  onSubmit: ({ value }) =>
-                    value ? undefined : "validation.required",
-                }}
-              >
-                {(field) => (
-                  <field.SelectField
-                    label={t("address.district")}
-                    placeholder={t("address.selectDistrict")}
-                    options={districtOptions}
-                    disabled={!cityId}
-                  />
-                )}
-              </form.AppField>
+        {/* District picker — enabled only after city is chosen */}
+        <form.AppField
+          name="districtId"
+          listeners={{
+            onChange: () => form.setFieldValue("areaId", ""),
+          }}
+          validators={{
+            onSubmit: ({ value }) =>
+              value ? undefined : "validation.required",
+          }}
+        >
+          {(field) => (
+            <field.SelectField
+              label={t("address.district")}
+              placeholder={t("address.selectDistrict")}
+              options={districtOptions}
+              disabled={!cityId}
+            />
+          )}
+        </form.AppField>
 
-              {/* Area picker — enabled only after district is chosen */}
-              <form.AppField
-                name="areaId"
-                validators={{
-                  onSubmit: ({ value }) =>
-                    value ? undefined : "validation.required",
-                }}
-              >
-                {(field) => (
-                  <field.SelectField
-                    label={t("address.area")}
-                    placeholder={t("address.selectArea")}
-                    options={areaOptions}
-                    disabled={!districtId}
-                  />
-                )}
-              </form.AppField>
+        {/* Area picker — enabled only after district is chosen */}
+        <form.AppField
+          name="areaId"
+          validators={{
+            onSubmit: ({ value }) =>
+              value ? undefined : "validation.required",
+          }}
+        >
+          {(field) => (
+            <field.SelectField
+              label={t("address.area")}
+              placeholder={t("address.selectArea")}
+              options={areaOptions}
+              disabled={!districtId}
+            />
+          )}
+        </form.AppField>
 
-              {/* Building — required */}
-              <form.AppField
-                name="building"
-                validators={{
-                  onSubmit: ({ value }) =>
-                    value.trim() ? undefined : "validation.required",
-                }}
-              >
-                {(field) => (
-                  <field.StringField label={`${t("address.building")} *`} />
-                )}
-              </form.AppField>
+        {/* Building — required */}
+        <form.AppField
+          name="building"
+          validators={{
+            onSubmit: ({ value }) =>
+              value.trim() ? undefined : "validation.required",
+          }}
+        >
+          {(field) => (
+            <field.StringField label={`${t("address.building")} *`} />
+          )}
+        </form.AppField>
 
-              <form.AppField name="floor">
-                {(field) => <field.StringField label={t("address.floor")} />}
-              </form.AppField>
-              <form.AppField name="apartment">
-                {(field) => (
-                  <field.StringField label={t("address.apartment")} />
-                )}
-              </form.AppField>
-              <form.AppField name="landmark">
-                {(field) => <field.StringField label={t("address.landmark")} />}
-              </form.AppField>
+        <form.AppField name="floor">
+          {(field) => <field.StringField label={t("address.floor")} />}
+        </form.AppField>
+        <form.AppField name="apartment">
+          {(field) => (
+            <field.StringField label={t("address.apartment")} />
+          )}
+        </form.AppField>
+        <form.AppField name="landmark">
+          {(field) => <field.StringField label={t("address.landmark")} />}
+        </form.AppField>
 
-              {/* Contact phone — LTR override intentionally preserved */}
-              <form.AppField
-                name="contactPhone"
-                validators={{
-                  onSubmit: ({ value }) =>
-                    egyptianPhoneSchema.safeParse(value).success
-                      ? undefined
-                      : "validation.phoneInvalid",
-                }}
-              >
-                {(field) => (
-                  <field.PhoneField label={t("address.contactPhone")} />
-                )}
-              </form.AppField>
+        {/* Contact phone — LTR override intentionally preserved */}
+        <form.AppField
+          name="contactPhone"
+          validators={{
+            onSubmit: ({ value }) =>
+              egyptianPhoneSchema.safeParse(value).success
+                ? undefined
+                : "validation.phoneInvalid",
+          }}
+        >
+          {(field) => (
+            <field.PhoneField label={t("address.contactPhone")} />
+          )}
+        </form.AppField>
 
-              {/* isDefault toggle */}
-              <form.AppField name="isDefault">
-                {(field) => (
-                  <field.BooleanField label={t("address.isDefault")} />
-                )}
-              </form.AppField>
+        {/* isDefault toggle */}
+        <form.AppField name="isDefault">
+          {(field) => (
+            <field.BooleanField label={t("address.isDefault")} />
+          )}
+        </form.AppField>
 
-              {error ? (
-                <View className="flex-row items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3">
-                  <Ionicons
-                    name="alert-circle-outline"
-                    size={16}
-                    color="#F0584F"
-                  />
-                  <Text className="flex-1 text-sm text-destructive">{error}</Text>
-                </View>
-              ) : null}
-            </KeyboardAwareScrollView>
+        {error ? (
+          <View className="flex-row items-center gap-2 rounded-2xl border border-destructive/40 bg-destructive/10 p-3">
+            <Ionicons
+              name="alert-circle-outline"
+              size={16}
+              color="#F0584F"
+            />
+            <Text className="flex-1 text-sm text-destructive">{error}</Text>
+          </View>
+        ) : null}
+      </KeyboardAwareScrollView>
 
-            {/* Fixed footer — lifts above the keyboard while editing fields. */}
-            <KeyboardStickyFooter
-              className="gap-2 border-t bg-background border-border px-4 py-4"
-              style={{ paddingBottom: insets.bottom + 16 }}
-            >
-              <Button
-                label={t("address.save")}
-                loading={create.isPending || update.isPending}
-                onPress={() => void form.handleSubmit()}
-              />
-              <Button
-                variant="ghost"
-                label={t("common.cancel")}
-                onPress={onClose}
-              />
-            </KeyboardStickyFooter>
+      {/* Fixed footer — lifts above the keyboard while editing fields. */}
+      <KeyboardStickyFooter
+        className="gap-2 border-t bg-background border-border px-4 py-4"
+        style={{ paddingBottom: insets.bottom + 16 }}
+      >
+        <Button
+          label={t("address.save")}
+          loading={create.isPending || update.isPending}
+          onPress={() => void form.handleSubmit()}
+        />
+        <Button
+          variant="ghost"
+          label={t("common.cancel")}
+          onPress={onClose}
+        />
+      </KeyboardStickyFooter>
     </FocusChainProvider>
   )
 }
