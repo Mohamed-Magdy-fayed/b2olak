@@ -35,9 +35,9 @@ export function Skeleton({ className }: { className?: string }) {
  *  card with an 84px thumb, a two-line name, and an add button. */
 export function ItemCardSkeleton() {
   return (
-    <View className="w-[148px] h-[148px] rounded-2xl border border-border bg-card p-4 gap-2">
-      <Skeleton className="rounded-xl py-12" />
-      <Skeleton className="py-2 w-full" />
+    <View className="rounded-2xl border border-border bg-card p-3 gap-2">
+      <Skeleton className="rounded-xl h-12 py-12 w-32" />
+      <Skeleton className="h-4 w-full" />
       <Skeleton className="rounded-xl p-4" />
     </View>
   )

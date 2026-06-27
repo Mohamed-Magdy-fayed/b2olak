@@ -281,6 +281,7 @@ const en = {
     addToCart: "Add to cart",
     inCart: "In cart: {count}",
     itemNote: "Note for the driver (optional)",
+    addNote: "Add a note",
     qty: "Qty",
     egpWorth: "{amount} EGP worth",
     pickerTitle: "Quantity & unit",

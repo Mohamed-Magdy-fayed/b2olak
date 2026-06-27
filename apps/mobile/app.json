@@ -23,8 +23,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "backgroundColor": "#0E0E10",
-      "navigationBarColor": "#0E0E10",
-      "softwareKeyboardLayoutMode": "pan",
+      "softwareKeyboardLayoutMode": "resize",
       "predictiveBackGestureEnabled": false,
       "googleServicesFile": "./google-services.json",
       "package": "com.gatelingsolutions.ba2olak"

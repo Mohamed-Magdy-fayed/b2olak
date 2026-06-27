@@ -1,5 +1,5 @@
-import { type ReactNode } from "react"
-import { View, type ViewStyle } from "react-native"
+import { useState, type ReactNode } from "react"
+import { View, type LayoutChangeEvent, type ViewStyle } from "react-native"
 import {
   KeyboardAvoidingView,
   KeyboardAwareScrollView,
@@ -22,37 +22,70 @@ import { Screen } from "@/components/ui/screen"
 
 type KeyboardAwareScreenProps = {
   children: ReactNode
-  /** Horizontal screen gutter; defaults to the standard 20px. */
+  /**
+   * Pinned content above the scroll area — typically `ScreenHeader` /
+   * `ScreenBackHeader`. Stays fixed while the body scrolls under the keyboard.
+   */
+  header?: ReactNode
+  /**
+   * Pinned content below the scroll area — typically a `KeyboardStickyFooter`
+   * with the primary CTA. Rendered full-bleed so its top border spans the edge.
+   */
+  footer?: ReactNode
+  /** Horizontal screen gutter (header + scroll body); defaults to off. */
   padded?: boolean
   /** Extra space kept between the focused input and the keyboard. */
   bottomOffset?: number
-  className?: string
   contentContainerClassName?: string
+  contentContainerStyle?: ViewStyle
 }
 
 /**
- * Scrollable, keyboard-aware screen for forms. Renders the shared `Screen`
- * canvas, then a keyboard-aware scroll view that lifts the focused field above
- * the keyboard. Taps outside inputs stay responsive (`persistTaps`).
+ * The single keyboard-aware scroll screen for input forms. Renders the shared
+ * `Screen` canvas with an optional pinned `header`, a keyboard-aware scroll body
+ * that lifts the focused field above the keyboard, and an optional pinned
+ * `footer`. Every scrolling input screen routes through this so behaviour
+ * (offset, tap handling, dismiss-on-drag) stays identical app-wide.
+ *
+ * The footer renders outside the padded region so a sticky-footer border spans
+ * the full width; `padded` only gutters the header and scroll body.
  */
 export function KeyboardAwareScreen({
   children,
+  header,
+  footer,
   padded = false,
   bottomOffset = 24,
-  className,
   contentContainerClassName,
+  contentContainerStyle,
 }: KeyboardAwareScreenProps) {
+  // The sticky footer is a sibling of the scroll view, so the keyboard-aware
+  // scroll has no idea it exists: it would lift a focused field to `bottomOffset`
+  // above the keyboard — straight behind the footer, which rises to sit on the
+  // keyboard. Measure the footer and add its height to the offset so the focused
+  // field clears it. Footers without inputs below them (no footer) keep the base
+  // offset.
+  const [footerHeight, setFooterHeight] = useState(0)
+  const onFooterLayout = (e: LayoutChangeEvent) => {
+    setFooterHeight(e.nativeEvent.layout.height)
+  }
+
   return (
-    <Screen padded={padded}>
+    <Screen padded={false}>
+      {header ? <View className={padded ? "px-4" : undefined}>{header}</View> : null}
       <KeyboardAwareScrollView
-        bottomOffset={bottomOffset}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        className={className}
+        className={padded ? "flex-1 px-4" : "flex-1"}
         contentContainerClassName={contentContainerClassName}
+        contentContainerStyle={contentContainerStyle}
+        bottomOffset={bottomOffset + footerHeight}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        showsVerticalScrollIndicator={false}
+        automaticallyAdjustContentInsets
       >
         {children}
       </KeyboardAwareScrollView>
+      {footer ? <KeyboardStickyView onLayout={onFooterLayout}>{footer}</KeyboardStickyView> : null}
     </Screen>
   )
 }

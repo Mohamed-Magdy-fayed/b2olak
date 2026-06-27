@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Ionicons } from "@expo/vector-icons"
 
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
@@ -34,6 +35,7 @@ export function FormSelectField({
 }) {
   const field = useFieldContext<string>()
   const invalid = useFieldInvalid()
+  const insets = useSafeAreaInsets()
   const [open, setOpen] = useState(false)
   const selected = options.find((o) => o.value === field.state.value)
 
@@ -61,7 +63,10 @@ export function FormSelectField({
         onRequestClose={() => setOpen(false)}
       >
         <Pressable className="flex-1 bg-black/60" onPress={() => setOpen(false)} />
-        <View className="max-h-[60%] rounded-t-2xl bg-card px-4 pt-4 pb-8">
+        <View
+          className="max-h-[60%] rounded-t-2xl bg-card px-4 pt-4"
+          style={{ paddingBottom: insets.bottom + 16 }}
+        >
           <View className="mb-1 items-center">
             <View className="mb-3 h-1 w-10 rounded-full bg-border" />
           </View>

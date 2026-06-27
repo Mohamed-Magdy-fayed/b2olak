@@ -21,7 +21,6 @@ import {
   upsertAccount,
 } from "@/lib/session"
 import { useTRPC } from "@/lib/trpc"
-import { KeyboardProvider } from "react-native-keyboard-controller"
 import { useSelector } from "@tanstack/react-store"
 
 type Dest = Href
@@ -175,7 +174,7 @@ export default function VerifyScreen() {
   }
 
   return (
-    <KeyboardProvider>
+    <>
       <KeyboardAvoidingView behavior="padding" className="flex-1">
         <Screen padded>
           {/* Back to sign-in */}
@@ -247,6 +246,6 @@ export default function VerifyScreen() {
         onEnable={() => void enableBiometric()}
         onSkip={() => void skipBiometric()}
       />
-    </KeyboardProvider>
+    </>
   )
 }

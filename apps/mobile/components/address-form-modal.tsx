@@ -4,6 +4,7 @@ import {
   KeyboardAwareScrollView,
   KeyboardProvider,
 } from "react-native-keyboard-controller"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useStore } from "@tanstack/react-form"
 import { Ionicons } from "@expo/vector-icons"
@@ -12,7 +13,7 @@ import { egyptianPhoneSchema } from "@workspace/validators/auth"
 
 import { Button } from "@/components/ui/button"
 import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen"
-import { useAppForm } from "@/components/forms"
+import { FocusChainProvider, useAppForm } from "@/components/forms"
 import { useTranslation } from "@/lib/i18n"
 import { useTRPC } from "@/lib/trpc"
 
@@ -180,6 +181,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
+  const insets = useSafeAreaInsets()
   const [error, setError] = useState<string | null>(null)
 
   const listKey = trpc.addresses.list.queryOptions().queryKey
@@ -252,7 +254,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
   const areaOptions = useMemo(() => geoOptions(areas, locale), [areas, locale])
 
   return (
-    <>
+    <FocusChainProvider>
       <KeyboardAwareScrollView
         className="px-4"
         contentContainerClassName="gap-4 py-4"
@@ -386,7 +388,10 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
             </KeyboardAwareScrollView>
 
             {/* Fixed footer — lifts above the keyboard while editing fields. */}
-            <KeyboardStickyFooter className="gap-2 border-t bg-background border-border px-4 py-4">
+            <KeyboardStickyFooter
+              className="gap-2 border-t bg-background border-border px-4 py-4"
+              style={{ paddingBottom: insets.bottom + 16 }}
+            >
               <Button
                 label={t("address.save")}
                 loading={create.isPending || update.isPending}
@@ -398,6 +403,6 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
                 onPress={onClose}
               />
             </KeyboardStickyFooter>
-    </>
+    </FocusChainProvider>
   )
 }

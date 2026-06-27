@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input"
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
+import { useFocusChainField } from "./focus-chain"
 import { useFieldContext } from "./form-context"
 
 /** Egyptian phone field — numeric keypad, always LTR so digits read correctly. */
@@ -14,10 +15,12 @@ export function FormPhoneField({
 }) {
   const field = useFieldContext<string>()
   const invalid = useFieldInvalid()
+  const chain = useFocusChainField()
 
   return (
     <FieldBase label={label} description={description}>
       <Input
+        {...chain}
         value={field.state.value}
         invalid={invalid}
         onChangeText={(text) => field.handleChange(text)}

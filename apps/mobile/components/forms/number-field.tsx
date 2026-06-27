@@ -1,5 +1,6 @@
 import { Input } from "@/components/ui/input"
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
+import { useFocusChainField } from "./focus-chain"
 import { useFieldContext } from "./form-context"
 
 export function FormNumberField({
@@ -9,10 +10,12 @@ export function FormNumberField({
 }: MobileFieldProps & { placeholder?: string }) {
   const field = useFieldContext<number | null>()
   const invalid = useFieldInvalid()
+  const chain = useFocusChainField()
 
   return (
     <FieldBase label={label} description={description}>
       <Input
+        {...chain}
         value={field.state.value == null ? "" : String(field.state.value)}
         invalid={invalid}
         onChangeText={(text) => {

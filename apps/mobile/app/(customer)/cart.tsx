@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FlatList, Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -32,12 +33,12 @@ function CartRow({ line, onEdit }: { line: CartLine; onEdit: () => void }) {
   return (
     <View className="gap-2 rounded-2xl border border-border bg-card p-3">
       <View className="flex-row items-center gap-3">
-        <ItemThumb label={itemDisplayName(line, locale)} size={52} />
+        <ItemThumb uri={line.imageUrl} label={itemDisplayName(line, locale)} size={52} />
         <View className="flex-1 gap-0.5">
           <Text className="text-base font-semibold text-foreground">
             {itemDisplayName(line, locale)}
           </Text>
-          <Pressable hitSlop={8} onPress={onEdit}>
+          <Pressable className="self-start" hitSlop={8} onPress={onEdit}>
             <Text className="text-xs text-primary">
               {isMoneyKind(kind)
                 ? t("shop.egpWorth", { amount: line.qty })
@@ -45,7 +46,8 @@ function CartRow({ line, onEdit }: { line: CartLine; onEdit: () => void }) {
             </Text>
           </Pressable>
           <Pressable
-            hitSlop={16}
+            className="self-start"
+            hitSlop={8}
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               remove(line.itemId);
@@ -80,6 +82,25 @@ function CartRow({ line, onEdit }: { line: CartLine; onEdit: () => void }) {
           </Pressable>
         </View>
       </View>
+
+      {/* Per-item note — tap to add or edit in the picker sheet. */}
+      <Pressable
+        hitSlop={8}
+        onPress={onEdit}
+        className="flex-row items-center gap-1.5 border-t border-border pt-2"
+      >
+        <Ionicons
+          name={line.note ? "chatbox-ellipses" : "add-circle-outline"}
+          size={14}
+          color="#9B968C"
+        />
+        <Text
+          className={`flex-1 text-xs ${line.note ? "text-foreground" : "text-muted-foreground"}`}
+          numberOfLines={2}
+        >
+          {line.note ? line.note : t("shop.addNote")}
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -185,6 +206,7 @@ export default function CartScreen() {
             id: editingLine.itemId,
             nameEn: editingLine.nameEn,
             nameAr: editingLine.nameAr,
+            imageUrl: editingLine.imageUrl,
             units: editingLine.units,
             defaultUnit: cartLineUnit(editingLine)?.code ?? null,
           }}
@@ -192,6 +214,7 @@ export default function CartScreen() {
           onClose={() => setEditingLine(null)}
           initialUnitId={editingLine.unitId}
           initialQty={editingLine.qty}
+          initialNote={editingLine.note}
         />
       ) : null}
     </Screen>

@@ -208,6 +208,7 @@ export default function SearchScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
+          automaticallyAdjustContentInsets
         >
           <Card className="gap-3">
             <Text className="text-lg font-bold text-foreground">
@@ -289,8 +290,12 @@ export default function SearchScreen() {
         </KeyboardAwareScrollView>
       ) : (
         <FlatList
+          className="flex-1"
           data={search.data?.items ?? []}
           keyExtractor={(item) => item.id}
+          renderScrollComponent={(props) => (
+            <KeyboardAwareScrollView {...props} bottomOffset={24} />
+          )}
           renderItem={({ item }) => (
             <Pressable
               onPress={() =>
@@ -368,6 +373,7 @@ export default function SearchScreen() {
             ) : null
           }
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         />
       )}
     </Screen>

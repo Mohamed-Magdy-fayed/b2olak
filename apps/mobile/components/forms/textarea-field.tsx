@@ -20,6 +20,8 @@ export function FormTextareaField({
         onBlur={() => field.handleBlur()}
         placeholder={placeholder}
         multiline
+        // Let a drag over the field scroll the page, not the input's own content.
+        scrollEnabled={false}
         numberOfLines={numberOfLines}
         className="h-auto min-h-24 py-3"
         style={{ textAlignVertical: "top" }}

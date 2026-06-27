@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react"
-import { KeyboardAvoidingView, Pressable, Text, View } from "react-native"
-import { KeyboardAwareScrollView, KeyboardProvider } from "react-native-keyboard-controller"
+import { Pressable, Text, View } from "react-native"
 import { router } from "expo-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -9,13 +8,19 @@ import { useAppAlert } from "@/components/ui/app-alert"
 import { Card } from "@/components/ui/card"
 import { PlaceOrderButton } from "@/components/place-order-button"
 import { Input } from "@/components/ui/input"
-import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen"
-import { Screen, ScreenHeader } from "@/components/ui/screen"
+import {
+  KeyboardAwareScreen,
+  KeyboardStickyFooter,
+} from "@/components/ui/keyboard-screen"
+import { ScreenHeader } from "@/components/ui/screen"
 import { useSignedIn } from "@/lib/auth-gate"
 import { useTranslation } from "@/lib/i18n"
-import { cartLineUnitName, useCart } from "@/lib/cart-store"
+import { isMoneyKind } from "@workspace/validators/units"
+
+import { cartLineUnit, cartLineUnitName, useCart } from "@/lib/cart-store"
 import { useTRPC } from "@/lib/trpc"
 import { itemDisplayName } from "@/components/item-utils"
+import { KeyboardStickyView } from "react-native-keyboard-controller"
 
 function addressDisplayName(
   address: {
@@ -120,89 +125,13 @@ export default function CheckoutScreen() {
   )
 
   return (
-    <KeyboardProvider>
-      <Screen padded={false}>
-        <KeyboardAwareScrollView
-          className="flex-1 px-4"
-          contentContainerStyle={{ paddingBottom: 24 }}
-          bottomOffset={24}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <ScreenHeader title={t("shop.checkout")} />
-
-          <KeyboardAvoidingView className="gap-4 pt-1">
-            <Card className="gap-2">
-              {lines.map((line) => (
-                <View key={line.itemId} className="flex-row justify-between">
-                  <Text className="flex-1 text-foreground">
-                    {itemDisplayName(line, locale)}
-                  </Text>
-                  <Text className="text-muted-foreground">
-                    {line.qty} × {cartLineUnitName(line, locale)}
-                  </Text>
-                </View>
-              ))}
-              <View className="mt-2 flex-row justify-between border-t border-border pt-2">
-                <Text className="font-semibold text-foreground">
-                  {t("shop.deliveryFee")}
-                </Text>
-                <Text className="font-bold text-foreground">
-                  {fee ? `${fee.amount} EGP` : "…"}
-                </Text>
-              </View>
-              <Text className="text-xs text-muted-foreground">
-                {t("shop.marketPriceNote")}
-              </Text>
-            </Card>
-
-            <View className="gap-2">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-lg font-bold text-foreground">
-                  {t("shop.deliverTo")}
-                </Text>
-                <Pressable onPress={() => setAddingAddress(true)}>
-                  <Text className="font-semibold text-primary">
-                    {t("address.add")}
-                  </Text>
-                </Pressable>
-              </View>
-              {(addresses ?? []).map((address) => (
-                <Pressable
-                  key={address.id}
-                  onPress={() => setAddressId(address.id)}
-                  className={`rounded-2xl border p-4 ${selected === address.id
-                    ? "border-primary bg-primary/10"
-                    : "bg-elevated border-border"
-                    }`}
-                >
-                  <Text className="font-semibold text-foreground">
-                    {addressDisplayName(address, locale)}
-                  </Text>
-                  <Text className="text-sm text-muted-foreground">
-                    {addressSubtitle(address, locale)}
-                  </Text>
-                </Pressable>
-              ))}
-              {addresses?.length === 0 ? (
-                <Text className="text-muted-foreground">{t("address.none")}</Text>
-              ) : null}
-            </View>
-
-            <View className="gap-2">
-              <Text className="font-medium text-foreground">
-                {t("shop.orderNote")}
-              </Text>
-              <Input value={note} onChangeText={setNote} />
-            </View>
-            {error ? <Text className="text-destructive">{error}</Text> : null}
-          </KeyboardAvoidingView>
-        </KeyboardAwareScrollView>
-        {/* Fixed footer — keeps the primary CTA fully visible above the tab bar,
-          and lifts above the keyboard when the note field is focused. The
-          parent Screen owns the bottom safe-area inset, so this only adds a
-          small breathing gap. */}
-        <KeyboardStickyFooter className="border-t border-border bg-background px-4 py-4">
+    <KeyboardAwareScreen
+      padded
+      contentContainerStyle={{ paddingBottom: 24 }}
+      bottomOffset={24}
+      header={<ScreenHeader title={t("shop.checkout")} />}
+      footer={
+        <View className="border-t border-border bg-background px-4 py-4">
           <PlaceOrderButton
             label={t("shop.placeOrder")}
             loading={place.isPending}
@@ -222,17 +151,86 @@ export default function CheckoutScreen() {
               })
             }}
           />
-        </KeyboardStickyFooter>
+        </View>
+      }
+    >
+      <View className="gap-4 pt-1">
+        <Card className="gap-2">
+          {lines.map((line) => (
+            <View key={line.itemId} className="flex-row justify-between">
+              <Text className="flex-1 text-foreground">
+                {itemDisplayName(line, locale)}
+              </Text>
+              <Text className="text-muted-foreground">
+                {isMoneyKind(cartLineUnit(line)?.kind ?? "count")
+                  ? t("shop.egpWorth", { amount: line.qty })
+                  : `${line.qty} × ${cartLineUnitName(line, locale)}`}
+              </Text>
+            </View>
+          ))}
+          <View className="mt-2 flex-row justify-between border-t border-border pt-2">
+            <Text className="font-semibold text-foreground">
+              {t("shop.deliveryFee")}
+            </Text>
+            <Text className="font-bold text-foreground">
+              {fee ? `${fee.amount} EGP` : "…"}
+            </Text>
+          </View>
+          <Text className="text-xs text-muted-foreground">
+            {t("shop.marketPriceNote")}
+          </Text>
+        </Card>
 
-        <AddressFormModal
-          visible={addingAddress}
-          onClose={() => setAddingAddress(false)}
-          onSaved={(newId) => {
-            setAddingAddress(false)
-            setAddressId(newId)
-          }}
-        />
-      </Screen>
-    </KeyboardProvider>
+        <View className="gap-2">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-lg font-bold text-foreground">
+              {t("shop.deliverTo")}
+            </Text>
+            <Pressable onPress={() => setAddingAddress(true)}>
+              <Text className="font-semibold text-primary">
+                {t("address.add")}
+              </Text>
+            </Pressable>
+          </View>
+          {(addresses ?? []).map((address) => (
+            <Pressable
+              key={address.id}
+              onPress={() => setAddressId(address.id)}
+              className={`rounded-2xl border p-4 ${selected === address.id
+                ? "border-primary bg-primary/10"
+                : "bg-elevated border-border"
+                }`}
+            >
+              <Text className="font-semibold text-foreground">
+                {addressDisplayName(address, locale)}
+              </Text>
+              <Text className="text-sm text-muted-foreground">
+                {addressSubtitle(address, locale)}
+              </Text>
+            </Pressable>
+          ))}
+          {addresses?.length === 0 ? (
+            <Text className="text-muted-foreground">{t("address.none")}</Text>
+          ) : null}
+        </View>
+
+        <View className="gap-2">
+          <Text className="font-medium text-foreground">
+            {t("shop.orderNote")}
+          </Text>
+          <Input value={note} onChangeText={setNote} />
+        </View>
+        {error ? <Text className="text-destructive">{error}</Text> : null}
+      </View>
+
+      <AddressFormModal
+        visible={addingAddress}
+        onClose={() => setAddingAddress(false)}
+        onSaved={(newId) => {
+          setAddingAddress(false)
+          setAddressId(newId)
+        }}
+      />
+    </KeyboardAwareScreen>
   )
 }

@@ -22,6 +22,8 @@ export type CartLine = {
   itemId: string;
   nameEn: string | null;
   nameAr: string | null;
+  /** Item thumbnail URL, kept so the cart can render the image offline. */
+  imageUrl?: string | null;
   /** Units the item can be ordered in (so cart can offer a choice). */
   units: CartUnit[];
   /** Currently selected unit id — always one of `units`. */
@@ -121,6 +123,7 @@ export type CatalogItemForCart = {
   id: string;
   nameEn: string | null;
   nameAr: string | null;
+  imageUrl?: string | null;
   units: CartUnit[];
   defaultUnit: string | null;
 };
@@ -144,6 +147,7 @@ export function cartLineFromItem(
     itemId: item.id,
     nameEn: item.nameEn,
     nameAr: item.nameAr,
+    imageUrl: item.imageUrl ?? null,
     units: item.units,
     unitId: chosen?.id ?? "",
   };
