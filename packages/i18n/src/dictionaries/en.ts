@@ -431,6 +431,7 @@ const en = {
     egp: "EGP worth",
   },
   driver: {
+    nextItem: "Next",
     available: "Available for orders",
     unavailable: "Not available",
     activeOrders: "Active orders",

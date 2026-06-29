@@ -182,3 +182,67 @@ export function OrderDetailSkeleton() {
     </View>
   )
 }
+
+/** Matches the driver order detail screen: address card with location/note/call button,
+ *  followed by items checklist with price inputs/buttons, then totals. */
+export function DriverOrderDetailSkeleton() {
+  return (
+    <View className="gap-4 pt-1 p-4">
+      {/* address card */}
+      <View className="gap-3 rounded-2xl border border-border bg-card p-4">
+        {/* location header */}
+        <View className="flex-row items-center gap-2">
+          <Skeleton className="size-4 rounded-full" />
+          <Skeleton className="h-4 w-24" />
+        </View>
+        {/* address text */}
+        <Skeleton className="h-12 w-full rounded-lg" />
+        {/* customer note (optional) */}
+        <View className="flex-row items-start gap-2 rounded-xl bg-elevated px-3 py-2">
+          <Skeleton className="size-3 rounded-full mt-1" />
+          <Skeleton className="flex-1 h-8 rounded-lg" />
+        </View>
+        {/* call button */}
+        <Skeleton className="h-10 w-full rounded-2xl" />
+      </View>
+
+      {/* items checklist card */}
+      <View className="gap-4 rounded-2xl border border-border bg-card p-4">
+        {Array.from({ length: 3 }).map((_, i) => {
+          const isLast = i === 2
+          return (
+            <View key={i} className={`gap-2 ${!isLast ? "border-b border-border pb-4" : ""}`}>
+              {/* item name and qty */}
+              <View className="flex-row items-start justify-between gap-2">
+                <Skeleton className="flex-1 h-4 w-2/3" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </View>
+              {/* price input and buttons */}
+              <View className="flex-row items-center gap-2">
+                <Skeleton className="flex-1 h-10 rounded-lg" />
+                <Skeleton className="size-12 rounded-full" />
+                <Skeleton className="size-12 rounded-full" />
+              </View>
+            </View>
+          )
+        })}
+
+        {/* totals section */}
+        <View className="gap-2 border-t border-border pt-3">
+          <View className="flex-row items-center justify-between">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-16" />
+          </View>
+          <View className="flex-row items-center justify-between">
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-3 w-12" />
+          </View>
+          <View className="mt-1 flex-row items-center justify-between rounded-xl bg-primary/10 px-3 py-2.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-5 w-20" />
+          </View>
+        </View>
+      </View>
+    </View>
+  )
+}

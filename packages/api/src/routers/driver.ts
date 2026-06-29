@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { DriverProfilesTable } from "@workspace/db/schemas/drivers/driver-profiles";
@@ -90,7 +90,7 @@ export const driverRouter = createTRPCRouter({
         isNull(OrdersTable.deletedAt),
       ),
       with: { items: true },
-      orderBy: [desc(OrdersTable.assignedAt)],
+      orderBy: [asc(OrdersTable.assignedAt)],
     });
     const history = await ctx.db.query.OrdersTable.findMany({
       where: and(

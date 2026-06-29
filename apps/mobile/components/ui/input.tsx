@@ -20,9 +20,8 @@ export const Input = forwardRef<
         setFocused(false);
         onBlur?.(e);
       }}
-      className={`h-14 w-full rounded-2xl border bg-elevated px-4 text-base text-foreground ${
-        invalid ? "border-destructive" : focused ? "border-primary" : "border-input"
-      } ${className ?? ""}`}
+      className={`h-12 w-full rounded-2xl border bg-elevated px-4 text-base text-foreground ${invalid ? "border-destructive" : focused ? "border-primary" : "border-input"
+        } ${className ?? ""}`}
       {...props}
     />
   );

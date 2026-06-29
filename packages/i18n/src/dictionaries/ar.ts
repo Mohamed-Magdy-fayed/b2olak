@@ -426,6 +426,7 @@ const ar = {
     egp: "بقيمة (جنيه)",
   },
   driver: {
+    nextItem: "التالي",
     available: "متاح للطلبات",
     unavailable: "غير متاح",
     activeOrders: "الطلبات النشطة",

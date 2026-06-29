@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import { useState, useRef } from "react";
+import { Keyboard, Linking, Pressable, Text, View } from "react-native";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
-import { OrderDetailSkeleton } from "@/components/ui/skeleton";
+import { DriverOrderDetailSkeleton } from "@/components/ui/skeleton";
 import { StatusChip } from "@/components/ui/status-chip";
 import { useAppAlert } from "@/components/ui/app-alert";
 import { useTranslation } from "@/lib/i18n";
@@ -32,6 +32,7 @@ export default function DriverOrderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [collecting, setCollecting] = useState(false);
   const [cashCollected, setCashCollected] = useState("");
+  const priceInputRefs = useRef<Record<string, any>>({});
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
   const { data: order, isLoading, isRefetching } = useQuery({ ...orderOptions, enabled: !!id });
@@ -115,7 +116,7 @@ export default function DriverOrderScreen() {
         });
         return { previous };
       },
-      onSuccess: () => {
+      onSuccess: ({ }) => {
         void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setError(null);
         invalidate();
@@ -193,7 +194,7 @@ export default function DriverOrderScreen() {
     return (
       <Screen padded={false}>
         <ScreenBackHeader title="" className="px-4" />
-        <OrderDetailSkeleton />
+        <DriverOrderDetailSkeleton />
       </Screen>
     );
   }
@@ -236,10 +237,25 @@ export default function DriverOrderScreen() {
     order.status === "purchased" ||
     (order.status === "delivering" && !collecting);
 
+  function handleInputNext(isLast: boolean, index: number) {
+    if (!order) return
+    if (!isLast) {
+      const nextIndex = index + 1;
+      const nextLine = order.items[nextIndex];
+      if (nextLine) {
+        setTimeout(() => {
+          priceInputRefs.current[nextLine.id]?.focus();
+        }, 10);
+      }
+    } else {
+      Keyboard.dismiss()
+    }
+  }
+
   return (
     <KeyboardAwareScreen
       padded
-      bottomOffset={100}
+      bottomOffset={24}
       contentContainerStyle={{ paddingBottom: 24 }}
       header={
         <ScreenBackHeader
@@ -261,8 +277,8 @@ export default function DriverOrderScreen() {
             {order.status === "shopping" ? (
               <Button
                 label={t("driver.doneShopping")}
-                loading={doneShopping.isPending || updateLine.isPending}
-                disabled={isRefetching || isLoading}
+                loading={doneShopping.isPending}
+                disabled={isRefetching || isLoading || updateLine.isPending || order.items.some(item => item.status === "pending")}
                 onPress={() => doneShopping.mutate({ orderId: order.id })}
               />
             ) : null}
@@ -384,7 +400,12 @@ export default function DriverOrderScreen() {
                 {shoppingMode ? (
                   <View className="flex-row items-center gap-2">
                     <Input
-                      className="h-12 flex-1"
+                      ref={(el) => {
+                        if (el) priceInputRefs.current[line.id] = el;
+                      }}
+                      className="flex-1 text-sm"
+                      multiline
+                      returnKeyType={isLast ? "done" : "next"}
                       placeholder={
                         money
                           ? t("shop.egpWorth", { amount: Number(line.qty) })
@@ -393,14 +414,16 @@ export default function DriverOrderScreen() {
                       keyboardType="decimal-pad"
                       value={
                         prices[line.id] ??
-                        line.actualLineTotal ??
                         line.actualUnitPrice ??
-                        ""
+                        (isMoneyKind(line.unitKind) ? line.qty.toString() : "")
                       }
+                      onSubmitEditing={() => {
+                        handleInputNext(isLast, index)
+                      }}
                       onChangeText={(value) =>
                         setPrices((p) => ({ ...p, [line.id]: value }))
                       }
-                      style={{ textAlign: "auto", writingDirection: "ltr", minWidth: 80 }}
+                      style={{ textAlign: "center", textAlignVertical: "center", writingDirection: "ltr", direction: "ltr", minWidth: 80 }}
                     />
                     <Pressable
                       className="size-12 items-center justify-center rounded-full bg-success active:opacity-80"
@@ -418,18 +441,37 @@ export default function DriverOrderScreen() {
                           actualUnitPrice:
                             raw && price > 0 ? price : undefined,
                         });
+
+
                       }}
                     >
                       <Ionicons name="checkmark" size={22} color="#0E0E10" />
                     </Pressable>
                     <Pressable
                       className="size-12 items-center justify-center rounded-full bg-destructive active:opacity-80"
-                      onPress={() =>
+                      onPress={() => {
+                        // Clear the price input for this line
+                        setPrices((p) => {
+                          const newPrices = { ...p };
+                          delete newPrices[line.id];
+                          return newPrices;
+                        });
+
                         updateLine.mutate({
                           orderItemId: line.id,
                           status: "unavailable",
                         })
-                      }
+
+                        if (!isLast) {
+                          const nextIndex = index + 1;
+                          const nextLine = order.items[nextIndex];
+                          if (nextLine) {
+                            setTimeout(() => {
+                              priceInputRefs.current[nextLine.id]?.focus();
+                            }, 10);
+                          }
+                        }
+                      }}
                     >
                       <Ionicons name="close" size={22} color="#F5F2EC" />
                     </Pressable>
@@ -489,7 +531,7 @@ export default function DriverOrderScreen() {
               keyboardType="decimal-pad"
               value={cashCollected}
               onChangeText={setCashCollected}
-              style={{ textAlign: "auto", writingDirection: "ltr" }}
+              style={{ textAlign: "center", writingDirection: "ltr", direction: "ltr" }}
             />
             <Button
               label={t("driver.confirmCollected")}
