@@ -10,6 +10,7 @@ import { adminCatalogRouter } from "./catalog";
 import { adminDriversRouter } from "./drivers";
 import { adminGeoRouter } from "./geo";
 import { adminOrdersRouter } from "./orders";
+import { adminPricingRouter } from "./pricing";
 import { adminReviewRouter } from "./review";
 import { adminSettingsRouter } from "./settings";
 import { adminUnitsRouter } from "./units";
@@ -20,6 +21,7 @@ export const adminRouter = createTRPCRouter({
   drivers: adminDriversRouter,
   geo: adminGeoRouter,
   orders: adminOrdersRouter,
+  pricing: adminPricingRouter,
   review: adminReviewRouter,
   settings: adminSettingsRouter,
   units: adminUnitsRouter,

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   ClipboardList,
   LayoutDashboard,
+  LineChart,
   MapPin,
   Package,
   Ruler,
@@ -27,6 +28,7 @@ const links = [
   { href: "/admin/items", key: "admin.nav.items", icon: Package },
   { href: "/admin/units", key: "admin.nav.units", icon: Ruler },
   { href: "/admin/items/review", key: "admin.nav.review", icon: ScanSearch },
+  { href: "/admin/pricing", key: "admin.nav.pricing", icon: LineChart },
   { href: "/admin/geo", key: "admin.nav.geo", icon: MapPin },
   { href: "/admin/settings", key: "admin.nav.settings", icon: Settings },
 ] as const;
@@ -53,7 +55,13 @@ const groups: {
     },
     {
       labelKey: "admin.nav.group.catalog",
-      hrefs: ["/admin/categories", "/admin/items", "/admin/units", "/admin/items/review"],
+      hrefs: [
+        "/admin/categories",
+        "/admin/items",
+        "/admin/units",
+        "/admin/items/review",
+        "/admin/pricing",
+      ],
     },
     {
       labelKey: "admin.nav.group.settings",

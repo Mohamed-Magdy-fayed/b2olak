@@ -42,7 +42,10 @@ export const OrderItemsTable = pgTable(
     actualLineTotal: numeric({ precision: 10, scale: 2 }),
     ...auditColumns,
   },
-  (table) => [index("order_items_order_idx").on(table.orderId)],
+  (table) => [
+    index("order_items_order_idx").on(table.orderId),
+    index("order_items_item_idx").on(table.itemId),
+  ],
 );
 
 export const orderItemsRelations = relations(OrderItemsTable, ({ one }) => ({

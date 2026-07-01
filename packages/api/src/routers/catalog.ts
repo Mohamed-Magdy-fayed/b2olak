@@ -14,6 +14,7 @@ import {
 import { z } from "zod";
 
 import { CategoriesTable } from "@workspace/db/schemas/catalog/categories";
+import { ItemPriceStatsTable } from "@workspace/db/schemas/catalog/item-price-stats";
 import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
 import { UnitsTable, type UnitKind } from "@workspace/db/schemas/catalog/units";
@@ -41,6 +42,10 @@ type CatalogUnit = {
   nameEn: string;
   nameAr: string;
   kind: UnitKind;
+  /** Real-order market average for this item in this unit (null = no data). */
+  avgPrice: number | null;
+  /** How many priced lines back `avgPrice` — the UI gates the hint on this. */
+  sampleCount: number;
 };
 
 /** Active money-kind units ("EGP worth") — offered on every item, not linked per-item. */
@@ -68,12 +73,10 @@ async function attachUnits<T extends { id: string }>(
   items: T[],
 ): Promise<(T & { units: CatalogUnit[]; defaultUnit: string | null })[]> {
   if (items.length === 0) return [];
-  const [links, moneyUnits] = await Promise.all([
+  const itemIds = items.map((i) => i.id);
+  const [links, moneyUnits, priceStats] = await Promise.all([
     db.query.ItemUnitsTable.findMany({
-      where: inArray(
-        ItemUnitsTable.itemId,
-        items.map((i) => i.id),
-      ),
+      where: inArray(ItemUnitsTable.itemId, itemIds),
       orderBy: [asc(ItemUnitsTable.sortOrder)],
       with: {
         unit: {
@@ -88,7 +91,20 @@ async function attachUnits<T extends { id: string }>(
       },
     }),
     activeMoneyUnits(db),
+    db.query.ItemPriceStatsTable.findMany({
+      where: inArray(ItemPriceStatsTable.itemId, itemIds),
+      columns: { itemId: true, unit: true, avgPrice: true, sampleCount: true },
+    }),
   ]);
+
+  // Market average keyed by `${itemId}::${unitCode}` — money units have none.
+  const statByKey = new Map<string, { avgPrice: number | null; sampleCount: number }>();
+  for (const stat of priceStats) {
+    statByKey.set(`${stat.itemId}::${stat.unit}`, {
+      avgPrice: stat.avgPrice != null ? Number(stat.avgPrice) : null,
+      sampleCount: stat.sampleCount,
+    });
+  }
 
   const moneyCatalogUnits: CatalogUnit[] = moneyUnits.map((u) => ({
     id: u.id,
@@ -96,17 +112,22 @@ async function attachUnits<T extends { id: string }>(
     nameEn: u.nameEn,
     nameAr: u.nameAr,
     kind: u.kind,
+    avgPrice: null,
+    sampleCount: 0,
   }));
 
   const byItem = new Map<string, { units: CatalogUnit[]; defaultUnit: string | null }>();
   for (const link of links) {
     const entry = byItem.get(link.itemId) ?? { units: [], defaultUnit: null };
+    const stat = statByKey.get(`${link.itemId}::${link.unit.code}`);
     entry.units.push({
       id: link.unit.id,
       code: link.unit.code,
       nameEn: link.unit.nameEn,
       nameAr: link.unit.nameAr,
       kind: link.unit.kind,
+      avgPrice: stat?.avgPrice ?? null,
+      sampleCount: stat?.sampleCount ?? 0,
     });
     if (link.isDefault) entry.defaultUnit = link.unit.code;
     byItem.set(link.itemId, entry);

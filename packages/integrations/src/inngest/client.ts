@@ -28,6 +28,12 @@ type Events = {
   "wallet/credited": {
     data: { userId: string; orderId: string; amount: number };
   };
+  "pricing/sample.recorded": {
+    data: { itemId: string };
+  };
+  "pricing/sync.requested": {
+    data: { runId: string };
+  };
 };
 
 export const inngest = new Inngest({
