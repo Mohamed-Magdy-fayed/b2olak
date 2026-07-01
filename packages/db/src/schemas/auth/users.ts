@@ -1,5 +1,12 @@
 import { relations } from "drizzle-orm";
-import { pgEnum, pgTable, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import {
+  numeric,
+  pgEnum,
+  pgTable,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from "drizzle-orm/pg-core";
 
 import { auditColumns, id } from "../../helpers";
 import { DriverProfilesTable } from "../drivers/driver-profiles";
@@ -46,6 +53,12 @@ export const UsersTable = pgTable(
      * OS notification permission. OTP + admin ops pings are always WhatsApp.
      */
     notificationChannel: notificationChannelEnum().notNull().default("whatsapp"),
+    /**
+     * Customer wallet credit (EGP). Positive = spendable credit. Denormalized
+     * running total of `customer_wallet_entries`; kept in sync in the same
+     * transaction as each ledger write.
+     */
+    walletBalance: numeric({ precision: 10, scale: 2 }).notNull().default("0.00"),
     phoneVerifiedAt: timestamp({ withTimezone: true }),
     emailVerifiedAt: timestamp({ withTimezone: true }),
     lastSignInAt: timestamp({ withTimezone: true }),

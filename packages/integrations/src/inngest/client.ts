@@ -25,6 +25,9 @@ type Events = {
   "order/placed": {
     data: { orderId: string; userId: string; value: number; currency: string };
   };
+  "wallet/credited": {
+    data: { userId: string; orderId: string; amount: number };
+  };
 };
 
 export const inngest = new Inngest({

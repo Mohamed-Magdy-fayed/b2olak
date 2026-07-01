@@ -467,6 +467,15 @@ const ar = {
     tabAccount: "حسابي",
     orderDelivered: "تم التوصيل!",
     orderDeliveredMessage: "عمل رائع! تم توصيل الطلب بنجاح.",
+    mismatchTitle: "المبلغ غير مطابق",
+    mismatchMessage:
+      "المتوقع {expected} جنيه لكنك أدخلت {entered} جنيه. أكّد لتسجيل الفرق.",
+    balance: "رصيد التحصيل",
+    balanceOwed: "هذا المبلغ مستحق عليك للشركة.",
+  },
+  wallet: {
+    balance: "رصيد المحفظة",
+    appliesNextOrder: "يُخصم تلقائياً من طلبك القادم.",
   },
   landing: {
     nav: {
@@ -712,6 +721,14 @@ const ar = {
       alreadyDriver: "الرقم ده مسجّل لطيّار بالفعل.",
       phoneIsAdmin: "الرقم ده لحساب أدمن.",
       suspendWarning: "الإيقاف لا يلغي الطلبات النشطة — أعد تعيينها أولاً.",
+      balance: "الرصيد",
+      settle: "تسوية الرصيد",
+      settleTitle: "تسوية رصيد الطيّار",
+      settleHint: "رصيد {name} الحالي {balance} جنيه. أدخل المبلغ الذي سلّمه.",
+      settleAmount: "المبلغ المستلم (جنيه)",
+      settleNote: "ملاحظة (اختياري)",
+      settleConfirm: "تسجيل التسوية",
+      settleSuccess: "تم تحديث الرصيد.",
     },
     users: {
       title: "العملاء",

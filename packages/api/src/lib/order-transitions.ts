@@ -2,6 +2,9 @@ import { TRPCError } from "@trpc/server";
 import { eq } from "drizzle-orm";
 
 import type { Db } from "@workspace/db/client";
+
+/** The transaction handle passed to `db.transaction(...)` — same query API as `Db`. */
+export type TransitionTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 import { OrderStatusEventsTable } from "@workspace/db/schemas/orders/order-status-events";
 import { type Order, OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { inngest } from "@workspace/integrations/inngest/client";
@@ -26,6 +29,12 @@ export async function applyTransition(
     /** Admin recovery override — bypasses the machine, note required. */
     override?: boolean;
     extra?: Partial<typeof OrdersTable.$inferInsert>;
+    /**
+     * Runs inside the SAME transaction as the status change + timeline event,
+     * after both are written. Use for side effects that must be atomic with the
+     * transition (e.g. COD reconciliation ledger writes).
+     */
+    onCommit?: (tx: TransitionTx) => Promise<void>;
   } = {},
 ) {
   if (options.override) {
@@ -50,6 +59,7 @@ export async function applyTransition(
       note: options.note,
       createdBy: actor.id,
     });
+    if (options.onCommit) await options.onCommit(tx);
   });
 
   // The `id` field is Inngest's dedup key (24-hour window): if this send is

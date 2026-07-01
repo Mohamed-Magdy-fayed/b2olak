@@ -35,6 +35,10 @@ export const customerMessages = {
     l === "ar"
       ? `بقولك\nتم إلغاء طلبك #${o.orderNumber}${o.cancelReason ? ` — ${o.cancelReason}` : ""}.`
       : `ba2olak\nYour order #${o.orderNumber} was cancelled${o.cancelReason ? ` — ${o.cancelReason}` : ""}.`,
+  walletCredited: (o: { amount: string; balance: string }, l: Locale) =>
+    l === "ar"
+      ? `بقولك 💜\nأضفنا ${o.amount} جنيه إلى محفظتك.\nرصيدك الحالي: ${o.balance} جنيه — هيتخصم تلقائياً من طلبك الجاي.`
+      : `ba2olak 💜\nWe added ${o.amount} EGP to your wallet.\nBalance: ${o.balance} EGP — it'll apply automatically to your next order.`,
 };
 
 export const driverMessages = {

@@ -12,6 +12,7 @@ import { healthRouter } from "./routers/health";
 import { itemsRouter } from "./routers/items";
 import { ordersRouter } from "./routers/orders";
 import { waitlistRouter } from "./routers/waitlist";
+import { walletRouter } from "./routers/wallet";
 
 export const appRouter = createTRPCRouter({
   health: healthRouter,
@@ -25,6 +26,7 @@ export const appRouter = createTRPCRouter({
   driver: driverRouter,
   admin: adminRouter,
   waitlist: waitlistRouter,
+  wallet: walletRouter,
 });
 
 export type AppRouter = typeof appRouter;

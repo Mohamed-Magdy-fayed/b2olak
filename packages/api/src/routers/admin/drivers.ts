@@ -16,6 +16,7 @@ import { z } from "zod";
 
 import type { Db } from "@workspace/db/client";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
+import { DriverLedgerEntriesTable } from "@workspace/db/schemas/drivers/driver-ledger-entries";
 import {
   DriverProfilesTable,
   driverStatusValues,
@@ -23,6 +24,8 @@ import {
 } from "@workspace/db/schemas/drivers/driver-profiles";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { egyptianPhoneSchema } from "@workspace/validators/auth";
+import { settleDriverSchema } from "@workspace/validators/driver";
+import { toMoney } from "@workspace/validators/totals";
 
 import { adminProcedure, createTRPCRouter } from "../../init";
 import {
@@ -297,6 +300,38 @@ export const adminDriversRouter = createTRPCRouter({
         .returning();
       if (!row) throw new TRPCError({ code: "NOT_FOUND" });
       return row;
+    }),
+
+  /**
+   * Record cash a driver handed over: credits their balance toward zero and
+   * writes a `settlement` ledger entry, atomically. A negative balance means
+   * the driver owes; settling moves it up toward 0.
+   */
+  settle: adminProcedure
+    .input(settleDriverSchema)
+    .mutation(async ({ ctx, input }) => {
+      const profile = await ctx.db.query.DriverProfilesTable.findFirst({
+        where: eq(DriverProfilesTable.userId, input.driverUserId),
+      });
+      if (!profile) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await ctx.db.transaction(async (tx) => {
+        await tx.insert(DriverLedgerEntriesTable).values({
+          userId: input.driverUserId,
+          amount: toMoney(input.amount),
+          reason: "settlement",
+          note: input.note,
+          createdBy: ctx.session.user.id,
+        });
+        await tx
+          .update(DriverProfilesTable)
+          .set({
+            balance: sql`${DriverProfilesTable.balance} + ${toMoney(input.amount)}::numeric`,
+            updatedBy: ctx.session.user.id,
+          })
+          .where(eq(DriverProfilesTable.userId, input.driverUserId));
+      });
+      return { ok: true as const };
     }),
 
   setStatus: adminProcedure

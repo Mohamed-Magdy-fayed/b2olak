@@ -12,3 +12,10 @@ export const markDeliveredSchema = z.object({
   orderId: z.uuid(),
   amountCollected: z.number().positive().max(100_000),
 });
+
+/** Admin settlement — cash a driver handed over, credited against their balance. */
+export const settleDriverSchema = z.object({
+  driverUserId: z.uuid(),
+  amount: z.number().positive().max(1_000_000),
+  note: z.string().max(500).optional(),
+});

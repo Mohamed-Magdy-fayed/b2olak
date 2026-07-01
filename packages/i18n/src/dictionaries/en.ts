@@ -472,6 +472,15 @@ const en = {
     tabAccount: "Account",
     orderDelivered: "Order Delivered!",
     orderDeliveredMessage: "Great job! The order has been delivered successfully.",
+    mismatchTitle: "Amount doesn't match",
+    mismatchMessage:
+      "Expected {expected} EGP but you entered {entered} EGP. Confirm to record the difference.",
+    balance: "COD balance",
+    balanceOwed: "You owe this amount to the company.",
+  },
+  wallet: {
+    balance: "Wallet balance",
+    appliesNextOrder: "Applies automatically to your next order.",
   },
   landing: {
     nav: {
@@ -717,6 +726,15 @@ const en = {
       alreadyDriver: "This phone already belongs to a driver.",
       phoneIsAdmin: "This phone belongs to an admin account.",
       suspendWarning: "Suspending does not unassign active orders — reassign them first.",
+      balance: "Balance",
+      settle: "Settle balance",
+      settleTitle: "Settle driver balance",
+      settleHint:
+        "{name}'s current balance is {balance} EGP. Enter the cash they handed over.",
+      settleAmount: "Amount received (EGP)",
+      settleNote: "Note (optional)",
+      settleConfirm: "Record settlement",
+      settleSuccess: "Balance updated.",
     },
     users: {
       title: "Customers",

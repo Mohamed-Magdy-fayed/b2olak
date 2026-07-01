@@ -102,6 +102,10 @@ export default function AccountScreen() {
     ...trpc.auth.listDevices.queryOptions(),
     enabled: signedIn === true,
   });
+  const { data: wallet } = useQuery({
+    ...trpc.wallet.myBalance.queryOptions(),
+    enabled: signedIn === true,
+  });
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricOn, setBiometricOn] = useState(false);
   const [pushOn, setPushOn] = useState(false);
@@ -388,6 +392,23 @@ export default function AccountScreen() {
           </View>
         )}
       </Card>
+
+      {wallet && Number(wallet.balance) > 0 ? (
+        <Card className="gap-2">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="wallet-outline" size={18} color="#C9A227" />
+            <Text className="font-semibold text-foreground">
+              {t("wallet.balance")}
+            </Text>
+          </View>
+          <Text className="font-display text-2xl text-primary">
+            {Number(wallet.balance).toFixed(2)} EGP
+          </Text>
+          <Text className="text-xs text-muted-foreground">
+            {t("wallet.appliesNextOrder")}
+          </Text>
+        </Card>
+      ) : null}
 
       <Pressable
         className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-4 active:bg-elevated"

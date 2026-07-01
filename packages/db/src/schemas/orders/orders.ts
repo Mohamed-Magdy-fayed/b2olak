@@ -47,6 +47,8 @@ export const OrdersTable = pgTable(
 
     deliveryFee: numeric({ precision: 10, scale: 2 }).notNull(),
     actualItemsTotal: numeric({ precision: 10, scale: 2 }),
+    /** Customer wallet credit applied at COD finalization (reduces codTotal). */
+    walletApplied: numeric({ precision: 10, scale: 2 }).notNull().default("0.00"),
     codTotal: numeric({ precision: 10, scale: 2 }),
     amountCollected: numeric({ precision: 10, scale: 2 }),
     customerNote: text(),

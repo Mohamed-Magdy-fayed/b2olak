@@ -98,6 +98,11 @@ function DriverRowActions({
             {String(t("admin.drivers.reactivate"))}
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem
+          onClick={() => setRowAction({ row, variant: "settle" })}
+        >
+          {String(t("admin.drivers.settle"))}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -252,6 +257,28 @@ export function buildDriverColumns(opts: {
       ),
       meta: { label: String(t("admin.drivers.delivered")) },
       cell: ({ row }) => row.original.deliveredOrders,
+    },
+    {
+      accessorKey: "balance",
+      enableSorting: false,
+      header: () => (
+        <span className="text-xs font-medium">
+          {String(t("admin.drivers.balance"))}
+        </span>
+      ),
+      meta: { label: String(t("admin.drivers.balance")) },
+      cell: ({ row }) => {
+        // Negative balance = the driver owes the company (COD shortfall).
+        const bal = Number(row.original.balance ?? 0);
+        return (
+          <span
+            dir="ltr"
+            className={bal < 0 ? "text-destructive font-medium" : ""}
+          >
+            {bal.toFixed(2)} EGP
+          </span>
+        );
+      },
     },
     {
       accessorKey: "createdAt",

@@ -30,6 +30,7 @@ export default function DriverOrderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [prices, setPrices] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  const [lineErrors, setLineErrors] = useState<Record<string, string>>({});
   const [collecting, setCollecting] = useState(false);
   const [cashCollected, setCashCollected] = useState("");
   const priceInputRefs = useRef<Record<string, any>>({});
@@ -86,6 +87,13 @@ export default function DriverOrderScreen() {
         await queryClient.cancelQueries({ queryKey: orderOptions.queryKey });
         const previous = queryClient.getQueryData(orderOptions.queryKey);
         setError(null);
+        // Clear this row's warning — we're retrying it.
+        setLineErrors((e) => {
+          if (!e[vars.orderItemId]) return e;
+          const next = { ...e };
+          delete next[vars.orderItemId];
+          return next;
+        });
         queryClient.setQueryData(orderOptions.queryKey, (old) => {
           if (!old) return old;
           return {
@@ -121,22 +129,17 @@ export default function DriverOrderScreen() {
         setError(null);
         invalidate();
       },
-      onError: (err, _vars, context) => {
+      onError: (err, vars, context) => {
         if (context?.previous) {
           queryClient.setQueryData(orderOptions.queryKey, context.previous);
         }
-        setError(
-          err.message === "driver.linesPending"
-            ? t("driver.linesPending")
-            : err.message === "driver.priceRequired"
-              ? t("driver.priceRequired")
-              : t("errors.unknown"),
-        );
-      },
-      onSettled: () => {
-        void queryClient.invalidateQueries({
-          queryKey: orderOptions.queryKey,
-        });
+        // The failure belongs to ONE line — surface it on that row, not the
+        // global banner, so the driver knows exactly which item to redo.
+        const message =
+          err.message === "driver.priceRequired"
+            ? t("driver.priceRequired")
+            : t("errors.unknown");
+        setLineErrors((e) => ({ ...e, [vars.orderItemId]: message }));
       },
     }),
   );
@@ -237,19 +240,66 @@ export default function DriverOrderScreen() {
     order.status === "purchased" ||
     (order.status === "delivering" && !collecting);
 
-  function handleInputNext(isLast: boolean, index: number) {
-    if (!order) return
-    if (!isLast) {
-      const nextIndex = index + 1;
-      const nextLine = order.items[nextIndex];
-      if (nextLine) {
-        setTimeout(() => {
-          priceInputRefs.current[nextLine.id]?.focus();
-        }, 10);
-      }
-    } else {
-      Keyboard.dismiss()
+  function focusNextOrDismiss(index: number, isLast: boolean) {
+    if (isLast) {
+      Keyboard.dismiss();
+      return;
     }
+    const nextLine = order?.items[index + 1];
+    if (nextLine) {
+      setTimeout(() => priceInputRefs.current[nextLine.id]?.focus(), 10);
+    }
+  }
+
+  /**
+   * The single commit path shared by keyboard "next", the ✓ button, and the ✕
+   * button. Decides found vs unavailable from the entered value (0/empty →
+   * unavailable; ✕ forces it), fires the optimistic + background update, and
+   * advances the cursor (or dismisses on the last row).
+   */
+  function commitLine(
+    line: NonNullable<typeof order>["items"][number],
+    index: number,
+    isLast: boolean,
+    opts?: { forceUnavailable?: boolean },
+  ) {
+    if (!order) return;
+    const money = isMoneyKind(line.unitKind);
+    const raw =
+      prices[line.id] ??
+      line.actualUnitPrice ??
+      (money ? line.qty.toString() : "");
+    const hasValue = raw !== "" && raw != null;
+    const price = Number(raw);
+
+    // A non-money line committed with NO price (and not an explicit ✕) is almost
+    // always a slip — flag the row and keep the cursor here instead of silently
+    // marking it unavailable. Typing 0 is the explicit "unavailable" signal.
+    if (!opts?.forceUnavailable && !money && !hasValue) {
+      setLineErrors((e) => ({ ...e, [line.id]: t("driver.priceRequired") }));
+      return;
+    }
+
+    const unavailable =
+      opts?.forceUnavailable === true || !hasValue || !(price > 0);
+
+    if (unavailable) {
+      // Drop any typed value so the row reads clean as "unavailable".
+      setPrices((p) => {
+        if (!(line.id in p)) return p;
+        const next = { ...p };
+        delete next[line.id];
+        return next;
+      });
+    }
+
+    updateLine.mutate({
+      orderItemId: line.id,
+      status: unavailable ? "unavailable" : "found",
+      actualUnitPrice: !unavailable && price > 0 ? price : undefined,
+    });
+
+    focusNextOrDismiss(index, isLast);
   }
 
   return (
@@ -398,83 +448,61 @@ export default function DriverOrderScreen() {
                   </View>
                 ) : null}
                 {shoppingMode ? (
-                  <View className="flex-row items-center gap-2">
-                    <Input
-                      ref={(el) => {
-                        if (el) priceInputRefs.current[line.id] = el;
-                      }}
-                      className="flex-1 text-sm"
-                      multiline
-                      returnKeyType={isLast ? "done" : "next"}
-                      placeholder={
-                        money
-                          ? t("shop.egpWorth", { amount: Number(line.qty) })
-                          : t("driver.enterPrice")
-                      }
-                      keyboardType="decimal-pad"
-                      value={
-                        prices[line.id] ??
-                        line.actualUnitPrice ??
-                        (isMoneyKind(line.unitKind) ? line.qty.toString() : "")
-                      }
-                      onSubmitEditing={() => {
-                        handleInputNext(isLast, index)
-                      }}
-                      onChangeText={(value) =>
-                        setPrices((p) => ({ ...p, [line.id]: value }))
-                      }
-                      style={{ textAlign: "center", textAlignVertical: "center", writingDirection: "ltr", direction: "ltr", minWidth: 80 }}
-                    />
-                    <Pressable
-                      className="size-12 items-center justify-center rounded-full bg-success active:opacity-80"
-                      onPress={() => {
-                        const raw = prices[line.id] ?? line.actualUnitPrice ?? "";
-                        const price = Number(raw);
-                        // Money lines default to the requested worth — price optional.
-                        if (!money && (!price || price <= 0)) {
-                          setError(t("driver.priceRequired"));
-                          return;
+                  <View className="gap-1">
+                    <View className="flex-row items-center gap-2">
+                      <Input
+                        ref={(el) => {
+                          if (el) priceInputRefs.current[line.id] = el;
+                        }}
+                        className="flex-1 text-sm"
+                        multiline
+                        returnKeyType={isLast ? "done" : "next"}
+                        placeholder={
+                          money
+                            ? t("shop.egpWorth", { amount: Number(line.qty) })
+                            : t("driver.enterPrice")
                         }
-                        updateLine.mutate({
-                          orderItemId: line.id,
-                          status: "found",
-                          actualUnitPrice:
-                            raw && price > 0 ? price : undefined,
-                        });
-
-
-                      }}
-                    >
-                      <Ionicons name="checkmark" size={22} color="#0E0E10" />
-                    </Pressable>
-                    <Pressable
-                      className="size-12 items-center justify-center rounded-full bg-destructive active:opacity-80"
-                      onPress={() => {
-                        // Clear the price input for this line
-                        setPrices((p) => {
-                          const newPrices = { ...p };
-                          delete newPrices[line.id];
-                          return newPrices;
-                        });
-
-                        updateLine.mutate({
-                          orderItemId: line.id,
-                          status: "unavailable",
-                        })
-
-                        if (!isLast) {
-                          const nextIndex = index + 1;
-                          const nextLine = order.items[nextIndex];
-                          if (nextLine) {
-                            setTimeout(() => {
-                              priceInputRefs.current[nextLine.id]?.focus();
-                            }, 10);
-                          }
+                        keyboardType="decimal-pad"
+                        value={
+                          prices[line.id] ??
+                          line.actualUnitPrice ??
+                          (isMoneyKind(line.unitKind) ? line.qty.toString() : "")
                         }
-                      }}
-                    >
-                      <Ionicons name="close" size={22} color="#F5F2EC" />
-                    </Pressable>
+                        onSubmitEditing={() => commitLine(line, index, isLast)}
+                        onChangeText={(value) =>
+                          setPrices((p) => ({ ...p, [line.id]: value }))
+                        }
+                        style={{ textAlign: "center", textAlignVertical: "center", writingDirection: "ltr", direction: "ltr", minWidth: 80 }}
+                      />
+                      <Pressable
+                        className="size-12 items-center justify-center rounded-full bg-success active:opacity-80"
+                        onPress={() => commitLine(line, index, isLast)}
+                      >
+                        <Ionicons name="checkmark" size={22} color="#0E0E10" />
+                      </Pressable>
+                      <Pressable
+                        className="size-12 items-center justify-center rounded-full bg-destructive active:opacity-80"
+                        onPress={() =>
+                          commitLine(line, index, isLast, {
+                            forceUnavailable: true,
+                          })
+                        }
+                      >
+                        <Ionicons name="close" size={22} color="#F5F2EC" />
+                      </Pressable>
+                    </View>
+                    {lineErrors[line.id] ? (
+                      <View className="flex-row items-center gap-1.5">
+                        <Ionicons
+                          name="alert-circle"
+                          size={13}
+                          color="#F0584F"
+                        />
+                        <Text className="flex-1 text-xs text-destructive">
+                          {lineErrors[line.id]}
+                        </Text>
+                      </View>
+                    ) : null}
                   </View>
                 ) : null}
               </View>
@@ -542,10 +570,30 @@ export default function DriverOrderScreen() {
                   setError(t("driver.amountRequired"));
                   return;
                 }
-                markDelivered.mutate({
-                  orderId: order.id,
-                  amountCollected: amount,
-                });
+                setError(null);
+                const deliver = () =>
+                  markDelivered.mutate({
+                    orderId: order.id,
+                    amountCollected: amount,
+                  });
+                // Exact-match gate: any difference from the expected COD must be
+                // acknowledged — a shortfall lands on the driver's balance, an
+                // overpayment goes to the customer's wallet.
+                if (amount !== Number(codTotal)) {
+                  appAlert(
+                    t("driver.mismatchTitle"),
+                    t("driver.mismatchMessage", {
+                      expected: codTotal,
+                      entered: amount.toFixed(2),
+                    }),
+                    [
+                      { text: t("common.cancel"), style: "cancel" },
+                      { text: t("common.confirm"), onPress: deliver },
+                    ],
+                  );
+                  return;
+                }
+                deliver();
               }}
             />
           </Card>

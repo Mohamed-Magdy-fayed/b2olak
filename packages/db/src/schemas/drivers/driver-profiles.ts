@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   index,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -38,6 +39,12 @@ export const DriverProfilesTable = pgTable(
     vehiclePlate: varchar({ length: 32 }),
     /** Driver-toggled; only approved + available drivers are assignable. */
     isAvailable: boolean().notNull().default(false),
+    /**
+     * Running COD balance (EGP). NEGATIVE = driver owes the company (collected
+     * less than order totals); positive/zero after settlement. Denormalized
+     * running total of `driver_ledger_entries`, kept in sync per ledger write.
+     */
+    balance: numeric({ precision: 10, scale: 2 }).notNull().default("0.00"),
     adminNotes: text(),
     ...auditColumns,
   },

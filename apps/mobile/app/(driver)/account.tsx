@@ -29,6 +29,7 @@ export default function DriverAccount() {
   const { t } = useTranslation();
   const appAlert = useAppAlert();
   const { data } = useQuery(trpc.auth.me.queryOptions());
+  const { data: balanceData } = useQuery(trpc.driver.balance.queryOptions());
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricOn, setBiometricOn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -118,6 +119,32 @@ export default function DriverAccount() {
             ) : null}
           </View>
         </Card>
+
+        {/* COD balance — negative means the driver owes the company */}
+        {balanceData ? (
+          <Card className="mb-4 gap-2">
+            <View className="flex-row items-center gap-2">
+              <Ionicons name="wallet-outline" size={18} color="#C9A227" />
+              <Text className="font-semibold text-foreground">
+                {t("driver.balance")}
+              </Text>
+            </View>
+            <Text
+              className={`font-display text-2xl ${
+                Number(balanceData.balance) < 0
+                  ? "text-destructive"
+                  : "text-foreground"
+              }`}
+            >
+              {Math.abs(Number(balanceData.balance)).toFixed(2)} EGP
+            </Text>
+            {Number(balanceData.balance) < 0 ? (
+              <Text className="text-xs text-muted-foreground">
+                {t("driver.balanceOwed")}
+              </Text>
+            ) : null}
+          </Card>
+        ) : null}
 
         {/* biometric toggle */}
         {biometricAvailable ? (

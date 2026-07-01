@@ -55,7 +55,7 @@ type DriverExportRow =
 
 export type DriverRowAction = {
   row: DriverRow;
-  variant: "approve" | "suspend" | "reactivate";
+  variant: "approve" | "suspend" | "reactivate" | "settle";
 } | null;
 
 const VEHICLES = ["motorcycle", "bicycle", "car", "on_foot"] as const;
@@ -164,6 +164,86 @@ function AddDriverForm({
         </Button>
         <Button type="submit" disabled={isPending}>
           {String(t("common.save"))}
+        </Button>
+      </DialogFooter>
+    </form>
+  );
+}
+
+function SettleDriverForm({
+  driver,
+  isPending,
+  onClose,
+  onSubmit,
+}: {
+  driver: DriverRow;
+  isPending: boolean;
+  onClose: () => void;
+  onSubmit: (values: { amount: number; note?: string }) => void;
+}) {
+  const { t } = useTranslation();
+  const balance = Number(driver.balance ?? 0);
+
+  const form = useAppForm({
+    defaultValues: {
+      // Pre-fill the amount the driver owes (a negative balance) so one click settles.
+      amount: balance < 0 ? Number(Math.abs(balance).toFixed(2)) : (null as number | null),
+      note: "",
+    },
+    onSubmit: ({ value }) => {
+      if (!value.amount || value.amount <= 0) return;
+      onSubmit({
+        amount: value.amount,
+        note: value.note.trim() || undefined,
+      });
+    },
+  });
+
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        void form.handleSubmit();
+      }}
+    >
+      <DialogHeader>
+        <DialogTitle>{String(t("admin.drivers.settleTitle"))}</DialogTitle>
+      </DialogHeader>
+      <div className="flex flex-col gap-4 py-2">
+        <p className="text-muted-foreground text-sm">
+          {String(
+            t("admin.drivers.settleHint", {
+              name: driver.user?.name ?? "—",
+              balance: balance.toFixed(2),
+            }),
+          )}
+        </p>
+        <form.AppField
+          name="amount"
+          validators={{
+            onSubmit: ({ value }) =>
+              value && value > 0 ? undefined : "validation.required",
+          }}
+        >
+          {(field) => (
+            <field.NumberField
+              label={String(t("admin.drivers.settleAmount"))}
+              autoFocus
+            />
+          )}
+        </form.AppField>
+        <form.AppField name="note">
+          {(field) => (
+            <field.TextareaField label={String(t("admin.drivers.settleNote"))} />
+          )}
+        </form.AppField>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onClose}>
+          {String(t("common.cancel"))}
+        </Button>
+        <Button type="submit" disabled={isPending}>
+          {String(t("admin.drivers.settleConfirm"))}
         </Button>
       </DialogFooter>
     </form>
@@ -285,6 +365,9 @@ export function DriversTable() {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
+  // Settle-balance dialog state
+  const [settleRow, setSettleRow] = useState<DriverRow | null>(null);
+
   const listInput = useMemo(
     () => ({
       page: pagination.pageIndex + 1,
@@ -377,6 +460,17 @@ export function DriversTable() {
     }),
   );
 
+  const settle = useMutation(
+    trpc.admin.drivers.settle.mutationOptions({
+      onSuccess: () => {
+        void invalidate();
+        setSettleRow(null);
+        toast.success(String(t("admin.drivers.settleSuccess")));
+      },
+      onError: (err) => toast.error(err.message),
+    }),
+  );
+
   const create = useMutation(
     trpc.admin.drivers.create.mutationOptions({
       onSuccess: () => {
@@ -410,6 +504,9 @@ export function DriversTable() {
       } else {
         setRowAction(null);
       }
+    } else if (rowAction.variant === "settle") {
+      setSettleRow(rowAction.row);
+      setRowAction(null);
     }
     // Only trigger when rowAction changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -568,6 +665,31 @@ export function DriversTable() {
                 setAddError(null);
               }}
               onSubmit={(values) => create.mutate(values)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Settle balance dialog */}
+      <Dialog
+        open={settleRow !== null}
+        onOpenChange={(open) => {
+          if (!open) setSettleRow(null);
+        }}
+      >
+        <DialogContent>
+          {settleRow && (
+            <SettleDriverForm
+              driver={settleRow}
+              isPending={settle.isPending}
+              onClose={() => setSettleRow(null)}
+              onSubmit={(values) =>
+                settle.mutate({
+                  driverUserId: settleRow.userId,
+                  amount: values.amount,
+                  note: values.note,
+                })
+              }
             />
           )}
         </DialogContent>
