@@ -9,6 +9,14 @@ export interface PushMessage {
 }
 
 /**
+ * Whether a stored token is a deliverable Expo push token. Callers use this to
+ * decide *before* sending whether push is viable (e.g. to fall back to WhatsApp
+ * when it isn't). `sendExpoPush` applies the same check internally.
+ */
+export const isExpoPushToken = (t: string | null | undefined): t is string =>
+  !!t && t.startsWith("ExponentPushToken[");
+
+/**
  * Sends an Expo push notification. Silently no-ops if the token is missing or
  * not an Expo token (e.g. recipient hasn't installed the app yet).
  *
@@ -22,7 +30,7 @@ export async function sendExpoPush(
   to: string | null | undefined,
   message: PushMessage,
 ): Promise<void> {
-  if (!to?.startsWith("ExponentPushToken[")) return;
+  if (!isExpoPushToken(to)) return;
 
   try {
     const response = await fetch(EXPO_PUSH_URL, {

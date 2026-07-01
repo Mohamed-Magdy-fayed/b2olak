@@ -21,6 +21,7 @@ import {
   type TrustedAccount,
 } from "@/lib/device-auth";
 import { useTranslation } from "@/lib/i18n";
+import { getExpoPushToken } from "@/lib/notifications";
 import {
   getActiveAccount,
   removeAccount,
@@ -103,6 +104,7 @@ export default function AccountScreen() {
   });
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricOn, setBiometricOn] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [trusted, setTrusted] = useState<TrustedAccount | null>(null);
   const [editingName, setEditingName] = useState(false);
@@ -116,6 +118,42 @@ export default function AccountScreen() {
       setTrusted(await getTrustedAccount());
     })();
   }, [signedIn]);
+
+  // Reflect the server's channel once the profile loads / changes.
+  useEffect(() => {
+    if (data) setPushOn(data.notificationChannel === "push");
+  }, [data]);
+
+  const setChannel = useMutation(
+    trpc.auth.setNotificationChannel.mutationOptions({
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({
+          queryKey: trpc.auth.me.queryKey(),
+        });
+      },
+      onError: (err) => appAlert(t("common.error"), err.message),
+    }),
+  );
+
+  const toggleChannel = async (next: boolean) => {
+    if (next) {
+      // Switching to in-app push: (re-)request OS permission. Only stick if
+      // granted; otherwise leave the user on WhatsApp and point them to Settings.
+      const token = await getExpoPushToken();
+      if (!token) {
+        appAlert(
+          t("account.notifications.permissionDeniedTitle"),
+          t("account.notifications.permissionDeniedBody"),
+        );
+        return;
+      }
+      setPushOn(true);
+      setChannel.mutate({ channel: "push", pushToken: token });
+    } else {
+      setPushOn(false);
+      setChannel.mutate({ channel: "whatsapp" });
+    }
+  };
 
   const toggleBiometric = async (next: boolean) => {
     if (!userId) return;
@@ -381,6 +419,25 @@ export default function AccountScreen() {
           />
         </Card>
       ) : null}
+
+      <Card className="flex-row items-center justify-between gap-3">
+        <View className="flex-1 gap-1">
+          <View className="flex-row items-center gap-2">
+            <Ionicons name="notifications-outline" size={18} color="#F5F2EC" />
+            <Text className="font-semibold text-foreground">
+              {t("account.notifications.channelLabel")}
+            </Text>
+          </View>
+          <Text className="text-sm text-muted-foreground">
+            {t("account.notifications.channelHint")}
+          </Text>
+        </View>
+        <Switch
+          value={pushOn}
+          onValueChange={(next) => void toggleChannel(next)}
+          trackColor={{ true: "#C9A227" }}
+        />
+      </Card>
 
       {devices && devices.length > 0 ? (
         <Card className="gap-3">

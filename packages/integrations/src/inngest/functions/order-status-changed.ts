@@ -4,7 +4,7 @@ import { db } from "@workspace/db/client";
 import { OrdersTable } from "@workspace/db/schemas/orders/orders";
 import { SystemSettingsTable } from "@workspace/db/schemas/system/system-settings";
 
-import { sendExpoPush } from "../../expo/push";
+import { isExpoPushToken, sendExpoPush } from "../../expo/push";
 import { getWhatsAppConfig } from "../../whatsapp/config";
 import { sendWhatsAppMessage } from "../../whatsapp/send";
 import {
@@ -112,6 +112,7 @@ export const onOrderStatusChanged = inngest.createFunction(
               name: true,
               preferredLocale: true,
               pushToken: true,
+              notificationChannel: true,
             },
           },
           driver: {
@@ -177,6 +178,24 @@ export const onOrderStatusChanged = inngest.createFunction(
         sendExpoPush(order.driver?.pushToken, { ...payload, data: { orderId } }),
       );
 
+    // Customer channel preference. `push` sends in-app only (saving a WhatsApp
+    // message); anything else — or a push-channel customer whose token is
+    // missing/stale — falls back to the WhatsApp version so an update is never
+    // silently dropped. Driver + ops sends below are unaffected (always both).
+    const canPush =
+      order.customer.notificationChannel === "push" &&
+      isExpoPushToken(order.customer.pushToken);
+
+    const notifyCustomer = (o: {
+      whatsapp?: string;
+      push: { title: string; body: string };
+    }) =>
+      canPush
+        ? customerPush(o.push)
+        : o.whatsapp
+          ? customerWhatsApp(o.whatsapp)
+          : Promise.resolve();
+
     if (to === "placed") {
       await step.run("notify-ops", async () => {
         const setting = await db.query.SystemSettingsTable.findFirst({
@@ -192,33 +211,43 @@ export const onOrderStatusChanged = inngest.createFunction(
           );
         }
       });
-      await customerWhatsApp(customerMessages.placed(info, customerLocale));
-      await customerPush(pushCustomer("placed", info, customerLocale));
+      await notifyCustomer({
+        whatsapp: customerMessages.placed(info, customerLocale),
+        push: pushCustomer("placed", info, customerLocale),
+      });
       return { ok: true as const };
     }
 
     if (to === "assigned") {
       await driverWhatsApp(driverMessages.assigned(info, driverLocale));
       await driverPush(pushDriver("assigned", info, driverLocale));
-      await customerWhatsApp(customerMessages.assigned(info, customerLocale));
-      await customerPush(pushCustomer("assigned", info, customerLocale));
+      await notifyCustomer({
+        whatsapp: customerMessages.assigned(info, customerLocale),
+        push: pushCustomer("assigned", info, customerLocale),
+      });
       return { ok: true as const };
     }
 
     if (to === "shopping" || to === "purchased") {
-      await customerPush(pushCustomer(to, info, customerLocale));
+      // No WhatsApp template for these minor steps — push-channel customers get
+      // a ping, whatsapp-channel customers get nothing (intended, saves WA).
+      await notifyCustomer({ push: pushCustomer(to, info, customerLocale) });
       return { ok: true as const };
     }
 
     if (to === "delivering" || to === "delivered") {
-      await customerWhatsApp(customerMessages[to](info, customerLocale));
-      await customerPush(pushCustomer(to, info, customerLocale));
+      await notifyCustomer({
+        whatsapp: customerMessages[to](info, customerLocale),
+        push: pushCustomer(to, info, customerLocale),
+      });
       return { ok: true as const };
     }
 
     if (to === "cancelled") {
-      await customerWhatsApp(customerMessages.cancelled(info, customerLocale));
-      await customerPush(pushCustomer("cancelled", info, customerLocale));
+      await notifyCustomer({
+        whatsapp: customerMessages.cancelled(info, customerLocale),
+        push: pushCustomer("cancelled", info, customerLocale),
+      });
       if (order.driver) {
         await driverWhatsApp(driverMessages.cancelled(info, driverLocale));
         await driverPush(pushDriver("cancelled", info, driverLocale));

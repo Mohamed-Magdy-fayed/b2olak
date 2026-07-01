@@ -398,6 +398,14 @@ const en = {
       signOutEverywhereConfirm:
         "You'll be signed out on every device, including this one.",
     },
+    notifications: {
+      channelLabel: "In-app notifications",
+      channelHint:
+        "Get order updates as app notifications. Turn off to receive them on WhatsApp instead.",
+      permissionDeniedTitle: "Notifications are off",
+      permissionDeniedBody:
+        "Enable notifications for ba2olak in your phone settings to get updates in the app. For now you'll keep getting them on WhatsApp.",
+    },
   },
   address: {
     title: "My addresses",

@@ -44,3 +44,11 @@ export const updateProfileSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   preferredLocale: z.enum(["en", "ar"]).optional(),
 });
+
+export const notificationChannelSchema = z.enum(["push", "whatsapp"]);
+
+export const setNotificationChannelSchema = z.object({
+  channel: notificationChannelSchema,
+  // Sent alongside channel === "push" so the fresh token is stored atomically.
+  pushToken: z.string().min(1).max(512).optional(),
+});

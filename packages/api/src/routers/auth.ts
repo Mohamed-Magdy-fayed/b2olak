@@ -32,6 +32,7 @@ import {
   egyptianPhoneSchema,
   otpCodeSchema,
   requestOtpSchema,
+  setNotificationChannelSchema,
   updateProfileSchema,
   verifyOtpSchema,
 } from "@workspace/validators/auth";
@@ -189,6 +190,7 @@ export const authRouter = createTRPCRouter({
     return {
       user: toSessionUser(user),
       driverProfile: user.driverProfile ?? null,
+      notificationChannel: user.notificationChannel,
     };
   }),
 
@@ -222,6 +224,25 @@ export const authRouter = createTRPCRouter({
         .set({ pushToken: input.token, updatedBy: ctx.session.user.id })
         .where(eq(UsersTable.id, ctx.session.user.id));
       return { ok: true as const };
+    }),
+
+  /**
+   * Sets the user's order-update notification channel. When switching to
+   * `push`, the client also passes the freshly-minted Expo token so it's stored
+   * atomically with the channel change.
+   */
+  setNotificationChannel: protectedProcedure
+    .input(setNotificationChannelSchema)
+    .mutation(async ({ ctx, input }) => {
+      await ctx.db
+        .update(UsersTable)
+        .set({
+          notificationChannel: input.channel,
+          ...(input.pushToken ? { pushToken: input.pushToken } : {}),
+          updatedBy: ctx.session.user.id,
+        })
+        .where(eq(UsersTable.id, ctx.session.user.id));
+      return { channel: input.channel };
     }),
 
   signOut: protectedProcedure.mutation(async ({ ctx }) => {

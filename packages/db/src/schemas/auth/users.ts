@@ -19,6 +19,13 @@ export const userStatusEnum = pgEnum("user_status", userStatusValues);
 export const localeValues = ["en", "ar"] as const;
 export const localeEnum = pgEnum("locale", localeValues);
 
+export const notificationChannelValues = ["push", "whatsapp"] as const;
+export type NotificationChannel = (typeof notificationChannelValues)[number];
+export const notificationChannelEnum = pgEnum(
+  "notification_channel",
+  notificationChannelValues,
+);
+
 export const UsersTable = pgTable(
   "users",
   {
@@ -33,6 +40,12 @@ export const UsersTable = pgTable(
     status: userStatusEnum().notNull().default("active"),
     preferredLocale: localeEnum().notNull().default("ar"),
     pushToken: varchar({ length: 512 }),
+    /**
+     * Which channel order-status updates go to. `push` = in-app only (saves
+     * WhatsApp sends); `whatsapp` = WhatsApp fallback for customers who denied
+     * OS notification permission. OTP + admin ops pings are always WhatsApp.
+     */
+    notificationChannel: notificationChannelEnum().notNull().default("whatsapp"),
     phoneVerifiedAt: timestamp({ withTimezone: true }),
     emailVerifiedAt: timestamp({ withTimezone: true }),
     lastSignInAt: timestamp({ withTimezone: true }),

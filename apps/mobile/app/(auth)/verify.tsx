@@ -59,6 +59,9 @@ export default function VerifyScreen() {
   const registerPush = useMutation(
     trpc.auth.registerPushToken.mutationOptions()
   )
+  const setChannel = useMutation(
+    trpc.auth.setNotificationChannel.mutationOptions()
+  )
 
   const verify = useMutation(
     trpc.auth.verifyOtp.mutationOptions({
@@ -70,9 +73,16 @@ export default function VerifyScreen() {
           name: data.user.name ?? "",
           phone: data.user.phone ?? "",
         })
+        // Auto-detect the notification channel: permission granted (token
+        // present) → in-app push; denied/unavailable → WhatsApp fallback.
         void getExpoPushToken().then((token) => {
           console.log("[push-debug] expo push token:", token ?? "null — not registered")
-          if (token) registerPush.mutate({ token })
+          if (token) {
+            registerPush.mutate({ token })
+            setChannel.mutate({ channel: "push", pushToken: token })
+          } else {
+            setChannel.mutate({ channel: "whatsapp" })
+          }
         })
         // Drivers always land in the captain shell; customers return to the
         // gated action they came from (e.g. checkout) when one was provided.
