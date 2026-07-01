@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { router } from "expo-router";
 
-import { getToken } from "@/lib/session";
+import { getActiveAccount, getToken } from "@/lib/session";
 
 /**
  * Wraps the customer/driver tab shells. The active token is the only thing that

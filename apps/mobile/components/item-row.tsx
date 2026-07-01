@@ -24,7 +24,7 @@ type CatalogItem = {
   defaultUnit: string | null;
 };
 
-import { itemDisplayName } from "./item-utils";
+import { itemDisplayName, unitAvgPriceHint } from "./item-utils";
 
 /** Catalog row with leading thumbnail, qty stepper — the only way items enter the cart (C3/C5). */
 export function ItemRow({ item }: { item: CatalogItem }) {
@@ -39,6 +39,7 @@ export function ItemRow({ item }: { item: CatalogItem }) {
   const unitLabel = defaultUnitObj
     ? (locale === "ar" ? defaultUnitObj.nameAr : defaultUnitObj.nameEn)
     : "";
+  const avgPrice = unitAvgPriceHint(defaultUnitObj);
   const disabled = item.units.length === 0;
 
   const lineUnit = line ? cartLineUnit(line) : undefined;
@@ -52,6 +53,11 @@ export function ItemRow({ item }: { item: CatalogItem }) {
         <Text className="text-base font-semibold text-foreground">{name}</Text>
         {unitLabel ? (
           <Text className="text-xs text-muted-foreground">{unitLabel}</Text>
+        ) : null}
+        {avgPrice ? (
+          <Text className="text-xs text-muted-foreground">
+            {t("shop.avgPrice", { price: avgPrice })}
+          </Text>
         ) : null}
       </View>
 

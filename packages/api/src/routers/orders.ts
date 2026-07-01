@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { Db } from "@workspace/db/client";
 import { UsersTable } from "@workspace/db/schemas/auth/users";
 import { AddressesTable } from "@workspace/db/schemas/orders/addresses";
+import { ItemPriceStatsTable } from "@workspace/db/schemas/catalog/item-price-stats";
 import { ItemUnitsTable } from "@workspace/db/schemas/catalog/item-units";
 import { ItemsTable } from "@workspace/db/schemas/catalog/items";
 import { UnitsTable } from "@workspace/db/schemas/catalog/units";
@@ -272,9 +273,44 @@ export const ordersRouter = createTRPCRouter({
         (user.role === "driver" && order.driverId === user.id);
       if (!allowed) throw new TRPCError({ code: "FORBIDDEN" });
 
+      // Attach the market-price average per line (itemId + snapshot unit code):
+      // the customer's rough estimate and the driver's price sanity-check both
+      // read this. Null when there's no data for that item/unit.
+      const itemIds = [...new Set(order.items.map((line) => line.itemId))];
+      const stats = itemIds.length
+        ? await ctx.db.query.ItemPriceStatsTable.findMany({
+            where: inArray(ItemPriceStatsTable.itemId, itemIds),
+            columns: {
+              itemId: true,
+              unit: true,
+              avgPrice: true,
+              sampleCount: true,
+            },
+          })
+        : [];
+      const statByKey = new Map(
+        stats.map((s) => [
+          `${s.itemId}::${s.unit}`,
+          {
+            avgPrice: s.avgPrice != null ? Number(s.avgPrice) : null,
+            sampleCount: s.sampleCount,
+          },
+        ]),
+      );
+
       // The assigned driver's name + phone ride along so the customer can
       // reach them during an active delivery.
-      return order;
+      return {
+        ...order,
+        items: order.items.map((line) => {
+          const stat = statByKey.get(`${line.itemId}::${line.unit}`);
+          return {
+            ...line,
+            marketAvgPrice: stat?.avgPrice ?? null,
+            marketSampleCount: stat?.sampleCount ?? 0,
+          };
+        }),
+      };
     }),
 
   /**

@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from "react"
-import { View, type LayoutChangeEvent, type ViewStyle } from "react-native"
+import { type ReactNode } from "react"
+import { View, type ViewStyle } from "react-native"
 import {
   KeyboardAvoidingView,
   KeyboardAwareScrollView,
@@ -59,17 +59,6 @@ export function KeyboardAwareScreen({
   contentContainerClassName,
   contentContainerStyle,
 }: KeyboardAwareScreenProps) {
-  // The sticky footer is a sibling of the scroll view, so the keyboard-aware
-  // scroll has no idea it exists: it would lift a focused field to `bottomOffset`
-  // above the keyboard — straight behind the footer, which rises to sit on the
-  // keyboard. Measure the footer and add its height to the offset so the focused
-  // field clears it. Footers without inputs below them (no footer) keep the base
-  // offset.
-  const [footerHeight, setFooterHeight] = useState(0)
-  const onFooterLayout = (e: LayoutChangeEvent) => {
-    setFooterHeight(e.nativeEvent.layout.height)
-  }
-
   return (
     <Screen padded={false}>
       {header ? <View className={padded ? "px-4" : undefined}>{header}</View> : null}
@@ -77,7 +66,7 @@ export function KeyboardAwareScreen({
         className={padded ? "flex-1 px-4" : "flex-1"}
         contentContainerClassName={contentContainerClassName}
         contentContainerStyle={contentContainerStyle}
-        bottomOffset={bottomOffset + footerHeight}
+        bottomOffset={bottomOffset}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
@@ -85,7 +74,7 @@ export function KeyboardAwareScreen({
       >
         {children}
       </KeyboardAwareScrollView>
-      {footer ? <KeyboardStickyView onLayout={onFooterLayout}>{footer}</KeyboardStickyView> : null}
+      {footer}
     </Screen>
   )
 }
@@ -106,7 +95,7 @@ export function KeyboardStickyFooter({
   style?: ViewStyle
 }) {
   return (
-    <KeyboardStickyView offset={offset}>
+    <KeyboardStickyView offset={{ closed: -48, opened: 0 }}>
       {/* Styling lives on a core View so NativeWind reliably maps className. */}
       <View className={className} style={style}>
         {children}

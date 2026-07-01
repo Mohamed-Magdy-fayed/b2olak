@@ -86,7 +86,7 @@ export default function DriverHistory() {
   );
 
   return (
-    <Screen padded={false}>
+    <Screen padded={false} className="mb-0">
       <FlatList
         className="flex-1 px-4"
         data={isLoading ? [] : (data?.history ?? [])}

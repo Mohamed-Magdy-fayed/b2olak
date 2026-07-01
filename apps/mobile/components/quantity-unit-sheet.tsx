@@ -35,7 +35,7 @@ import {
   type CatalogItemForCart,
 } from "@/lib/cart-store";
 import { useTranslation } from "@/lib/i18n";
-import { itemDisplayName } from "./item-utils";
+import { itemDisplayName, unitAvgPriceHint } from "./item-utils";
 
 type Props = {
   item: CatalogItemForCart;
@@ -119,6 +119,8 @@ export function QuantityUnitSheet({
     ? t("shop.egpWorth", { amount: qty })
     : `${formatQty(qty, kind)} ${unitName(selectedUnit, locale)}`;
 
+  const avgPriceHint = unitAvgPriceHint(selectedUnit);
+
   const onConfirm = () => {
     if (!selectedUnit) return;
     add(cartLineFromItem(item, selectedUnit.id), qty);
@@ -185,7 +187,14 @@ export function QuantityUnitSheet({
 
               {/* Quantity presets */}
               <View className="gap-2">
-                <Text className="font-medium text-foreground">{t("shop.pickerQuantity")}</Text>
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-medium text-foreground">{t("shop.pickerQuantity")}</Text>
+                  {avgPriceHint ? (
+                    <Text className="text-xs text-muted-foreground">
+                      {t("shop.avgPrice", { price: avgPriceHint })}
+                    </Text>
+                  ) : null}
+                </View>
                 <View className="flex-row flex-wrap gap-2">
                   {presets.map((p) => {
                     const active = p === qty;

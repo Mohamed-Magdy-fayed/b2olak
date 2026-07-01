@@ -20,6 +20,7 @@ import {
   KeyboardAwareScreen,
   KeyboardStickyFooter,
 } from "@/components/ui/keyboard-screen";
+import { unitAvgPriceHint } from "@/components/item-utils";
 
 /** One screen drives the whole fulfillment journey (D3→D5) by order status. */
 export default function DriverOrderScreen() {
@@ -305,8 +306,7 @@ export default function DriverOrderScreen() {
   return (
     <KeyboardAwareScreen
       padded
-      bottomOffset={24}
-      contentContainerStyle={{ paddingBottom: 24 }}
+      contentContainerStyle={{ paddingBottom: 48 }}
       header={
         <ScreenBackHeader
           title={t("shop.orderNumber", { number: String(order.orderNumber) })}
@@ -315,7 +315,7 @@ export default function DriverOrderScreen() {
       }
       footer={
         showActionBar ? (
-          <KeyboardStickyFooter className="bg-background border-border border-t p-4">
+          <KeyboardStickyFooter style={{ paddingBottom: 24 }} className="bg-background border-border border-t p-4">
             {order.status === "assigned" ? (
               <Button
                 label={t("driver.startShopping")}
@@ -491,6 +491,17 @@ export default function DriverOrderScreen() {
                         <Ionicons name="close" size={22} color="#F5F2EC" />
                       </Pressable>
                     </View>
+                    {(() => {
+                      const avg = unitAvgPriceHint({
+                        avgPrice: line.marketAvgPrice,
+                        sampleCount: line.marketSampleCount,
+                      });
+                      return avg ? (
+                        <Text className="text-xs text-muted-foreground">
+                          {t("driver.marketAvg", { price: avg })}
+                        </Text>
+                      ) : null;
+                    })()}
                     {lineErrors[line.id] ? (
                       <View className="flex-row items-center gap-1.5">
                         <Ionicons

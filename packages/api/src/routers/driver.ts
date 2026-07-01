@@ -206,6 +206,20 @@ export const driverRouter = createTRPCRouter({
         line.orderId,
         ctx.session.user.id,
       );
+
+      // Feed the market-price estimate: a real per-unit price was recorded, so
+      // refresh this item's stats in the background (non-blocking, best-effort).
+      if (resolving && !isMoney && actualUnitPriceStr !== null) {
+        try {
+          await inngest.send({
+            name: "pricing/sample.recorded",
+            data: { itemId: line.itemId },
+          });
+        } catch {
+          // stats are best-effort; the admin full sync backfills any gaps
+        }
+      }
+
       return { ok: true as const, totals };
     }),
 

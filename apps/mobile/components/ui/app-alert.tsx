@@ -63,6 +63,7 @@ export function AppAlertProvider({
       {children}
       <Modal
         visible={!!config}
+        className="pb-4"
         transparent
         animationType="slide"
         statusBarTranslucent

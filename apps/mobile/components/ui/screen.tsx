@@ -30,7 +30,7 @@ export function Screen({
   return (
     <View
       className={`flex-1 bg-background ${padded ? "px-4" : ""} ${className ?? ""}`}
-      style={[{ paddingTop: insets.top + 12, paddingBottom: insets.bottom }, style]}
+      style={[{ paddingTop: insets.top + 12 }, style]}
       {...props}
     >
       {children}

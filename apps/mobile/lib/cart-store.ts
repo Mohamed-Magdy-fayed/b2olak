@@ -16,6 +16,10 @@ export type CartUnit = {
   nameEn: string;
   nameAr: string;
   kind: UnitKind;
+  /** Market average for this item in this unit (from real orders); optional. */
+  avgPrice?: number | null;
+  /** Priced-line count behind `avgPrice` — the hint is gated on this. */
+  sampleCount?: number;
 };
 
 export type CartLine = {

@@ -10,7 +10,6 @@ import { PlaceOrderButton } from "@/components/place-order-button"
 import { Input } from "@/components/ui/input"
 import {
   KeyboardAwareScreen,
-  KeyboardStickyFooter,
 } from "@/components/ui/keyboard-screen"
 import { ScreenHeader } from "@/components/ui/screen"
 import { useSignedIn } from "@/lib/auth-gate"
@@ -20,7 +19,6 @@ import { isMoneyKind } from "@workspace/validators/units"
 import { cartLineUnit, cartLineUnitName, useCart } from "@/lib/cart-store"
 import { useTRPC } from "@/lib/trpc"
 import { itemDisplayName } from "@/components/item-utils"
-import { KeyboardStickyView } from "react-native-keyboard-controller"
 
 function addressDisplayName(
   address: {
