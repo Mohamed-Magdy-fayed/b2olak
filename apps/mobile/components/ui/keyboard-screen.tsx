@@ -1,11 +1,13 @@
 import { type ReactNode } from "react"
 import { View, type ViewStyle } from "react-native"
+import Animated from "react-native-reanimated"
 import {
   KeyboardAvoidingView,
   KeyboardAwareScrollView,
   KeyboardStickyView,
 } from "react-native-keyboard-controller"
 
+import { useKeyboardBottomPadding } from "@/components/ui/keyboard-insets"
 import { Screen } from "@/components/ui/screen"
 
 /**
@@ -28,10 +30,13 @@ type KeyboardAwareScreenProps = {
    */
   header?: ReactNode
   /**
-   * Pinned content below the scroll area — typically a `KeyboardStickyFooter`
-   * with the primary CTA. Rendered full-bleed so its top border spans the edge.
+   * Pinned footer CONTENT (e.g. the primary CTA). Rendered inside a
+   * `ScreenFooter`, so it rides the keyboard and owns the bottom safe area —
+   * callers pass children, not a pre-styled bar.
    */
   footer?: ReactNode
+  /** Set when the tab bar is visible below this screen (it owns the inset). */
+  insideTabs?: boolean
   /** Horizontal screen gutter (header + scroll body); defaults to off. */
   padded?: boolean
   /** Extra space kept between the focused input and the keyboard. */
@@ -47,13 +52,14 @@ type KeyboardAwareScreenProps = {
  * `footer`. Every scrolling input screen routes through this so behaviour
  * (offset, tap handling, dismiss-on-drag) stays identical app-wide.
  *
- * The footer renders outside the padded region so a sticky-footer border spans
- * the full width; `padded` only gutters the header and scroll body.
+ * The footer renders outside the padded region so its top border spans the
+ * full width; `padded` only gutters the header and scroll body.
  */
 export function KeyboardAwareScreen({
   children,
   header,
   footer,
+  insideTabs = false,
   padded = false,
   bottomOffset = 24,
   contentContainerClassName,
@@ -74,31 +80,38 @@ export function KeyboardAwareScreen({
       >
         {children}
       </KeyboardAwareScrollView>
-      {footer}
+      {footer ? <ScreenFooter insideTabs={insideTabs}>{footer}</ScreenFooter> : null}
     </Screen>
   )
 }
 
 /**
- * Fixed footer (e.g. a primary CTA) that rises above the keyboard when it opens
- * and falls back to its normal position when it closes.
+ * THE pinned screen footer. Place it as the last child of a `Screen` whose
+ * scrollable content is `flex-1`. It sits flush on top of whatever owns the
+ * bottom edge: the tab bar (`insideTabs`), the Android nav bar / home
+ * indicator (via safe-area insets), or the open keyboard (it rides up with it
+ * and its safe-area padding collapses — see `useKeyboardBottomPadding`).
  */
-export function KeyboardStickyFooter({
+export function ScreenFooter({
   children,
-  offset,
+  insideTabs = false,
   className,
-  style,
 }: {
   children: ReactNode
-  offset?: { closed?: number; opened?: number }
+  insideTabs?: boolean
   className?: string
-  style?: ViewStyle
 }) {
+  const bottomPadding = useKeyboardBottomPadding({ insideTabs })
   return (
-    <KeyboardStickyView offset={{ closed: -48, opened: 0 }}>
-      {/* Styling lives on a core View so NativeWind reliably maps className. */}
-      <View className={className} style={style}>
-        {children}
+    <KeyboardStickyView>
+      <View className={`border-t border-border bg-background ${className ?? ""}`}>
+        {/* Padding lives on a core Animated.View so the animated bottom inset
+            and the static chrome never fight NativeWind's className mapping. */}
+        <Animated.View
+          style={[{ paddingTop: 12, paddingHorizontal: 16, gap: 12 }, bottomPadding]}
+        >
+          {children}
+        </Animated.View>
       </View>
     </KeyboardStickyView>
   )

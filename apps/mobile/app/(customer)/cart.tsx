@@ -7,8 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 
 import { formatQty, isMoneyKind, stepForKind } from "@workspace/validators/units";
 
-import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { Button } from "@/components/ui/button";
+import { ScreenFooter } from "@/components/ui/keyboard-screen";
 import { Screen, ScreenHeader } from "@/components/ui/screen";
 import { useAppAlert } from "@/components/ui/app-alert";
 import { ItemThumb } from "@/components/item-thumb";
@@ -132,8 +132,9 @@ export default function CartScreen() {
   }
 
   return (
-    <Screen>
+    <Screen padded={false}>
       <ScreenHeader
+        className="px-4"
         title={t("shop.cartTitle")}
         right={
           lines.length > 0 ? (
@@ -168,9 +169,9 @@ export default function CartScreen() {
             renderItem={({ item: line }) => (
               <CartRow line={line} onEdit={() => setEditingLine(line)} />
             )}
-            contentContainerClassName="pb-4 pt-1"
+            contentContainerClassName="px-4 pb-4 pt-1"
           />
-          <BottomActionBar>
+          <ScreenFooter insideTabs>
             <Text className="text-muted-foreground">
               {t("shop.itemsAtMarketPrice")}
             </Text>
@@ -196,7 +197,7 @@ export default function CartScreen() {
                 }
               }}
             />
-          </BottomActionBar>
+          </ScreenFooter>
         </>
       )}
 

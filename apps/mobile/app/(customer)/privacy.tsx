@@ -1,10 +1,12 @@
 import { ScrollView, Text, View } from "react-native";
 
+import { useScreenBottomPadding } from "@/components/ui/keyboard-insets";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
 import { useTranslation } from "@/lib/i18n";
 
 export default function PrivacyScreen() {
   const { t } = useTranslation();
+  const bottomPadding = useScreenBottomPadding();
 
   const sections = [
     { title: t("privacy.s1Title"), body: t("privacy.s1Body") },
@@ -20,7 +22,7 @@ export default function PrivacyScreen() {
       <ScrollView
         className="flex-1 px-4"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >

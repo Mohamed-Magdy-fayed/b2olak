@@ -1,14 +1,8 @@
 import { useState } from "react"
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { Pressable, Text, TouchableOpacity } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+
+import { AppBottomSheet, SheetPlainScrollView } from "@/components/ui/bottom-sheet"
 
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
 import { useFieldContext } from "./form-context"
@@ -35,7 +29,6 @@ export function FormSelectField({
 }) {
   const field = useFieldContext<string>()
   const invalid = useFieldInvalid()
-  const insets = useSafeAreaInsets()
   const [open, setOpen] = useState(false)
   const selected = options.find((o) => o.value === field.state.value)
 
@@ -56,54 +49,34 @@ export function FormSelectField({
         <Ionicons name="chevron-down" size={16} color="#9B968C" />
       </Pressable>
 
-      <Modal
-        visible={open}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setOpen(false)}
-      >
-        <Pressable className="flex-1 bg-black/60" onPress={() => setOpen(false)} />
-        <View
-          className="max-h-[60%] rounded-t-2xl bg-card px-4 pt-4"
-          style={{ paddingBottom: insets.bottom + 16 }}
-        >
-          <View className="mb-1 items-center">
-            <View className="mb-3 h-1 w-10 rounded-full bg-border" />
-          </View>
-          <Text className="mb-3 text-center text-base font-bold text-foreground">
-            {label}
-          </Text>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {options.map((option) => {
-              const isSelected = option.value === field.state.value
-              return (
-                <TouchableOpacity
-                  key={option.value}
-                  onPress={() => {
-                    field.handleChange(option.value)
-                    setOpen(false)
-                  }}
-                  className={`flex-row items-center justify-between border-b border-border py-3.5 ${isSelected ? "bg-primary/10" : ""
+      <AppBottomSheet visible={open} onClose={() => setOpen(false)} title={label}>
+        <SheetPlainScrollView>
+          {options.map((option) => {
+            const isSelected = option.value === field.state.value
+            return (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => {
+                  field.handleChange(option.value)
+                  setOpen(false)
+                }}
+                className={`flex-row items-center justify-between border-b border-border py-3.5 ${isSelected ? "bg-primary/10" : ""
+                  }`}
+              >
+                <Text
+                  className={`flex-1 text-base ${isSelected ? "font-bold text-primary" : "text-foreground"
                     }`}
                 >
-                  <Text
-                    className={`flex-1 text-base ${isSelected ? "font-bold text-primary" : "text-foreground"
-                      }`}
-                  >
-                    {option.label}
-                  </Text>
-                  {isSelected ? (
-                    <Ionicons name="checkmark" size={18} color="#C9A227" />
-                  ) : null}
-                </TouchableOpacity>
-              )
-            })}
-          </ScrollView>
-        </View>
-      </Modal>
+                  {option.label}
+                </Text>
+                {isSelected ? (
+                  <Ionicons name="checkmark" size={18} color="#C9A227" />
+                ) : null}
+              </TouchableOpacity>
+            )
+          })}
+        </SheetPlainScrollView>
+      </AppBottomSheet>
     </FieldBase>
   )
 }

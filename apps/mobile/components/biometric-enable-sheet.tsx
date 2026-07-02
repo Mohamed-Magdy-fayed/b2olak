@@ -1,7 +1,7 @@
-import { Modal, Pressable, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
+import { AppBottomSheet } from "@/components/ui/bottom-sheet";
 import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/lib/i18n";
 
@@ -22,48 +22,44 @@ export function BiometricEnableSheet({
   onSkip: () => void;
 }) {
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onSkip}>
-      <Pressable className="flex-1 justify-end bg-black/60" onPress={onSkip}>
-        <Pressable onPress={(e) => e.stopPropagation()}>
-          <View
-            className="gap-5 rounded-t-3xl border-t border-border bg-background p-6"
-            style={{ paddingBottom: insets.bottom + 24 }}
-          >
-            {/* Gold biometric icon */}
-            <View className="items-center py-2">
-              <View className="size-20 items-center justify-center rounded-2xl bg-card">
-                <Ionicons name="finger-print-outline" size={44} color="#C9A227" />
-              </View>
-            </View>
-
-            <View className="gap-2">
-              <Text className="font-display text-2xl text-foreground">
-                {t("auth.biometric.enableTitle")}
-              </Text>
-              <Text className="text-base text-muted-foreground">
-                {t("auth.biometric.enableBody")}
-              </Text>
-            </View>
-
-            <View className="gap-3 pt-2">
-              <Button
-                label={t("auth.biometric.enable")}
-                loading={busy}
-                onPress={onEnable}
-              />
-              <Button
-                variant="ghost"
-                label={t("auth.biometric.notNow")}
-                disabled={busy}
-                onPress={onSkip}
-              />
-            </View>
+    <AppBottomSheet
+      visible={visible}
+      onClose={onSkip}
+      footer={
+        <>
+          <Button
+            label={t("auth.biometric.enable")}
+            loading={busy}
+            onPress={onEnable}
+          />
+          <Button
+            variant="ghost"
+            label={t("auth.biometric.notNow")}
+            disabled={busy}
+            onPress={onSkip}
+          />
+        </>
+      }
+    >
+      <View className="gap-5 px-4 pb-2">
+        {/* Gold biometric icon */}
+        <View className="items-center py-2">
+          <View className="size-20 items-center justify-center rounded-2xl bg-elevated">
+            <Ionicons name="finger-print-outline" size={44} color="#C9A227" />
           </View>
-        </Pressable>
-      </Pressable>
-    </Modal>
+        </View>
+
+        <View className="gap-2">
+          <Text className="font-display text-2xl text-foreground">
+            {t("auth.biometric.enableTitle")}
+          </Text>
+          <Text className="text-base text-muted-foreground">
+            {t("auth.biometric.enableBody")}
+          </Text>
+        </View>
+      </View>
+    </AppBottomSheet>
   );
 }

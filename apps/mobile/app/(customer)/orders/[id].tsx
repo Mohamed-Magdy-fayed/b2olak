@@ -5,8 +5,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { formatQty, isMoneyKind } from "@workspace/validators/units";
 
-import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { useAppAlert } from "@/components/ui/app-alert";
+import { useScreenBottomPadding } from "@/components/ui/keyboard-insets";
+import { ScreenFooter } from "@/components/ui/keyboard-screen";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
@@ -33,6 +34,7 @@ export default function OrderDetailScreen() {
   const appAlert = useAppAlert();
   const { id } = useLocalSearchParams<{ id: string }>();
   const cart = useCart();
+  const bottomPadding = useScreenBottomPadding();
 
   const orderOptions = trpc.orders.byId.queryOptions({ orderId: id! });
   const { data: order, isLoading } = useQuery({
@@ -138,7 +140,10 @@ export default function OrderDetailScreen() {
     <Screen padded={false}>
       <ScrollView
         className="flex-1 px-4"
-        contentContainerClassName="gap-4 pb-6"
+        contentContainerClassName="gap-4"
+        // No pinned footer in mid-flight statuses — the last card must clear
+        // the nav bar itself.
+        contentContainerStyle={{ paddingBottom: bottomPadding }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
@@ -309,7 +314,7 @@ export default function OrderDetailScreen() {
       </ScrollView>
 
       {canCancel ? (
-        <BottomActionBar className="px-4">
+        <ScreenFooter>
           <Button
             variant="destructive"
             label={t("shop.cancelOrder")}
@@ -325,16 +330,16 @@ export default function OrderDetailScreen() {
               ])
             }
           />
-        </BottomActionBar>
+        </ScreenFooter>
       ) : null}
       {isTerminal ? (
-        <BottomActionBar className="px-4">
+        <ScreenFooter>
           <Button
             label={t("shop.orderAgain")}
             loading={reorder.isPending}
             onPress={() => reorder.mutate()}
           />
-        </BottomActionBar>
+        </ScreenFooter>
       ) : null}
     </Screen>
   );

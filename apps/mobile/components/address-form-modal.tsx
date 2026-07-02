@@ -1,18 +1,17 @@
 import { useMemo, useState } from "react"
-import { Modal, Pressable, Text, View } from "react-native"
-import {
-  KeyboardAwareScrollView,
-  KeyboardProvider,
-} from "react-native-keyboard-controller"
-import { useSafeAreaInsets } from "react-native-safe-area-context"
+import { Text, View } from "react-native"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useStore } from "@tanstack/react-form"
 import { Ionicons } from "@expo/vector-icons"
 
 import { egyptianPhoneSchema } from "@workspace/validators/auth"
 
+import {
+  AppBottomSheet,
+  SheetFooter,
+  SheetScrollView,
+} from "@/components/ui/bottom-sheet"
 import { Button } from "@/components/ui/button"
-import { KeyboardStickyFooter } from "@/components/ui/keyboard-screen"
 import { FocusChainProvider, useAppForm } from "@/components/forms"
 import { useTranslation } from "@/lib/i18n"
 import { useTRPC } from "@/lib/trpc"
@@ -127,45 +126,27 @@ export function AddressFormModal({
   const { t } = useTranslation()
 
   return (
-    <Modal
+    <AppBottomSheet
       visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
+      onClose={onClose}
+      title={address ? t("address.edit") : t("address.add")}
+      // The form renders its own SheetFooter — the Save button needs the form
+      // instance, which lives inside AddressForm.
+      footer={null}
     >
-      {/* RN Modal renders in its own window, so the root KeyboardProvider does
-          not reach inside it — nest a provider here so the form stays keyboard
-          aware within the sheet. */}
-      <KeyboardProvider>
-        <View className="flex-1 justify-end">
-          <Pressable className="flex-1 bg-black/60" onPress={onClose} />
-          <View className="max-h-[85%] rounded-t-2xl bg-card">
-            {/* Drag handle */}
-            <View className="items-center pt-3 pb-1">
-              <View className="h-1 w-10 rounded-full bg-border" />
-            </View>
-            <View className="border-b border-border px-4 py-3">
-              <Text className="text-center text-lg font-bold text-foreground">
-                {address ? t("address.edit") : t("address.add")}
-              </Text>
-            </View>
-
-            {/* Mount a fresh form per target, keyed by address id, so its fields
-                prefill straight from `defaultValues`. This avoids resetting a
-                shared form instance in an effect that races the modal's mount —
-                the cause of edits opening with empty fields. */}
-            {visible ? (
-              <AddressForm
-                key={address?.id ?? "new"}
-                address={address ?? null}
-                onClose={onClose}
-                onSaved={onSaved}
-              />
-            ) : null}
-          </View>
-        </View>
-      </KeyboardProvider>
-    </Modal>
+      {/* Mount a fresh form per target, keyed by address id, so its fields
+          prefill straight from `defaultValues`. This avoids resetting a
+          shared form instance in an effect that races the modal's mount —
+          the cause of edits opening with empty fields. */}
+      {visible ? (
+        <AddressForm
+          key={address?.id ?? "new"}
+          address={address ?? null}
+          onClose={onClose}
+          onSaved={onSaved}
+        />
+      ) : null}
+    </AppBottomSheet>
   )
 }
 
@@ -182,7 +163,6 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
   const trpc = useTRPC()
   const queryClient = useQueryClient()
   const { t, locale } = useTranslation()
-  const insets = useSafeAreaInsets()
   const customerPhone = useSignedInCustomerPhone()
   const [error, setError] = useState<string | null>(null)
 
@@ -257,13 +237,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
 
   return (
     <FocusChainProvider>
-      <KeyboardAwareScrollView
-        className="px-4"
-        contentContainerClassName="gap-4 py-4"
-        bottomOffset={24}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+      <SheetScrollView>
         <form.AppField name="label">
           {(field) => <field.StringField label={t("address.label")} />}
         </form.AppField>
@@ -387,13 +361,9 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
             <Text className="flex-1 text-sm text-destructive">{error}</Text>
           </View>
         ) : null}
-      </KeyboardAwareScrollView>
+      </SheetScrollView>
 
-      {/* Fixed footer — lifts above the keyboard while editing fields. */}
-      <KeyboardStickyFooter
-        className="gap-2 border-t bg-background border-border px-4 py-4"
-        style={{ paddingBottom: insets.bottom + 16 }}
-      >
+      <SheetFooter>
         <Button
           label={t("address.save")}
           loading={create.isPending || update.isPending}
@@ -404,7 +374,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
           label={t("common.cancel")}
           onPress={onClose}
         />
-      </KeyboardStickyFooter>
+      </SheetFooter>
     </FocusChainProvider>
   )
 }

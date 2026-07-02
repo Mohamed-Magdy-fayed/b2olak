@@ -129,27 +129,25 @@ export default function CheckoutScreen() {
       bottomOffset={24}
       header={<ScreenHeader title={t("shop.checkout")} />}
       footer={
-        <View className="border-t border-border bg-background px-4 py-4">
-          <PlaceOrderButton
-            label={t("shop.placeOrder")}
-            loading={place.isPending}
-            disabled={!selected || lines.length === 0}
-            onPress={() => {
-              if (!selected) return
-              setError(null)
-              place.mutate({
-                addressId: selected,
-                note: note.trim() || undefined,
-                items: lines.map((line) => ({
-                  itemId: line.itemId,
-                  qty: line.qty,
-                  unitId: line.unitId,
-                  note: line.note,
-                })),
-              })
-            }}
-          />
-        </View>
+        <PlaceOrderButton
+          label={t("shop.placeOrder")}
+          loading={place.isPending}
+          disabled={!selected || lines.length === 0}
+          onPress={() => {
+            if (!selected) return
+            setError(null)
+            place.mutate({
+              addressId: selected,
+              note: note.trim() || undefined,
+              items: lines.map((line) => ({
+                itemId: line.itemId,
+                qty: line.qty,
+                unitId: line.unitId,
+                note: line.note,
+              })),
+            })
+          }}
+        />
       }
     >
       <View className="gap-4 pt-1">

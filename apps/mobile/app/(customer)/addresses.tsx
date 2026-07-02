@@ -8,8 +8,8 @@ import {
   AddressFormModal,
   type EditableAddress,
 } from "@/components/address-form-modal";
-import { BottomActionBar } from "@/components/ui/bottom-action-bar";
 import { useAppAlert } from "@/components/ui/app-alert";
+import { ScreenFooter } from "@/components/ui/keyboard-screen";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Screen, ScreenBackHeader } from "@/components/ui/screen";
@@ -145,9 +145,9 @@ export default function AddressesScreen() {
           ) : null}
         </ScrollView>
 
-        <BottomActionBar className="px-4">
+        <ScreenFooter>
           <Button label={t("address.add")} onPress={() => setEditing("new")} />
-        </BottomActionBar>
+        </ScreenFooter>
       </Screen>
 
       <AddressFormModal

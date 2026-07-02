@@ -4,9 +4,9 @@ import React, {
   useContext,
   useState,
 } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { View } from "react-native";
 
+import { AppBottomSheet } from "./bottom-sheet";
 import { Button } from "./button";
 import { Typography } from "./typography";
 
@@ -36,7 +36,6 @@ export function AppAlertProvider({
   children: React.ReactNode;
 }) {
   const [config, setConfig] = useState<AlertConfig | null>(null);
-  const insets = useSafeAreaInsets();
 
   const alert = useCallback<AlertFn>(
     (title, message, buttons) =>
@@ -58,53 +57,26 @@ export function AppAlertProvider({
     ...buttons.filter((b) => b.style === "cancel"),
   ];
 
+  // Hardware back / swipe-down acts as cancel.
+  const onRequestClose = () => {
+    const cancelBtn = buttons.find((b) => b.style === "cancel");
+    dismiss();
+    cancelBtn?.onPress?.();
+  };
+
   return (
     <AlertContext.Provider value={alert}>
       {children}
-      <Modal
+      <AppBottomSheet
         visible={!!config}
-        className="pb-4"
-        transparent
-        animationType="slide"
-        statusBarTranslucent
-        onRequestClose={() => {
-          const cancelBtn = buttons.find((b) => b.style === "cancel");
-          dismiss();
-          cancelBtn?.onPress?.();
+        onClose={onRequestClose}
+        // A backdrop tap only dismisses single-button alerts (and counts as
+        // pressing that button); multi-button alerts require a choice.
+        onBackdropPress={() => {
+          if (buttons.length === 1) handlePress(buttons[0]!);
         }}
-      >
-        {/* dark scrim — tap to dismiss single-button alerts */}
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => {
-            if (buttons.length === 1) handlePress(buttons[0]!);
-          }}
-        >
-          <View style={[StyleSheet.absoluteFill, styles.scrim]} />
-        </Pressable>
-
-        {/* sheet anchored to the bottom */}
-        <View
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-          className="absolute bottom-0 left-0 right-0 rounded-t-3xl border-t border-border bg-card px-5 pt-6"
-        >
-          <View className="gap-2 pb-5">
-            {!!config?.title && (
-              <Typography variant="heading" className="text-center">
-                {config.title}
-              </Typography>
-            )}
-            {!!config?.message && (
-              <Typography
-                variant="body"
-                className="text-center text-muted-foreground"
-              >
-                {config.message}
-              </Typography>
-            )}
-          </View>
-
-          <View className="gap-3">
+        footer={
+          <>
             {sorted.map((btn, i) => (
               <Button
                 key={i}
@@ -119,16 +91,28 @@ export function AppAlertProvider({
                 onPress={() => handlePress(btn)}
               />
             ))}
-          </View>
+          </>
+        }
+      >
+        <View className="gap-2 px-5 pb-5 pt-2">
+          {!!config?.title && (
+            <Typography variant="heading" className="text-center">
+              {config.title}
+            </Typography>
+          )}
+          {!!config?.message && (
+            <Typography
+              variant="body"
+              className="text-center text-muted-foreground"
+            >
+              {config.message}
+            </Typography>
+          )}
         </View>
-      </Modal>
+      </AppBottomSheet>
     </AlertContext.Provider>
   );
 }
-
-const styles = StyleSheet.create({
-  scrim: { backgroundColor: "rgba(0,0,0,0.55)" },
-});
 
 export function useAppAlert(): AlertFn {
   const fn = useContext(AlertContext);

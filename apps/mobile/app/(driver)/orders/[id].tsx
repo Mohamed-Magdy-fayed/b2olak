@@ -16,10 +16,7 @@ import { StatusChip } from "@/components/ui/status-chip";
 import { useAppAlert } from "@/components/ui/app-alert";
 import { useTranslation } from "@/lib/i18n";
 import { useTRPC } from "@/lib/trpc";
-import {
-  KeyboardAwareScreen,
-  KeyboardStickyFooter,
-} from "@/components/ui/keyboard-screen";
+import { KeyboardAwareScreen } from "@/components/ui/keyboard-screen";
 import { unitAvgPriceHint } from "@/components/item-utils";
 
 /** One screen drives the whole fulfillment journey (D3→D5) by order status. */
@@ -315,7 +312,7 @@ export default function DriverOrderScreen() {
       }
       footer={
         showActionBar ? (
-          <KeyboardStickyFooter style={{ paddingBottom: 24 }} className="bg-background border-border border-t p-4">
+          <>
             {order.status === "assigned" ? (
               <Button
                 label={t("driver.startShopping")}
@@ -348,7 +345,7 @@ export default function DriverOrderScreen() {
                 onPress={() => setCollecting(true)}
               />
             ) : null}
-          </KeyboardStickyFooter>
+          </>
         ) : null
       }
     >
