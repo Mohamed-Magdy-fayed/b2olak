@@ -12,6 +12,7 @@ export function FormStringField({
   autoFocus,
   keyboardType,
   autoCapitalize,
+  autoComplete,
   maxLength,
   className,
   ltr,
@@ -21,6 +22,7 @@ export function FormStringField({
   autoFocus?: boolean
   keyboardType?: KeyboardTypeOptions
   autoCapitalize?: TextInputProps["autoCapitalize"]
+  autoComplete?: TextInputProps["autoComplete"]
   maxLength?: number
   className?: string
   /** Force left-to-right text (emails, codes) regardless of locale. */
@@ -48,6 +50,7 @@ export function FormStringField({
         autoCapitalize={autoCapitalize}
         maxLength={maxLength}
         className={className}
+        autoComplete={autoComplete}
         style={ltr ? { writingDirection: "ltr", textAlign: "center", direction: "ltr" } : undefined}
       />
     </FieldBase>

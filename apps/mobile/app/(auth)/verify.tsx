@@ -219,6 +219,7 @@ export default function VerifyScreen() {
                       keyboardType="number-pad"
                       maxLength={6}
                       autoFocus
+                      autoComplete="sms-otp"
                       ltr
                       sanitize={(text) => text.replace(/[^0-9]/g, "").slice(0, 6)}
                       className="text-2xl tracking-[8px]"

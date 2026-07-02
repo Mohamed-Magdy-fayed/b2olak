@@ -50,10 +50,8 @@ function sha256(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-function otpMessage(code: string, locale: "en" | "ar") {
-  return locale === "ar"
-    ? `كود الدخول لتطبيق بقولك: ${code}\nصالح لمدة ١٠ دقائق. لا تشاركه مع أي حد.`
-    : `Your ba2olak sign-in code: ${code}\nValid for 10 minutes. Never share it.`;
+function otpMessage(code: string) {
+  return `ba2olak: ${code} is your sign-in code.\nValid for 10 minutes. Never share it.`;
 }
 
 function toSessionUser(user: typeof UsersTable.$inferSelect): SessionUser {
@@ -105,7 +103,7 @@ export const authRouter = createTRPCRouter({
         await sendWhatsAppMessage(
           whatsappConfig,
           input.phone,
-          otpMessage(code, user.preferredLocale),
+          otpMessage(code),
           "otp:signin",
         );
       }
@@ -289,7 +287,7 @@ export const authRouter = createTRPCRouter({
       await sendWhatsAppMessage(
         whatsappConfig,
         input.phone,
-        otpMessage(code, ctx.session.user.preferredLocale),
+        otpMessage(code),
         "otp:self",
       );
 
