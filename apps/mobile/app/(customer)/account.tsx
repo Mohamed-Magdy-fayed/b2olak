@@ -357,6 +357,7 @@ export default function AccountScreen() {
   return (
     <KeyboardAwareScreen
       padded
+      insideTabs
       contentContainerClassName="gap-4"
       contentContainerStyle={{ paddingBottom: 16 }}
       header={

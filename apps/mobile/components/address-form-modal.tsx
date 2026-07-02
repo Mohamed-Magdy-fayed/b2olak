@@ -9,7 +9,7 @@ import { egyptianPhoneSchema } from "@workspace/validators/auth"
 import {
   AppBottomSheet,
   SheetFooter,
-  SheetScrollView,
+  SheetFormScrollView,
 } from "@/components/ui/bottom-sheet"
 import { Button } from "@/components/ui/button"
 import { FocusChainProvider, useAppForm } from "@/components/forms"
@@ -130,6 +130,9 @@ export function AddressFormModal({
       visible={visible}
       onClose={onClose}
       title={address ? t("address.edit") : t("address.add")}
+      // Tall form: the sheet stays anchored, the body scroll lifts the focused
+      // field, and the footer rides the keyboard on its own.
+      avoid="inset"
       // The form renders its own SheetFooter — the Save button needs the form
       // instance, which lives inside AddressForm.
       footer={null}
@@ -237,7 +240,7 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
 
   return (
     <FocusChainProvider>
-      <SheetScrollView>
+      <SheetFormScrollView>
         <form.AppField name="label">
           {(field) => <field.StringField label={t("address.label")} />}
         </form.AppField>
@@ -361,9 +364,9 @@ function AddressForm({ address, onClose, onSaved }: AddressFormProps) {
             <Text className="flex-1 text-sm text-destructive">{error}</Text>
           </View>
         ) : null}
-      </SheetScrollView>
+      </SheetFormScrollView>
 
-      <SheetFooter>
+      <SheetFooter sticky>
         <Button
           label={t("address.save")}
           loading={create.isPending || update.isPending}

@@ -1,59 +1,64 @@
-import { type ReactNode } from "react"
-import { View, type ViewStyle } from "react-native"
-import Animated from "react-native-reanimated"
+import { useEffect, useRef, type ReactNode } from "react"
 import {
-  KeyboardAvoidingView,
-  KeyboardAwareScrollView,
-  KeyboardStickyView,
-} from "react-native-keyboard-controller"
+  Dimensions,
+  ScrollView,
+  TextInput,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native"
 
-import { useKeyboardBottomPadding } from "@/components/ui/keyboard-insets"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
+
+import {
+  useFooterBottomPadding,
+  useKeyboardCoverage,
+  useWindowKeyboard,
+} from "@/components/ui/keyboard-insets"
 import { Screen } from "@/components/ui/screen"
 
 /**
- * Keyboard-aware primitives for input screens.
+ * Keyboard-aware primitives for MAIN-WINDOW input screens.
  *
- * These wrap `react-native-keyboard-controller`, which correctly insets the
- * layout above the on-screen keyboard on Android edge-to-edge (where the bare
- * RN `KeyboardAvoidingView` is a no-op) and in production builds.
+ * Everything here reacts to RN core keyboard events (`useWindowKeyboard`) and
+ * resizes real layout — no overlay/transform tricks, no
+ * react-native-keyboard-controller (whose native pipeline is inert on this
+ * app's main window; modals keep RNKC — see bottom-sheet.tsx).
  *
- * Deliberately separate from `Screen`: `Screen` stays a plain container so
- * list/static screens (e.g. the search `FlatList`) keep working — only screens
- * with focused inputs opt into a scroll/avoiding wrapper.
+ * The model: screens are a flex column [header, scroll flex-1, footer]. When
+ * the keyboard opens, the footer's bottom padding grows by the keyboard
+ * height, which SHRINKS the scroll viewport — the screen genuinely resizes,
+ * so all content stays reachable and pinned actions sit flush above the keys.
  */
 
 type KeyboardAwareScreenProps = {
   children: ReactNode
   /**
    * Pinned content above the scroll area — typically `ScreenHeader` /
-   * `ScreenBackHeader`. Stays fixed while the body scrolls under the keyboard.
+   * `ScreenBackHeader`. Stays fixed while the body scrolls.
    */
   header?: ReactNode
   /**
    * Pinned footer CONTENT (e.g. the primary CTA). Rendered inside a
-   * `ScreenFooter`, so it rides the keyboard and owns the bottom safe area —
-   * callers pass children, not a pre-styled bar.
+   * `ScreenFooter`, so it sits flush above the keyboard / nav bar — callers
+   * pass children, not a pre-styled bar.
    */
   footer?: ReactNode
   /** Set when the tab bar is visible below this screen (it owns the inset). */
   insideTabs?: boolean
   /** Horizontal screen gutter (header + scroll body); defaults to off. */
   padded?: boolean
-  /** Extra space kept between the focused input and the keyboard. */
+  /** Extra space kept between the focused input and the keyboard/footer. */
   bottomOffset?: number
   contentContainerClassName?: string
-  contentContainerStyle?: ViewStyle
+  contentContainerStyle?: StyleProp<ViewStyle>
 }
 
 /**
- * The single keyboard-aware scroll screen for input forms. Renders the shared
- * `Screen` canvas with an optional pinned `header`, a keyboard-aware scroll body
- * that lifts the focused field above the keyboard, and an optional pinned
- * `footer`. Every scrolling input screen routes through this so behaviour
- * (offset, tap handling, dismiss-on-drag) stays identical app-wide.
- *
- * The footer renders outside the padded region so its top border spans the
- * full width; `padded` only gutters the header and scroll body.
+ * The single keyboard-aware scroll screen for input forms: shared `Screen`
+ * canvas, optional pinned header, a scroll body whose viewport shrinks above
+ * the keyboard, and an optional pinned footer. When the keyboard opens with a
+ * field focused, the body scrolls the field into the visible viewport.
  */
 export function KeyboardAwareScreen({
   children,
@@ -61,36 +66,76 @@ export function KeyboardAwareScreen({
   footer,
   insideTabs = false,
   padded = false,
-  bottomOffset = 24,
+  bottomOffset,
   contentContainerClassName,
   contentContainerStyle,
 }: KeyboardAwareScreenProps) {
+  const keyboard = useWindowKeyboard()
+  const insets = useSafeAreaInsets()
+  const scrollRef = useRef<ScrollView>(null)
+  const scrollY = useRef(0)
+  const clearance = bottomOffset ?? 24
+
+  // When the keyboard opens over a focused field, scroll it into the (now
+  // shrunken) viewport. Focus moves BETWEEN fields while the keyboard is up
+  // are handled natively — the viewport is real layout, so Android's
+  // focused-field-into-view behaviour targets the right area.
+  useEffect(() => {
+    if (!keyboard.visible) return
+    const input = TextInput.State.currentlyFocusedInput()
+    if (!input) return
+    // Let the footer/viewport resize settle before measuring.
+    const task = requestAnimationFrame(() => {
+      input.measureInWindow((_x, y, _w, h) => {
+        // Core events under-report the keyboard height by the nav-bar inset
+        // on edge-to-edge — the real keyboard top sits that much higher.
+        const keyboardTop =
+          Dimensions.get("window").height - keyboard.height - insets.bottom
+        const overlap = y + h + clearance - keyboardTop
+        if (overlap > 0) {
+          scrollRef.current?.scrollTo({
+            y: scrollY.current + overlap,
+            animated: true,
+          })
+        }
+      })
+    })
+    return () => cancelAnimationFrame(task)
+  }, [keyboard.visible, keyboard.height, insets.bottom, clearance])
+
   return (
     <Screen padded={false}>
       {header ? <View className={padded ? "px-4" : undefined}>{header}</View> : null}
-      <KeyboardAwareScrollView
+      <ScrollView
+        ref={scrollRef}
         className={padded ? "flex-1 px-4" : "flex-1"}
         contentContainerClassName={contentContainerClassName}
         contentContainerStyle={contentContainerStyle}
-        bottomOffset={bottomOffset}
+        onScroll={(e) => {
+          scrollY.current = e.nativeEvent.contentOffset.y
+        }}
+        scrollEventThrottle={16}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
         showsVerticalScrollIndicator={false}
-        automaticallyAdjustContentInsets
       >
         {children}
-      </KeyboardAwareScrollView>
-      {footer ? <ScreenFooter insideTabs={insideTabs}>{footer}</ScreenFooter> : null}
+      </ScrollView>
+      {footer ? (
+        <ScreenFooter insideTabs={insideTabs}>{footer}</ScreenFooter>
+      ) : (
+        <KeyboardSpacer insideTabs={insideTabs} />
+      )}
     </Screen>
   )
 }
 
 /**
  * THE pinned screen footer. Place it as the last child of a `Screen` whose
- * scrollable content is `flex-1`. It sits flush on top of whatever owns the
- * bottom edge: the tab bar (`insideTabs`), the Android nav bar / home
- * indicator (via safe-area insets), or the open keyboard (it rides up with it
- * and its safe-area padding collapses — see `useKeyboardBottomPadding`).
+ * scrollable content is `flex-1`. Its bottom padding always reflects the
+ * current owner of the bottom edge — tab bar, Android nav bar, or the open
+ * keyboard — so the content sits flush above whichever is there (and growing
+ * padding shrinks the sibling scroll area; see `useFooterBottomPadding`).
  */
 export function ScreenFooter({
   children,
@@ -101,21 +146,51 @@ export function ScreenFooter({
   insideTabs?: boolean
   className?: string
 }) {
-  const bottomPadding = useKeyboardBottomPadding({ insideTabs })
+  const paddingBottom = useFooterBottomPadding({ insideTabs })
   return (
-    <KeyboardStickyView>
-      <View className={`border-t border-border bg-background ${className ?? ""}`}>
-        {/* Padding lives on a core Animated.View so the animated bottom inset
-            and the static chrome never fight NativeWind's className mapping. */}
-        <Animated.View
-          style={[{ paddingTop: 12, paddingHorizontal: 16, gap: 12 }, bottomPadding]}
-        >
-          {children}
-        </Animated.View>
-      </View>
-    </KeyboardStickyView>
+    <View
+      className={`border-t border-border bg-background ${className ?? ""}`}
+      style={{ paddingTop: 12, paddingHorizontal: 16, gap: 12, paddingBottom }}
+    >
+      {children}
+    </View>
   )
 }
 
-/** Re-export for centered (non-scrolling) screens like the auth flow. */
-export { KeyboardAvoidingView }
+/**
+ * Invisible flex-column spacer that grows to the keyboard's coverage while it
+ * is open (nav-bar inset correction and, on tab screens, the always-visible
+ * tab bar's height are baked in — see `useKeyboardCoverage`). Place after a
+ * `flex-1` scroll area on screens WITHOUT a pinned footer so the viewport
+ * shrinks and content stays reachable above the keys.
+ */
+export function KeyboardSpacer({ insideTabs = false }: { insideTabs?: boolean }) {
+  const coverage = useKeyboardCoverage({ insideTabs })
+  return <View style={{ height: coverage }} />
+}
+
+/**
+ * Drop-in replacement for the old RNKC `KeyboardAvoidingView` used by the
+ * centered auth screens: pads its bottom by the keyboard coverage so `flex-1
+ * justify-center` content re-centers in the remaining space. The `behavior`
+ * prop is accepted for API compatibility and ignored — padding is the only
+ * mode.
+ */
+export function KeyboardAvoidingView({
+  children,
+  className,
+  style,
+  behavior: _behavior,
+}: {
+  children: ReactNode
+  className?: string
+  style?: StyleProp<ViewStyle>
+  behavior?: "padding" | "height" | "position"
+}) {
+  const coverage = useKeyboardCoverage()
+  return (
+    <View className={className} style={[style, { paddingBottom: coverage }]}>
+      {children}
+    </View>
+  )
+}

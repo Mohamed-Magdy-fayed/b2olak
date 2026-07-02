@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Pressable, Text, TouchableOpacity } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 
-import { AppBottomSheet, SheetPlainScrollView } from "@/components/ui/bottom-sheet"
+import { AppBottomSheet, SheetScrollView } from "@/components/ui/bottom-sheet"
 
 import { FieldBase, useFieldInvalid, type MobileFieldProps } from "./field-base"
 import { useFieldContext } from "./form-context"
@@ -50,7 +50,7 @@ export function FormSelectField({
       </Pressable>
 
       <AppBottomSheet visible={open} onClose={() => setOpen(false)} title={label}>
-        <SheetPlainScrollView>
+        <SheetScrollView contentContainerClassName="pb-2">
           {options.map((option) => {
             const isSelected = option.value === field.state.value
             return (
@@ -75,7 +75,7 @@ export function FormSelectField({
               </TouchableOpacity>
             )
           })}
-        </SheetPlainScrollView>
+        </SheetScrollView>
       </AppBottomSheet>
     </FieldBase>
   )

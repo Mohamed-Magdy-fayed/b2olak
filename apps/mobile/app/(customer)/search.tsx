@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { FlatList, Pressable, Text, View } from "react-native"
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
+import { FlatList, Pressable, ScrollView, Text, View } from "react-native"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { Ionicons } from "@expo/vector-icons"
@@ -11,6 +10,7 @@ import { ItemRow } from "@/components/item-row"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { KeyboardSpacer } from "@/components/ui/keyboard-screen"
 import { Screen, ScreenHeader } from "@/components/ui/screen"
 import { ItemRowListSkeleton } from "@/components/ui/skeleton"
 import { ensureSignedIn } from "@/lib/auth-gate"
@@ -201,14 +201,12 @@ export default function SearchScreen() {
 
 
       {adding ? (
-        <KeyboardAwareScrollView
+        <ScrollView
           className="flex-1 px-4"
           contentContainerClassName="gap-3 pb-6"
-          bottomOffset={24}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}
-          automaticallyAdjustContentInsets
         >
           <Card className="gap-3">
             <Text className="text-lg font-bold text-foreground">
@@ -287,15 +285,12 @@ export default function SearchScreen() {
               onPress={() => setAdding(false)}
             />
           </Card>
-        </KeyboardAwareScrollView>
+        </ScrollView>
       ) : (
         <FlatList
           className="flex-1"
           data={search.data?.items ?? []}
           keyExtractor={(item) => item.id}
-          renderScrollComponent={(props) => (
-            <KeyboardAwareScrollView {...props} bottomOffset={24} />
-          )}
           renderItem={({ item }) => (
             <Pressable
               onPress={() =>
@@ -376,6 +371,9 @@ export default function SearchScreen() {
           keyboardDismissMode="interactive"
         />
       )}
+      {/* Shrinks the list/form viewport above the open keyboard so every row
+          (and the add-item CTA at the list's end) stays reachable. */}
+      <KeyboardSpacer insideTabs />
     </Screen>
   )
 }

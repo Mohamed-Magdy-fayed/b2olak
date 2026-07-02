@@ -453,6 +453,11 @@ export default function DriverOrderScreen() {
                         }}
                         className="flex-1 text-sm"
                         multiline
+                        // A multiline input's return key inserts a newline by
+                        // default and never fires onSubmitEditing — "submit"
+                        // makes Next/Done commit the line while keeping the
+                        // keyboard up so focus can advance to the next row.
+                        submitBehavior="submit"
                         returnKeyType={isLast ? "done" : "next"}
                         placeholder={
                           money

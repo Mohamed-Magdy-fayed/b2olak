@@ -12,10 +12,16 @@ export const TAB_MUTED = "#9B968C"
 // Content height of the bar; the safe-area inset is added below it so the bar
 // pins to the physical bottom edge and its background fills the nav-bar /
 // home-indicator area.
-const TAB_BAR_CONTENT_HEIGHT = 56
+export const TAB_BAR_CONTENT_HEIGHT = 56
 // Breathing room below the tab label so it doesn't hug the bottom edge on
 // devices without a bottom inset (where insets.bottom is 0).
-const TAB_BAR_GAP = 8
+export const TAB_BAR_GAP = 8
+
+/** Full on-screen height of the tab bar (content + gap + safe-area inset). */
+export function useTabBarHeight(): number {
+  const insets = useSafeAreaInsets()
+  return TAB_BAR_CONTENT_HEIGHT + TAB_BAR_GAP + insets.bottom
+}
 
 // Full-screen pushed detail views hide the tab bar entirely. `href: null` only
 // removes a screen's tab *button* — the bar stays mounted behind the screen and
@@ -24,9 +30,9 @@ export const HIDDEN_TAB_BAR = { display: "none" } as const
 
 /**
  * Shared tab-bar options for both role layouts (customer + driver), so the
- * bottom edge behaves identically everywhere: bar covers the safe area when
- * visible, and hides while the keyboard is open so pinned footers can sit
- * flush on the keys.
+ * bottom edge behaves identically everywhere. The bar stays visible while the
+ * keyboard is open (hide-on-keyboard flickers on Android) — keyboard spacing
+ * on tab screens subtracts the bar's height instead (`useKeyboardCoverage`).
  */
 export function useTabBarScreenOptions(): TabsScreenOptions {
   const insets = useSafeAreaInsets()
@@ -34,7 +40,6 @@ export function useTabBarScreenOptions(): TabsScreenOptions {
     headerShown: false,
     tabBarActiveTintColor: TAB_GOLD,
     tabBarInactiveTintColor: TAB_MUTED,
-    tabBarHideOnKeyboard: true,
     tabBarLabelStyle: { fontWeight: "600", fontSize: 11 },
     tabBarStyle: {
       backgroundColor: "#161619",
